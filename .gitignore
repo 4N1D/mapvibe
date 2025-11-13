@@ -85,3 +85,7 @@
   # Misc
   *.bak
   *.orig
+
+  .docs/
+  .scripts/
+  .claude/

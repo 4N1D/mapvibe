@@ -1,91 +1,92 @@
 # Dependencies
-  node_modules/
-  .pnp
-  .pnp.js
-  bun.lockb
+node_modules/
+.pnp
+.pnp.js
+bun.lockb
 
-  # Testing
-  coverage/
-  *.lcov
-  .nyc_output
+# Testing
+coverage/
+*.lcov
+.nyc_output
 
-  # Production builds
-  dist/
-  build/
-  .next/
-  out/
-  *.tsbuildinfo
+# Production builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
 
   # Environment variables
-  .env
-  .env.local
-  .env.*.local
-  .env.development
-  .env.test
-  .env.production
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
 
-  # Logs
-  logs/
-  *.log
-  npm-debug.log*
-  yarn-debug.log*
-  yarn-error.log*
-  bun-debug.log*
-  lerna-debug.log*
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+lerna-debug.log*
 
-  # OS
-  .DS_Store
-  Thumbs.db
-  *.swp
-  *.swo
-  *~
-  desktop.ini
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+desktop.ini
 
-  # IDE
-  .vscode/
-  .idea/
-  *.iml
-  *.sublime-workspace
-  *.sublime-project
+# IDE
+.vscode/
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
 
-  # Turborepo
-  .turbo/
+# Turborepo
+.turbo/
 
-  # AWS CDK
-  cdk.out/
-  cdk.context.json
-  *.js
-  *.d.ts
-  !jest.config.js
+# AWS CDK
+cdk.out/
+cdk.context.json
+*.js
+*.d.ts
+!jest.config.js
 
-  # Build outputs
-  *.js.map
-  *.d.ts.map
+# Build outputs
+*.js.map
+*.d.ts.map
 
-  # Temporary files
-  *.tmp
-  *.temp
-  .cache/
+# Temporary files
+*.tmp
+*.temp
+.cache/
 
-  # Database
-  *.db
-  *.sqlite
-  *.sqlite3
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-  # Secrets (double check!)
-  *.pem
-  *.key
-  *.cert
-  credentials.json
-  secrets.json
+# Secrets (double check!)
+*.pem
+*.key
+*.cert
+credentials.json
+secrets.json
 
-  # AWS
-  .aws/
+#AWS
+.aws/
 
-  # Misc
-  *.bak
-  *.orig
+# Misc
+*.bak
+*.orig
 
-  docs/
-  scripts/
-  .claude/
+# Project folders (local only, not tracked in Git)
+docs/
+scripts/
+.claude/

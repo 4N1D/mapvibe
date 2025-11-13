@@ -86,6 +86,6 @@
   *.bak
   *.orig
 
-  .docs/
-  .scripts/
+  docs/
+  scripts/
   .claude/

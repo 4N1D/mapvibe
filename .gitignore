@@ -90,3 +90,6 @@ secrets.json
 docs/
 scripts/
 .claude/
+
+#Bun cache
+.bun-cache/

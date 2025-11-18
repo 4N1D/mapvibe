@@ -2,7 +2,9 @@
 node_modules/
 .pnp
 .pnp.js
-bun.lockb
+bun.lock
+yarn.lock
+.bun-cache/
 
 # Testing
 coverage/
@@ -91,5 +93,8 @@ docs/
 scripts/
 .claude/
 
-#Bun cache
-.bun-cache/
+# Bun
+.bun/
+
+# Generated files (will be created by codegen)
+packages/types/src/database.ts

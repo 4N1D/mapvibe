@@ -1,0 +1,10 @@
+{
+  "name": "infrastructure",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "echo 'Deploy infrastructure'",
+    "clean": "rm -rf cdk.out .terraform"
+  }
+}

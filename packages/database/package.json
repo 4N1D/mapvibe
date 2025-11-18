@@ -1,0 +1,30 @@
+{
+  "name": "@mapvibe/database",
+  "version": "0.1.0",
+  "private": "true",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "migrate": "bun run migrator.ts",
+    "codegen": "kysely-codegen --out-file ../types/src/database.ts --dialect postgres",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@mapvibe/types": "workspace:*",
+    "kysely": "^0.28.8",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "kysely-codegen": "^0.19.0",
+    "@types/pg": "^8.15.6"
+  }
+}

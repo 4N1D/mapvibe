@@ -13,7 +13,8 @@
   },
   "scripts": {
     "migrate": "bun run migrator.ts",
-    "codegen": "kysely-codegen --out-file ../types/src/database.ts --dialect postgres",
+    "migrate:down": "bun run migrator.ts --down",
+    "codegen": "kysely-codegen --out-file ../types/src/database.ts --dialect postgres --url postgresql://postgres:root@localhost:5432/mapvibe_db",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
     "clean": "rm -rf dist *.tsbuildinfo"

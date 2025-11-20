@@ -1,0 +1,99 @@
+# GitLab CI/CD Pipeline for MapVibe Monorepo
+# This pipeline runs on every push to any branch
+
+# Define pipeline stages
+stages:
+  - install
+  - build
+  - test
+
+# Cache dependencies for faster builds
+cache:
+  key:
+    files:
+      - bun.lock
+  paths:
+    - node_modules/
+    - .bun-cache/
+    - apps/web/node_modules/
+    - packages/*/node_modules/
+
+# Default configuration for all jobs
+default:
+  image: oven/bun:latest
+  before_script:
+    - bun --version
+
+# ===========================
+# STAGE 1: INSTALL
+# ===========================
+install:
+  stage: install
+  script:
+    - echo "📦 Installing dependencies for monorepo..."
+    - bun install --frozen-lockfile
+  artifacts:
+    paths:
+      - node_modules/
+      - apps/*/node_modules/
+      - packages/*/node_modules/
+    expire_in: 1 hour
+  only:
+    - branches
+
+# ===========================
+# STAGE 2: BUILD
+# ===========================
+
+# Build database package (skip - runs TypeScript directly)
+build:database:
+  stage: build
+  needs: [install]
+  script:
+    - echo "🗄️ Database package uses TypeScript directly - no build needed"
+    - echo "✅ Skipping build for database package"
+  only:
+    - branches
+
+# Build ui-components package
+build:ui-components:
+  stage: build
+  needs: [install]
+  script:
+    - echo "🎨 Building UI components..."
+    - cd packages/ui-components
+    - bun run build
+  artifacts:
+    paths:
+      - packages/ui-components/dist/
+    expire_in: 1 day
+  only:
+    - branches
+
+# Build web app
+build:web:
+  stage: build
+  needs: [install, build:ui-components]
+  script:
+    - echo "🌐 Building web application..."
+    - cd apps/web
+    - bun run build
+  artifacts:
+    paths:
+      - apps/web/dist/
+    expire_in: 1 week
+  only:
+    - branches
+# ===========================
+# STAGE 3: TEST (Optional)
+# ===========================
+
+# Uncomment when you have tests
+# test:unit:
+#   stage: test
+#   needs: [build:ui-components]
+#   script:
+#     - echo "🧪 Running unit tests..."
+#     - bun test
+#   only:
+#     - branches

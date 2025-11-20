@@ -17,7 +17,8 @@
     "codegen": "kysely-codegen --out-file ../types/src/database.ts --dialect postgres --url postgresql://postgres:root@localhost:5432/mapvibe_db",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsc"
   },
   "dependencies": {
     "@mapvibe/types": "workspace:*",

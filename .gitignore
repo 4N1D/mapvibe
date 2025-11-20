@@ -53,16 +53,27 @@ desktop.ini
 # Turborepo
 .turbo/
 
-# AWS CDK
+# AWS CDK (only in infrastructure folder if you add CDK later)
 cdk.out/
 cdk.context.json
-*.js
-*.d.ts
-!jest.config.js
 
-# Build outputs
+# Build outputs (TypeScript compilation artifacts)
+# Only ignore compiled .js/.d.ts in specific build directories
+dist/**/*.js
+dist/**/*.d.ts
+build/**/*.js
+build/**/*.d.ts
 *.js.map
 *.d.ts.map
+
+# Keep important config files
+!*.config.js
+!*.config.mjs
+!tailwind.config.js
+!postcss.config.js
+!postcss.config.mjs
+!vite.config.js
+!jest.config.js
 
 # Temporary files
 *.tmp

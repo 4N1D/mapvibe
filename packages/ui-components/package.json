@@ -14,7 +14,9 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsc",
+    "dev": "tsc --watch"
   },
   "dependencies": {
     "@mapvibe/types": "workspace:*",

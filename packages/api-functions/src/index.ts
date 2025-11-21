@@ -1,19 +1,17 @@
 // Lambda function handlers for MapVibe
 // Will be populated with actual handlers later
 
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
 // Placeholder handler
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   return {
     statusCode: 200,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      message: 'MapVibe API',
+      message: "MapVibe API",
       success: true,
     }),
   };

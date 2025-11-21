@@ -8,12 +8,7 @@
  * @param lng2 - Longitude of point 2
  * @returns Distance in kilometers
  */
-export function calculateDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
+export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371; // Earth's radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -33,9 +28,9 @@ export function calculateDistance(
  * Format Vietnamese currency
  */
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
   }).format(amount);
 }
 
@@ -45,12 +40,12 @@ export function formatCurrency(amount: number): string {
  */
 export function normalizeVietnamese(text: string): string {
   return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'd')
-    .replace(/\s+/g, '');
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .replace(/\s+/g, "");
 }
 
 /**
@@ -70,6 +65,7 @@ export function calculateAverageRating(ratings: {
   quality: number;
   ambiance: number;
 }): number {
-  const sum = ratings.service + ratings.location + ratings.price + ratings.quality + ratings.ambiance;
+  const sum =
+    ratings.service + ratings.location + ratings.price + ratings.quality + ratings.ambiance;
   return Math.round((sum / 5) * 10) / 10; // Round to 1 decimal
 }

@@ -1,36 +1,31 @@
 import React from "react";
 import { cn } from "../utils";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "login" | "secondary" | "danger" | "ghost";
   size?: "sm" | "md" | "lg";
   children: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    { className, variant = "primary", size = "md", children, ...props },
-    ref
-  ) => {
+  ({ className, variant = "primary", size = "md", children, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={cn(
           // Base styles
-          "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-          "disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center rounded-2xl font-medium transition-colors",
+          "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+          "w-fit disabled:pointer-events-none disabled:opacity-50",
 
-          // Variants 
-          variant === "primary" &&
-            "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-600",
+          // Variants
+          variant === "login" &&
+            "focus-visible:ring-primary-500 border-2 border-transparent text-black hover:border-black hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-offset-2",
           variant === "secondary" &&
             "bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400",
           variant === "danger" &&
             "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600",
-          variant === "ghost" &&
-            "hover:bg-gray-100 text-gray-700 focus-visible:ring-gray-400",
+          variant === "ghost" && "text-black hover:bg-gray-100 focus-visible:ring-gray-400",
 
           // Sizes
           size === "sm" && "h-9 px-3 text-sm",

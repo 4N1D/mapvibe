@@ -1,10 +1,5 @@
 import { promises as fs } from "fs";
-import {
-  Kysely,
-  Migrator,
-  PostgresDialect,
-  FileMigrationProvider,
-} from "kysely";
+import { Kysely, Migrator, PostgresDialect, FileMigrationProvider } from "kysely";
 import { Pool } from "pg";
 import * as path from "path";
 
@@ -37,9 +32,7 @@ async function migrateToLatest() {
 
   results?.forEach((it) => {
     if (it.status === "Success") {
-      console.log(
-        `Migration "${it.migrationName}" was executed successfully`
-      );
+      console.log(`Migration "${it.migrationName}" was executed successfully`);
     } else if (it.status === "Error") {
       console.error(`Failed to execute migration "${it.migrationName}"`);
     }
@@ -63,29 +56,27 @@ async function migrateDown(steps: number = 1) {
         user: process.env.DB_USER || "postgres",
         password: process.env.DB_PASSWORD || "password",
         database: process.env.DB_NAME || "mapvibe_db",
-      })
-    })
-  })
+      }),
+    }),
+  });
 
   const migrator = new Migrator({
-      db,
-      provider: new FileMigrationProvider({
-        fs,
-        path,
-        migrationFolder: path.join(__dirname, "migrations"),
-      }),
-    });
+    db,
+    provider: new FileMigrationProvider({
+      fs,
+      path,
+      migrationFolder: path.join(__dirname, "migrations"),
+    }),
+  });
 
   const { error, results } = await migrator.migrateDown();
 
   results?.forEach((it) => {
     if (it.status === "Success") {
-        console.log(
-          `Rollback "${it.migrationName}" was executed successfully`
-        );
-      } else if (it.status === "Error") {
-        console.error(`Failed to rollback migration "${it.migrationName}"`);
-      }
+      console.log(`Rollback "${it.migrationName}" was executed successfully`);
+    } else if (it.status === "Error") {
+      console.error(`Failed to rollback migration "${it.migrationName}"`);
+    }
   });
 
   if (error) {

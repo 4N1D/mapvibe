@@ -4,14 +4,32 @@
 // Districts in Ho Chi Minh City
 // ============================================
 export const DISTRICTS = [
-  'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
-  'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10',
-  'Quận 11', 'Quận 12', 'Bình Thạnh', 'Gò Vấp', 'Phú Nhuận',
-  'Tân Bình', 'Tân Phú', 'Thủ Đức', 'Bình Tân', 'Củ Chi',
-  'Hóc Môn', 'Nhà Bè', 'Cần Giờ'
+  "Quận 1",
+  "Quận 2",
+  "Quận 3",
+  "Quận 4",
+  "Quận 5",
+  "Quận 6",
+  "Quận 7",
+  "Quận 8",
+  "Quận 9",
+  "Quận 10",
+  "Quận 11",
+  "Quận 12",
+  "Bình Thạnh",
+  "Gò Vấp",
+  "Phú Nhuận",
+  "Tân Bình",
+  "Tân Phú",
+  "Thủ Đức",
+  "Bình Tân",
+  "Củ Chi",
+  "Hóc Môn",
+  "Nhà Bè",
+  "Cần Giờ",
 ] as const;
 
-export type District = typeof DISTRICTS[number];
+export type District = (typeof DISTRICTS)[number];
 
 // ============================================
 // Rating System (for approved restaurants)
@@ -20,14 +38,14 @@ export const MIN_RATING = 1;
 export const MAX_RATING = 10;
 
 export const RATING_ASPECTS = [
-  'service',    // Phục vụ
-  'location',   // Vị trí
-  'price',      // Giá cả
-  'quality',    // Chất lượng
-  'ambiance'    // Không gian
+  "service", // Phục vụ
+  "location", // Vị trí
+  "price", // Giá cả
+  "quality", // Chất lượng
+  "ambiance", // Không gian
 ] as const;
 
-export type RatingAspect = typeof RATING_ASPECTS[number];
+export type RatingAspect = (typeof RATING_ASPECTS)[number];
 
 // ============================================
 // Review System
@@ -47,24 +65,24 @@ export const MAX_VOTES_PER_USER_PER_DAY = 30;
 // ============================================
 // These are fixed features that AI can detect/assign
 export const FEATURES = [
-  'wifi',              // Wifi quán
-  'outdoor_seating',   // Chỗ ngồi ngoài trời
-  'parking',           // Chỗ đỗ xe
-  'air_conditioning',  // Điều hòa
-  'vegetarian_menu',   // Thực đơn chay
-  'delivery',          // Giao hàng
-  'reservation',       // Đặt chỗ
-  'music',             // Có nhạc
-  'outdoor_view',      // Tầm nhìn đẹp
-  'romantic',          // Không gian lãng mạn
-  'private_room',      // Phòng riêng
-  'kids_friendly',     // Thân thiện với trẻ em
-  'pet_friendly',      // Thân thiện với thú cưng
-  'fast_service',      // Phục vụ nhanh
-  'professional_staff' // Nhân viên chuyên nghiệp
+  "wifi", // Wifi quán
+  "outdoor_seating", // Chỗ ngồi ngoài trời
+  "parking", // Chỗ đỗ xe
+  "air_conditioning", // Điều hòa
+  "vegetarian_menu", // Thực đơn chay
+  "delivery", // Giao hàng
+  "reservation", // Đặt chỗ
+  "music", // Có nhạc
+  "outdoor_view", // Tầm nhìn đẹp
+  "romantic", // Không gian lãng mạn
+  "private_room", // Phòng riêng
+  "kids_friendly", // Thân thiện với trẻ em
+  "pet_friendly", // Thân thiện với thú cưng
+  "fast_service", // Phục vụ nhanh
+  "professional_staff", // Nhân viên chuyên nghiệp
 ] as const;
 
-export type Feature = typeof FEATURES[number];
+export type Feature = (typeof FEATURES)[number];
 
 // ============================================
 // CUISINE STYLES/TYPES - FROM DATABASE (DYNAMIC)
@@ -86,20 +104,20 @@ export type CuisineStyle = string; // Dynamic from DB
 // Photo Types
 // ============================================
 export const PHOTO_TYPES = [
-  'general',  // Tất cả
-  'space',    // Không gian
-  'food',     // Món ăn
-  'menu',     // Menu (OCR required)
-  'video'     // Video
+  "general", // Tất cả
+  "space", // Không gian
+  "food", // Món ăn
+  "menu", // Menu (OCR required)
+  "video", // Video
 ] as const;
 
-export type PhotoType = typeof PHOTO_TYPES[number];
+export type PhotoType = (typeof PHOTO_TYPES)[number];
 
 // ============================================
 // Vote Types
 // ============================================
-export const VOTE_TYPES = ['upvote', 'downvote'] as const;
-export type VoteType = typeof VOTE_TYPES[number];
+export const VOTE_TYPES = ["upvote", "downvote"] as const;
+export type VoteType = (typeof VOTE_TYPES)[number];
 
 // ============================================
 // Search
@@ -110,6 +128,6 @@ export const MAX_SEARCH_RESULTS = 50;
 // ============================================
 // Fuzzy Matching Thresholds
 // ============================================
-export const DUPLICATE_THRESHOLD_BLOCK = 0.95;        // >= 95%: Block submission
+export const DUPLICATE_THRESHOLD_BLOCK = 0.95; // >= 95%: Block submission
 export const DUPLICATE_THRESHOLD_SUGGEST_STRONG = 0.85; // 85-95%: Strong warning
-export const DUPLICATE_THRESHOLD_SUGGEST_WEAK = 0.70;   // 70-85%: Weak warning
+export const DUPLICATE_THRESHOLD_SUGGEST_WEAK = 0.7; // 70-85%: Weak warning

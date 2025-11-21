@@ -11,17 +11,7 @@ export interface RatingProps {
 }
 
 export const Rating = React.forwardRef<HTMLDivElement, RatingProps>(
-  (
-    {
-      value,
-      maxRating = 5,
-      onChange,
-      readOnly = false,
-      className,
-      size = "md",
-    },
-    ref
-  ) => {
+  ({ value, maxRating = 5, onChange, readOnly = false, className, size = "md" }, ref) => {
     const [hoverValue, setHoverValue] = React.useState<number | null>(null);
 
     const handleClick = (rating: number) => {
@@ -37,7 +27,10 @@ export const Rating = React.forwardRef<HTMLDivElement, RatingProps>(
     };
 
     return (
-      <div ref={ref} className={cn("flex gap-1", className)}>
+      <div
+        ref={ref}
+        className={cn("flex gap-1", className)}
+      >
         {Array.from({ length: maxRating }, (_, index) => {
           const rating = index + 1;
           const isFilled = rating <= (hoverValue ?? value);

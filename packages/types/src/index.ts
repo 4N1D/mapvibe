@@ -27,27 +27,27 @@ export interface PaginatedResponse<T> {
 // ============================================
 // Common Types
 // ============================================
-export type UserRole = 'user' | 'admin';
-export type AccountStatus = 'active' | 'suspended' | 'banned';
-export type LocationStatus = 'pending' | 'approved' | 'rejected' | 'merged';
-export type RestaurantStatus = 'approved' | 'closed' | 'removed';
-export type ReviewStatus = 'published' | 'hidden' | 'deleted';
-export type PhotoType = 'general' | 'space' | 'food' | 'menu' | 'video';
-export type VoteType = 'upvote' | 'downvote';
+export type UserRole = "user" | "admin";
+export type AccountStatus = "active" | "suspended" | "banned";
+export type LocationStatus = "pending" | "approved" | "rejected" | "merged";
+export type RestaurantStatus = "approved" | "closed" | "removed";
+export type ReviewStatus = "published" | "hidden" | "deleted";
+export type PhotoType = "general" | "space" | "food" | "menu" | "video";
+export type VoteType = "upvote" | "downvote";
 
 // ============================================
 // Rating Types (1-10 scale for approved restaurants)
 // ============================================
 export interface RestaurantRatings {
-  service: number;      // 1-10
-  location: number;     // 1-10
-  price: number;        // 1-10
-  quality: number;      // 1-10
-  ambiance: number;     // 1-10
-  overall?: number;     // Auto-calculated average
+  service: number; // 1-10
+  location: number; // 1-10
+  price: number; // 1-10
+  quality: number; // 1-10
+  ambiance: number; // 1-10
+  overall?: number; // Auto-calculated average
 }
 
-export type RatingAspect = keyof Omit<RestaurantRatings, 'overall'>;
+export type RatingAspect = keyof Omit<RestaurantRatings, "overall">;
 
 // ============================================
 // Location & Address Types

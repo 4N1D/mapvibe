@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_URL = "https://5194cef47e7e.ngrok-free.app";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -13,7 +13,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    console.log(`🚀 [${config.method?.toUpperCase()}] ${config.url}`);
+    console.log(`[${config.method?.toUpperCase()}] ${config.url}`);
     return config;
   },
   (error) => {

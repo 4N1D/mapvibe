@@ -1,5 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Message, Restaurant } from "../components/ChatMessage";
+import apiClient, { createCancelToken, retryRequest } from "@/lib/axios";
+import axios from "axios";
 
 // Mock RAG responses
 const mockRAGResponses: Record<string, { message: string; restaurants: Restaurant[] }> = {
@@ -122,16 +124,14 @@ const mockRAGResponses: Record<string, { message: string; restaurants: Restauran
   },
 };
 
+// Generate unique session ID
+const generateSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
 export function useSearchChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Build accumulated context from all user messages
-  const buildSearchContext = useCallback((currentMessages: Message[], newContent: string) => {
-    const previousQueries = currentMessages.filter((m) => m.role === "user").map((m) => m.content);
-
-    return [...previousQueries, newContent].join(" | ");
-  }, []);
+  const sessionIdRef = useRef<string>(generateSessionId());
+  const cancelTokenRef = useRef<{ cancel: () => void } | null>(null);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -143,70 +143,90 @@ export function useSearchChat() {
         timestamp: new Date(),
       };
 
-      // Build accumulated search context
-      const searchContext = buildSearchContext(messages, content);
-      console.log("Search context:", searchContext); // For debugging
+      // Determine if this is a new topic (first message in conversation)
+      const isNewTopic = messages.length === 0;
 
       setMessages((prev) => [...prev, userMessage]);
-
-      // Simulate API call
       setIsLoading(true);
 
-      // Fake delay for realistic feel
-      await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000));
-
-      // Get mock response based on accumulated context keywords
-      const lowerContext = searchContext.toLowerCase();
-      let response = mockRAGResponses.default;
-
-      // Check accumulated context for better results
-      if (lowerContext.includes("lẩu") || lowerContext.includes("lau")) {
-        response = mockRAGResponses.lau;
-      }
-      if (lowerContext.includes("buffet")) {
-        response = mockRAGResponses.buffet;
-      }
-      if (
-        lowerContext.includes("rẻ") ||
-        lowerContext.includes("re") ||
-        lowerContext.includes("giá")
-      ) {
-        response = mockRAGResponses.re;
+      if (cancelTokenRef.current) {
+        cancelTokenRef.current.cancel();
       }
 
-      // // THAY ĐỔI: Gọi API thật thay vì mock
-      // const response = await fetch('/api/search', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ query: searchContext })  // Gửi context tích lũy
-      // });
-      // const data = await response.json();
+      const { signal, cancel } = createCancelToken();
+      cancelTokenRef.current = { cancel };
 
-      // const aiMessage: Message = {
-      //   id: `ai-${Date.now()}`,
-      //   role: "assistant",
-      //   content: data.message,
-      //   restaurants: data.restaurants,
-      //   timestamp: new Date(),
-      // };
+      try {
+        const { data } = await retryRequest(
+          () =>
+            apiClient.post(
+              "/api/search",
+              {
+                session_id: sessionIdRef.current,
+                query: content,
+                is_new_topic: isNewTopic,
+              },
+              { signal }
+            ),
+          3,
+          1000
+        );
 
-      // Add AI response
-      const aiMessage: Message = {
-        id: `ai-${Date.now()}`,
-        role: "assistant",
-        content: response.message,
-        restaurants: response.restaurants,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+        // Add AI response
+        const aiMessage: Message = {
+          id: `ai-${Date.now()}`,
+          role: "assistant",
+          content: data.message || "Đã tìm thấy kết quả cho bạn:",
+          restaurants: data.restaurants || [],
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          console.log("Request cancelled");
+          return;
+        }
+
+        console.error("Search API error", error);
+
+        // Fallback to mock response on error
+        const lowerContent = content.toLowerCase();
+        let mockResponse = mockRAGResponses.default;
+
+        if (lowerContent.includes("lẩu") || lowerContent.includes("lau")) {
+          mockResponse = mockRAGResponses.lau;
+        } else if (lowerContent.includes("buffet")) {
+          mockResponse = mockRAGResponses.buffet;
+        } else if (
+          lowerContent.includes("rẻ") ||
+          lowerContent.includes("re") ||
+          lowerContent.includes("giá")
+        ) {
+          mockResponse = mockRAGResponses.re;
+        }
+
+        const aiMessage: Message = {
+          id: `ai-${Date.now()}`,
+          role: "assistant",
+          content: mockResponse.message,
+          restaurants: mockResponse.restaurants,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      }
 
       setIsLoading(false);
     },
-    [messages, buildSearchContext]
+    [messages]
   );
 
   const clearMessages = useCallback(() => {
+    if (cancelTokenRef.current) {
+      cancelTokenRef.current.cancel();
+    }
+
     setMessages([]);
+    sessionIdRef.current = generateSessionId(); // New session on reset
   }, []);
 
   return {

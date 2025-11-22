@@ -9,21 +9,21 @@ export function Footer() {
               <span className="text-xl font-bold text-white">MapVibe</span>
             </div>
             <p className="mb-4 max-w-md text-gray-400">
-              Discover the best restaurants in Vietnam. Read authentic reviews, explore nearby
-              places, and share your dining experiences.
+              Khám phá những nhà hàng ngon nhất Việt Nam. Đọc những đánh giá chân thực, khám phá
+              những địa điểm gần đó và chia sẻ trải nghiệm ẩm thực của bạn.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="mb-4 font-semibold text-white">Quick Links</h3>
+            <h3 className="mb-4 font-semibold text-white">Truy cập nhanh</h3>
             <ul className="space-y-2">
               <li>
                 <a
                   href="/explore"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Explore Restaurants
+                  Khám phá địa điểm ăn uống
                 </a>
               </li>
               <li>
@@ -31,7 +31,7 @@ export function Footer() {
                   href="/nearby"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Nearby Places
+                  Gần chỗ bạn
                 </a>
               </li>
               <li>
@@ -39,7 +39,7 @@ export function Footer() {
                   href="/write-review"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Write a Review
+                  Viết bài đánh giá
                 </a>
               </li>
             </ul>
@@ -47,14 +47,14 @@ export function Footer() {
 
           {/* Support */}
           <div>
-            <h3 className="mb-4 font-semibold text-white">Support</h3>
+            <h3 className="mb-4 font-semibold text-white">Hỗ trợ</h3>
             <ul className="space-y-2">
               <li>
                 <a
                   href="/help"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Help Center
+                  Trung tâm hỗ trợ
                 </a>
               </li>
               <li>
@@ -62,7 +62,7 @@ export function Footer() {
                   href="/contact"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Contact Us
+                  Liên hệ
                 </a>
               </li>
               <li>
@@ -70,7 +70,7 @@ export function Footer() {
                   href="/privacy"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Privacy Policy
+                  Chính sách bảo mật
                 </a>
               </li>
               <li>
@@ -78,7 +78,7 @@ export function Footer() {
                   href="/terms"
                   className="transition-colors hover:text-primary-400"
                 >
-                  Terms of Service
+                  Điều khoản dịch vụ
                 </a>
               </li>
             </ul>

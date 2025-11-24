@@ -40,3 +40,7 @@ The project is organized as a monorepo using **TurboRepo** and **Bun**, ensuring
    ```bash
    bun run build
    ```
+
+## Attention:
+- To work properly, create .env files for both the root project and the frontend (apps/web) folder.
+- Contact me for those .env files: [Facebook - Minh](https://www.facebook.com/mikenguyen.ntm)

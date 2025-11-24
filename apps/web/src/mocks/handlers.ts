@@ -46,7 +46,7 @@ export const handlers = [
   }),
 
   // Get single restaurant by slug
-  http.get("/api/restaurant/:slug", ({ params }) => {
+  http.get("/api/place/:slug", ({ params }) => {
     const { slug } = params;
     const restaurant = allRestaurants.find((r) => r.slug === slug);
 
@@ -81,7 +81,7 @@ export const handlers = [
   }),
 
   // Get all restaurants (cho Featured/Explore tabs)
-  http.get("/api/restaurants", () => {
+  http.get("/api/place", () => {
     return HttpResponse.json({
       restaurants: allRestaurants.slice(0, 12),
     });

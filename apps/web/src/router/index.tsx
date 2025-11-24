@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout";
 import { HomePage } from "@/pages/HomePage";
+import { PlaceDetailPage } from "@/pages/PlaceDetailPage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 export const router = createBrowserRouter([
@@ -12,8 +13,8 @@ export const router = createBrowserRouter([
         element: <HomePage />,
       },
       {
-        path: "/place/:id",
-        element: <div> Search Detail Page (TODO)</div>,
+        path: "/place/:slug",
+        element: <PlaceDetailPage />,
       },
       {
         path: "/admin",

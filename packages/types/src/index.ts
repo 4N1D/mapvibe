@@ -64,3 +64,60 @@ export interface Address {
   city: string;
   fullAddress?: string;
 }
+
+// ============================================
+// Restaurant Types
+// ============================================
+export interface Restaurant {
+  id: number;
+  slug: string;
+  name: string;
+  address: string;
+  priceRange: string;
+  hours: string;
+  rating: number;
+  phone: string;
+  description: string;
+  image?: string;
+  images?: string[];
+  reviews?: Review[];
+  matchReason?: string;
+}
+
+export interface RestaurantSearchResult {
+  id: number;
+  slug: string;
+  name: string;
+  address: string;
+  priceRange: string;
+  hours: string;
+  rating: number;
+  image: string;
+  matchReason: string;
+}
+
+// ============================================
+// Review Types
+// ============================================
+export interface Review {
+  id: number;
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+}
+
+// ============================================
+// Search API Types
+// ============================================
+export interface SearchRequest {
+  query: string;
+  session_id: string;
+  is_new_topic?: boolean;
+}
+
+export interface SearchResponse {
+  message: string;
+  current_context: string;
+  restaurants: RestaurantSearchResult[];
+}

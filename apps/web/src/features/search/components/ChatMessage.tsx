@@ -55,7 +55,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.restaurants.map((place) => (
               <Link
                 key={place.id}
-                to={`/place/${place.id}`}
+                to={`/place/${place.slug}`}
               >
                 <Card
                   key={place.id}

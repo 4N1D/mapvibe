@@ -109,3 +109,5 @@ scripts/
 
 # Generated files (will be created by codegen)
 packages/types/src/database.ts
+
+CLAUDE.md

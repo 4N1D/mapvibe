@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { Restaurant } from "@mapvibe/types";
 import { ArrowLeft } from "lucide-react";
-import { ImageGalleryPreview, RestaurantInfo } from "@/features/place";
+import { ImageGalleryPreview, IntroductionTab, RestaurantInfo } from "@/features/place";
 
 export function PlaceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -41,7 +41,7 @@ export function PlaceDetailPage() {
   if (error || !restaurant) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <p className="text-lg text-gray-600">{error || "Không tìm thấy quán"}</p>
+        <p className="text-lg text-gray-600">{"Không tìm thấy quán"}</p>
         <Link
           to="/"
           className="text-primary hover:underline"
@@ -57,40 +57,96 @@ export function PlaceDetailPage() {
     switch (activeTab) {
       case "gioi-thieu":
         return (
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-            <main className="space-y-6 lg:col-span-2">
-              {/* TODO: Dịch vụ */}
-              <div className="rounded-lg bg-white p-6 shadow-sm">
-                <h3 className="mb-4 font-semibold">Dịch vụ</h3>
-                <p className="text-gray-500">TODO: ServicesList</p>
-              </div>
-              {/* TODO: Loại hình ẩm thực */}
-              <div className="rounded-lg bg-white p-6 shadow-sm">
-                <h3 className="mb-4 font-semibold">Loại hình ẩm thực</h3>
-                <p className="text-gray-500">TODO: CuisineType</p>
-              </div>
-              {/* TODO: Địa điểm tương tự */}
-              <div className="rounded-lg bg-white p-6 shadow-sm">
-                <h3 className="mb-4 font-semibold">Những địa điểm tương tự</h3>
-                <p className="text-gray-500">TODO: SimilarPlaces</p>
-              </div>
-            </main>
-            <aside>
-              <div className="sticky top-4 rounded-lg bg-white p-6 shadow-sm">
-                <h3 className="mb-4 font-semibold">Direction</h3>
-                <div className="mb-4 h-48 rounded-lg bg-gray-200"></div>
-                <p className="mb-4 text-sm text-gray-600">{restaurant.address}</p>
-                <div className="flex gap-2">
-                  <button className="flex-1 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">
-                    Copy
-                  </button>
-                  <button className="flex-1 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">
-                    Share
-                  </button>
-                </div>
-              </div>
-            </aside>
-          </div>
+          <IntroductionTab
+            services={[
+              "Giữ xe miễn phí",
+              "Wifi miễn phí",
+              "Cho phép mang theo thú cưng",
+              "Tiệc ngoài trời",
+              "Acoustic hàng tuần",
+              "Mang đi",
+            ]}
+            cuisineTypes={[
+              {
+                name: "Buffet Lẩu Băng Chuyền",
+                description: "Bao gồm các loại hải sản, thịt, rau củ và nấm.",
+              },
+              {
+                name: "Lẩu Đa Dạng Nước Dùng",
+                description:
+                  "Các lựa chọn nước lẩu như lẩu thảo mộc, lẩu kim chi, lẩu miso và nhiều loại khác.",
+              },
+              {
+                name: "Chế Biến Theo Yêu Cầu",
+                description: "Thực khách có thể tự tay chế biến món ăn theo sở thích cá nhân.",
+              },
+              {
+                name: "Ẩm Thực Nhật Bản",
+                description:
+                  "Không chỉ có lẩu, nhà hàng còn phục vụ nhiều món ăn theo phong cách Nhật Bản.",
+              },
+              {
+                name: "Nước Chấm Đa Dạng",
+                description:
+                  "Không chỉ có lẩu, nhà hàng còn phục vụ nhiều món ăn theo phong cách Nhật Bản.",
+              },
+            ]}
+            similarPlaces={[
+              // TODO: Fetch from API
+              {
+                slug: "lau-manwah",
+                name: "Lẩu Manwah",
+                address:
+                  "Tầng 4 Vincom Plaza Lê Văn Việt, 50 Lê Văn Việt, Hiệp Phú, Quận 9, TP. HCM",
+                rating: 4.5,
+                priceRange: "200.000 vnđ - 350.000 vnđ",
+                hours: "11:00 AM - 10:00 PM",
+                image:
+                  "https://images.unsplash.com/photo-1541544744-378ca6f0407a?auto=format&fit=crop&q=80&w=600",
+              },
+              {
+                slug: "song-doi-quan-lau-oc",
+                name: "Song đôi quán Lẩu ốc",
+                address: "196 Đường Lê Văn Việt, Phường Tăng Nhơn Phú B, Quận 9",
+                rating: 4.2,
+                priceRange: "150.000 vnđ - 300.000 vnđ",
+                hours: "6:00 AM - 10:00 PM",
+                image:
+                  "https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?auto=format&fit=crop&q=80&w=600",
+              },
+              {
+                slug: "nijyu-maru",
+                name: "Nijyu Maru",
+                address: "196 Đường Lê Văn Việt, Phường Tăng Nhơn Phú B, Quận 9",
+                rating: 4.0,
+                priceRange: "150.000 vnđ - 300.000 vnđ",
+                hours: "6:00 AM - 10:00 PM",
+                image:
+                  "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=600",
+              },
+              {
+                slug: "nijyu-maru",
+                name: "Nijyu Maru",
+                address: "196 Đường Lê Văn Việt, Phường Tăng Nhơn Phú B, Quận 9",
+                rating: 4.0,
+                priceRange: "150.000 vnđ - 300.000 vnđ",
+                hours: "6:00 AM - 10:00 PM",
+                image:
+                  "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=600",
+              },
+              {
+                slug: "nijyu-maru",
+                name: "Nijyu Maru",
+                address: "196 Đường Lê Văn Việt, Phường Tăng Nhơn Phú B, Quận 9",
+                rating: 4.0,
+                priceRange: "150.000 vnđ - 300.000 vnđ",
+                hours: "6:00 AM - 10:00 PM",
+                image:
+                  "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=600",
+              },
+            ]}
+            address={restaurant.address}
+          />
         );
 
       case "binh-luan":

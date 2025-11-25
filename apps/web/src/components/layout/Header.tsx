@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, cn } from "@mapvibe/ui-components";
+import { Link } from "react-router-dom";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,34 +20,34 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <a
-              href="/"
+            <Link
+              to="/"
               className="flex items-center gap-2"
             >
               <span className="text-2xl font-bold text-gray-900">MapVibe</span>
-            </a>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-10 md:flex">
-            <a
-              href="/"
+            <Link
+              to="/"
               className={navLinkStyles}
             >
               Trang chủ
-            </a>
-            <a
-              href="/explore"
+            </Link>
+            <Link
+              to="/explore"
               className={navLinkStyles}
             >
               Đề xuất địa điểm
-            </a>
-            <a
-              href="/nearby"
+            </Link>
+            <Link
+              to="/nearby"
               className={navLinkStyles}
             >
               Khám phá và đánh giá
-            </a>
+            </Link>
           </nav>
 
           {/* Desktop Auth Buttons */}
@@ -101,24 +102,24 @@ export function Header() {
         {mobileMenuOpen && (
           <div className="border-t border-gray-100 py-4 md:hidden">
             <nav className="flex flex-col gap-2">
-              <a
-                href="/"
+              <Link
+                to="/"
                 className="rounded-lg px-3 py-2 font-medium text-gray-700 hover:bg-gray-50"
               >
                 Trang chủ
-              </a>
-              <a
-                href="/explore"
+              </Link>
+              <Link
+                to="/explore"
                 className="rounded-lg px-3 py-2 font-medium text-gray-700 hover:bg-gray-50"
               >
                 Đề xuất địa điểm
-              </a>
-              <a
-                href="/nearby"
+              </Link>
+              <Link
+                to="/nearby"
                 className="rounded-lg px-3 py-2 font-medium text-gray-700 hover:bg-gray-50"
               >
                 Khám phá và đánh giá
-              </a>
+              </Link>
             </nav>
             <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
               <Button

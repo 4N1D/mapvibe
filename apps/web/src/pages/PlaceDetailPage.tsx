@@ -137,29 +137,48 @@ export function PlaceDetailPage() {
         Quay lại
       </Link>
 
-      {/* Restaurant Info */}
-      <section className="mb-6">
-        {/* RestaurantInfo component */}
-        <RestaurantInfo
-          name={restaurant.name}
-          address={restaurant.address}
-          phone={restaurant.phone}
-          priceRange={restaurant.priceRange}
-          hours={restaurant.hours}
-          rating={restaurant.rating}
-          categories={["Café/Dessert", "Đài Loan", "Sinh viên", "Cặp đôi"]}
-          detailedRatings={[
-            { label: "Vị trí", score: 7.7 },
-            { label: "Không gian", score: 7.4 },
-            { label: "Chất lượng", score: 7.4 },
-            { label: "Phục vụ", score: 7.2 },
-            { label: "Giá cả", score: 6.8 },
-          ]}
-        />
-      </section>
+      {/* Main Content Area: Hero Image & Info */}
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Hero Image - Left on Desktop (5 cols) */}
+        <section className="lg:order-1 lg:col-span-5">
+          <div className="h-full overflow-hidden rounded-xl shadow-sm">
+            <img
+              src={restaurant.images?.[0]}
+              alt={restaurant.name}
+              className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+            />
+          </div>
+        </section>
 
-      {/* Image Gallery Preview */}
-      <section className="mb-6">
+        {/* Restaurant Info - Right on Desktop (7 cols) */}
+        <section className="lg:order-2 lg:col-span-7">
+          <RestaurantInfo
+            name={restaurant.name}
+            address={restaurant.address}
+            phone={restaurant.phone}
+            priceRange={restaurant.priceRange}
+            hours={restaurant.hours}
+            rating={restaurant.rating}
+            categories={["Café/Dessert", "Đài Loan", "Sinh viên", "Cặp đôi"]}
+            detailedRatings={[
+              { label: "Vị trí", score: 7.7 },
+              { label: "Không gian", score: 7.4 },
+              { label: "Chất lượng", score: 7.4 },
+              { label: "Phục vụ", score: 7.2 },
+              { label: "Giá cả", score: 6.8 },
+            ]}
+            onCommentClick={() => {
+              setActiveTab("binh-luan");
+              setTimeout(() => {
+                document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            }}
+          />
+        </section>
+      </div>
+
+      <section className="mb-8">
+        <h2 className="mb-4 text-lg font-bold text-gray-900">Preview</h2>
         <ImageGalleryPreview
           images={restaurant.images}
           restaurantName={restaurant.name}
@@ -192,7 +211,7 @@ export function PlaceDetailPage() {
       </section>
 
       {/* Tab Content */}
-      <section>{renderTabContent()}</section>
+      <section id="tab-content">{renderTabContent()}</section>
     </div>
   );
 }

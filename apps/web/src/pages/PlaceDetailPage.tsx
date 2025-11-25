@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { Restaurant } from "@mapvibe/types";
 import { ArrowLeft } from "lucide-react";
-import { ImageGalleryPreview } from "@/features/place";
+import { ImageGalleryPreview, RestaurantInfo } from "@/features/place";
 
 export function PlaceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -139,9 +139,23 @@ export function PlaceDetailPage() {
 
       {/* Restaurant Info */}
       <section className="mb-6">
-        {/* TODO: RestaurantInfo component */}
-        <h1 className="text-2xl font-bold">{restaurant.name}</h1>
-        <p className="text-gray-600">{restaurant.address}</p>
+        {/* RestaurantInfo component */}
+        <RestaurantInfo
+          name={restaurant.name}
+          address={restaurant.address}
+          phone={restaurant.phone}
+          priceRange={restaurant.priceRange}
+          hours={restaurant.hours}
+          rating={restaurant.rating}
+          categories={["Café/Dessert", "Đài Loan", "Sinh viên", "Cặp đôi"]}
+          detailedRatings={[
+            { label: "Vị trí", score: 7.7 },
+            { label: "Không gian", score: 7.4 },
+            { label: "Chất lượng", score: 7.4 },
+            { label: "Phục vụ", score: 7.2 },
+            { label: "Giá cả", score: 6.8 },
+          ]}
+        />
       </section>
 
       {/* Image Gallery Preview */}

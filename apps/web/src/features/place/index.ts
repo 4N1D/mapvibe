@@ -1,1 +1,2 @@
-export * from "./components/ImageGalleryPreview";
+export { ImageGalleryPreview } from "./components/ImageGalleryPreview";
+export { RestaurantInfo } from "./components/RestaurantInfo";

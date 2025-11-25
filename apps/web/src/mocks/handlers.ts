@@ -15,7 +15,7 @@ const generateRestaurants = (count: number) => {
       max: 200,
     })}k`,
     hours: "8:00 - 22:00",
-    rating: faker.number.float({ min: 3.5, max: 5, fractionDigits: 1 }),
+    rating: faker.number.float({ min: 0, max: 10, fractionDigits: 1 }),
     reviews: faker.number.int({ min: 10, max: 500 }),
     image: `https://images.unsplash.com/photo-${1478749286911 + i}`,
     description: faker.lorem.paragraph(),

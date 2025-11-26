@@ -9,3 +9,6 @@ export type { RatingProps } from "./Rating";
 
 export { SendButton } from "./ButtonNoText";
 export type { SendButtonProps } from "./ButtonNoText";
+
+export { Input } from "./Input";
+export type { InputProps } from "./Input";

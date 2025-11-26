@@ -2,6 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https:;
+      font-src 'self' data:;
+      connect-src 'self'
+        https://*.amazoncognito.com
+        https://*.amazonaws.com
+        https://cognito-idp.*.amazonaws.com
+        https://*.ngrok-free.app;
+      frame-src 'none';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+    "
+    />
+
     <link
       rel="icon"
       type="image/svg+xml"
@@ -11,7 +31,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0"
     />
-    <title>MapVibe - Discover Amazing Places</title>
+    <title>MapVibe - Ăn Gì Đó Có MapVibe Đây</title>
 
     <script>
       window.global = window;

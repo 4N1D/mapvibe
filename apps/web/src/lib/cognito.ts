@@ -1,176 +1,100 @@
+import { Amplify } from "aws-amplify";
 import {
-  AuthenticationDetails,
-  CognitoUser,
-  CognitoUserAttribute,
-  CognitoUserPool,
-} from "amazon-cognito-identity-js";
+  signIn as amplifySignIn,
+  signUp as amplifySignUp,
+  confirmSignUp as amplifyConfirmSignUp,
+  signOut as amplifySignOut,
+  getCurrentUser as amplifyGetCurrentUser,
+  fetchUserAttributes,
+  signInWithRedirect,
+} from "aws-amplify/auth";
 
-const poolData = {
-  UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
-  ClientId: import.meta.env.VITE_COGNITO_APP_CLIENT_ID,
-};
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
+      userPoolClientId: import.meta.env.VITE_COGNITO_APP_CLIENT_ID,
+      loginWith: {
+        oauth: {
+          domain: import.meta.env.VITE_COGNITO_DOMAIN,
+          scopes: ["openid", "email", "profile"],
+          redirectSignIn: ["http://localhost:5173", "http://localhost:5173/"],
+          redirectSignOut: ["http://localhost:5173", "http://localhost:5173/"],
+          responseType: "code",
+        },
+      },
+    },
+  },
+});
 
-export const userPool = new CognitoUserPool(poolData);
-
-export const signUp = (
+// Sign up với email và password
+export const signUp = async (
   email: string,
   password: string,
   attributes: { name?: string } = {}
-): Promise<{ user: CognitoUser; userConfirmed: boolean }> => {
-  return new Promise((resolve, reject) => {
-    const attributeList: CognitoUserAttribute[] = [];
+): Promise<{ userConfirmed: boolean }> => {
+  const result = await amplifySignUp({
+    username: email,
+    password,
+    options: {
+      userAttributes: {
+        email,
+        ...(attributes.name && { name: attributes.name }),
+      },
+    },
+  });
 
-    attributeList.push(
-      new CognitoUserAttribute({
-        Name: "email",
-        Value: email,
-      })
-    );
+  return {
+    userConfirmed: result.isSignUpComplete,
+  };
+};
 
-    if (attributes.name) {
-      attributeList.push(
-        new CognitoUserAttribute({
-          Name: "name",
-          Value: attributes.name,
-        })
-      );
-    }
-
-    userPool.signUp(email, password, attributeList, [], (err, result) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!result) {
-        reject(new Error("Sign up failed"));
-        return;
-      }
-      resolve({
-        user: result.user,
-        userConfirmed: result.userConfirmed,
-      });
-    });
+export const confirmSignUp = async (email: string, code: string): Promise<void> => {
+  await amplifyConfirmSignUp({
+    username: email,
+    confirmationCode: code,
   });
 };
 
-export const signIn = (
-  email: string,
-  password: string
-): Promise<{
-  accessToken: string;
-  idToken: string;
-  refreshToken: string;
-}> => {
-  return new Promise((resolve, reject) => {
-    const authenticationDetails = new AuthenticationDetails({
-      Username: email,
-      Password: password,
-    });
-
-    const cognitoUser = new CognitoUser({
-      Username: email,
-      Pool: userPool,
-    });
-
-    cognitoUser.authenticateUser(authenticationDetails, {
-      onSuccess: (result) => {
-        resolve({
-          accessToken: result.getAccessToken().getJwtToken(),
-          idToken: result.getIdToken().getJwtToken(),
-          refreshToken: result.getRefreshToken().getToken(),
-        });
-      },
-      onFailure: (err) => {
-        reject(err);
-      },
-    });
+// Sign in với email và password
+export const signIn = async (email: string, password: string): Promise<void> => {
+  await amplifySignIn({
+    username: email,
+    password,
   });
 };
 
-export const signOut = (): void => {
-  const cognitoUser = userPool.getCurrentUser();
-  if (cognitoUser) {
-    cognitoUser.signOut();
+export const signOut = async (): Promise<void> => {
+  await amplifySignOut();
+};
+
+export const getCurrentUser = async (): Promise<any> => {
+  try {
+    const user = await amplifyGetCurrentUser();
+    return user;
+  } catch (error) {
+    return null;
   }
 };
 
-export const getCurrentUser = (): Promise<CognitoUser | null> => {
-  return new Promise((resolve) => {
-    const cognitoUser = userPool.getCurrentUser();
-    if (!cognitoUser) {
-      resolve(null);
-      return;
-    }
-
-    cognitoUser.getSession((err: Error | null, session: any) => {
-      if (err || !session.isValid()) {
-        resolve(null);
-        return;
-      }
-      resolve(cognitoUser);
-    });
-  });
+export const getUserAttributes = async (): Promise<Record<string, string> | null> => {
+  try {
+    const attributes = await fetchUserAttributes();
+    return attributes as Record<string, string>;
+  } catch (error) {
+    return null;
+  }
 };
 
-export const getTokens = (): Promise<{
-  accessToken: string;
-  idToken: string;
-} | null> => {
-  return new Promise((resolve) => {
-    const cognitoUser = userPool.getCurrentUser();
-    if (!cognitoUser) {
-      resolve(null);
-      return;
-    }
-
-    cognitoUser.getSession((err: Error | null, session: any) => {
-      if (err || !session.isValid()) {
-        resolve(null);
-        return;
-      }
-      resolve({
-        accessToken: session.getAccessToken().getJwtToken(),
-        idToken: session.getIdToken().getJwtToken(),
-      });
-    });
+export const signInWithGoogle = async (): Promise<void> => {
+  await signInWithRedirect({
+    provider: "Google",
   });
 };
-
-export const getUserAttributes = (): Promise<Record<string, string> | null> => {
-  return new Promise((resolve) => {
-    const cognitoUser = userPool.getCurrentUser();
-    if (!cognitoUser) {
-      resolve(null);
-      return;
-    }
-
-    cognitoUser.getSession((err: Error | null, session: any) => {
-      if (err || !session.isValid()) {
-        resolve(null);
-        return;
-      }
-
-      cognitoUser.getUserAttributes((err, attributes) => {
-        if (err || !attributes) {
-          resolve(null);
-          return;
-        }
-
-        const attrs: Record<string, string> = {};
-        attributes.forEach((attr) => {
-          attrs[attr.Name] = attr.Value;
-        });
-        resolve(attrs);
-      });
-    });
-  });
-};
-
-export const getGoogleAuthUrl = (
-  redirectUri: string = `${window.location.origin}/auth/callback`
-): string => {
+export const getGoogleAuthUrl = (): string => {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN;
   const clientId = import.meta.env.VITE_COGNITO_APP_CLIENT_ID;
+  const redirectUri = window.location.origin;
 
   const params = new URLSearchParams({
     identity_provider: "Google",
@@ -181,21 +105,4 @@ export const getGoogleAuthUrl = (
   });
 
   return `https://${domain}/oauth2/authorize?${params.toString()}`;
-};
-
-export const confirmSignUp = (email: string, code: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const cognitoUser = new CognitoUser({
-      Username: email,
-      Pool: userPool,
-    });
-
-    cognitoUser.confirmRegistration(code, true, (err, result) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(result);
-    });
-  });
 };

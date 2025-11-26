@@ -8,6 +8,7 @@ import {
   getUserAttributes,
   signInWithGoogle as cognitoSignInWithGoogle,
 } from "@/lib/cognito";
+import { Hub } from "aws-amplify/utils";
 
 /**
  * User type
@@ -42,43 +43,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from session on mount
+  // Load user from session on mount and listen for OAuth events
   useEffect(() => {
+    // Listen for auth events from Amplify Hub
+    const hubListenerCancelToken = Hub.listen("auth", ({ payload }) => {
+      switch (payload.event) {
+        case "signedIn":
+        case "signInWithRedirect":
+          checkAuth();
+          break;
+        case "signInWithRedirect_failure":
+          console.error("[Auth] OAuth login failed:", payload.data);
+          break;
+        case "signedOut":
+          setUser(null);
+          break;
+      }
+    });
+
+    // Initial auth check
     checkAuth();
+
+    // Cleanup listener on unmount
+    return () => hubListenerCancelToken();
   }, []);
 
   /**
    * Check if user is authenticated
    */
   const checkAuth = async () => {
-    console.log("🔍 [AuthContext] Checking auth...");
     try {
       const cognitoUser = await getCurrentUser();
-      console.log("🔍 [AuthContext] Cognito user:", cognitoUser);
 
       if (cognitoUser) {
         const attributes = await getUserAttributes();
-        console.log("🔍 [AuthContext] User attributes:", attributes);
 
         if (attributes) {
-          const userData = {
-            email: attributes.email,
-            name: attributes.name,
-            sub: attributes.sub,
-          };
-          console.log("[AuthContext] Setting user:", userData);
-          setUser(userData);
+          setUser({
+            email: attributes.email || "",
+            name: attributes.name || attributes.email || cognitoUser.username,
+            sub: attributes.sub || cognitoUser.userId,
+          });
         } else {
-          console.log("[AuthContext] No attributes found");
+          setUser(null);
         }
       } else {
-        console.log("[AuthContext] No Cognito user found");
+        setUser(null);
       }
     } catch (error) {
-      console.error("[AuthContext] Check auth error:", error);
+      console.error("[Auth] Check auth failed:", error);
+      setUser(null);
     } finally {
       setLoading(false);
-      console.log("[AuthContext] Loading complete");
     }
   };
 
@@ -88,24 +104,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       await cognitoSignIn(email, password);
-      console.log("✅ [AuthContext] Sign in success");
-
-      // Reload user data
       await checkAuth();
     } catch (error: any) {
-      console.error("❌ [AuthContext] Sign in error:", error);
-
       // Handle "There is already a signed in user" error
-      if (error.message && error.message.includes("There is already a signed in user")) {
-        console.log("[AuthContext] User already signed in, signing out and retrying...");
+      if (error.message?.includes("There is already a signed in user")) {
         await cognitoSignOut();
         try {
           await cognitoSignIn(email, password);
-          console.log("[AuthContext] Retry sign in success");
           await checkAuth();
           return;
         } catch (retryError: any) {
-          console.error("[AuthContext] Retry sign in error:", retryError);
           throw new Error(retryError.message || "Đăng nhập thất bại");
         }
       }
@@ -120,9 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       await cognitoSignUp(email, password, { name });
-      console.log("[AuthContext] Sign up success");
     } catch (error: any) {
-      console.error("[AuthContext] Sign up error:", error);
       throw new Error(error.message || "Đăng ký thất bại");
     }
   };
@@ -133,9 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const confirmSignUp = async (email: string, code: string) => {
     try {
       await cognitoConfirmSignUp(email, code);
-      console.log("[AuthContext] Confirm sign up success");
     } catch (error: any) {
-      console.error("[AuthContext] Confirm sign up error:", error);
       throw new Error(error.message || "Xác nhận thất bại");
     }
   };
@@ -147,21 +151,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await cognitoSignOut();
       setUser(null);
-      console.log("[AuthContext] Sign out success");
     } catch (error) {
-      console.error("[AuthContext] Sign out error:", error);
+      console.error("[Auth] Sign out failed:", error);
     }
   };
 
   /**
-   * Sign in with Google (redirect to Cognito Hosted UI)
+   * Sign in with Google OAuth
    */
   const signInWithGoogle = async () => {
     try {
-      console.log("[AuthContext] Starting Google sign in...");
       await cognitoSignInWithGoogle();
     } catch (error) {
-      console.error("[AuthContext] Google sign in error:", error);
+      console.error("[Auth] Google sign in failed:", error);
     }
   };
 

@@ -1,24 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
 import { ChevronsDownIcon } from "lucide-react";
 import { HeroSearch, SearchConversation, useSearchChat } from "@/features/search";
 import { FeaturedReviews } from "@/features/review";
 
 export function HomePage() {
-  const [scrollY, setScrollY] = useState(0);
   const { messages, isLoading, sendMessage, clearMessages } = useSearchChat();
+  const { scrollY } = useScroll();
 
   const hasConversation = messages.length > 0;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
+  const overlayY = useTransform(scrollY, [0, 500], [0, 150]);
+  const contentY = useTransform(scrollY, [0, 500], [0, 250]);
+  const contentOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+  const scrollIndicatorOpacity = useTransform(scrollY, [0, 200], [1, 0]);
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Scroll to conversation CHỈ khi bắt đầu conversation (message đầu tiên)
   useEffect(() => {
     if (messages.length === 1) {
       const conversationElement = document.getElementById("conversation-section");
@@ -36,49 +32,42 @@ export function HomePage() {
 
   return (
     <div className="relative">
-      {/* Hero Section với Parallax */}
       <section
-        className={`relative flex w-full flex-col items-center justify-center bg-cover bg-center transition-all duration-500 ${
-          hasConversation ? "h-[50vh] bg-fixed" : "h-[calc(100vh-64px)] bg-fixed"
-        }`}
+        className={`relative flex w-full flex-col items-center justify-center bg-cover bg-center transition-[height] duration-500 ${
+          hasConversation ? "h-[50vh]" : "h-[calc(100vh-64px)]"
+        } bg-scroll md:bg-fixed`}
         style={{
           backgroundImage: "url('/images/hero-bg.avif')",
         }}
       >
-        {/* Parallax overlay */}
-        <div
-          className="absolute inset-0 bg-black/30 transition-opacity duration-500"
+        <motion.div
+          className="absolute inset-0 bg-black/30"
           style={{
-            transform: hasConversation ? "none" : `translateY(${scrollY * 0.3}px)`,
+            y: hasConversation ? 0 : overlayY,
             opacity: hasConversation ? 0.5 : 1,
           }}
         />
 
-        {/* Content */}
-        <div
-          className="transition-all duration-500"
+        <motion.div
+          className="z-10"
           style={{
-            transform: hasConversation ? "none" : `translateY(${scrollY * 0.5}px)`,
-            opacity: hasConversation ? 1 : Math.max(0, 1 - scrollY / 600),
+            y: hasConversation ? 0 : contentY,
+            opacity: hasConversation ? 1 : contentOpacity,
           }}
         >
           <HeroSearch onSearch={handleSearch} />
-        </div>
+        </motion.div>
 
-        {/* Scroll indicator - chỉ hiện khi chưa search */}
         {!hasConversation && (
-          <div
+          <motion.div
             className="absolute bottom-8 left-0 right-0 z-10 flex animate-bounce justify-center"
-            style={{
-              opacity: Math.max(0, 1 - scrollY / 200),
-            }}
+            style={{ opacity: scrollIndicatorOpacity }}
           >
             <ChevronsDownIcon className="h-10 w-10 text-white/70 drop-shadow-lg" />
-          </div>
+          </motion.div>
         )}
       </section>
 
-      {/* Conversation Section - hiện khi có messages */}
       {hasConversation && (
         <section
           id="conversation-section"
@@ -93,7 +82,6 @@ export function HomePage() {
         </section>
       )}
 
-      {/* Featured Reviews - chỉ hiện khi chưa search */}
       {!hasConversation && (
         <section className="relative z-10">
           <FeaturedReviews />

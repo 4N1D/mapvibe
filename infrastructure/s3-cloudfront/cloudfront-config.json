@@ -1,0 +1,71 @@
+{
+  "CallerReference": "mapvibe-2025-11-26",
+  "Comment": "MapVibe CDN - Static Assets + Photos",
+  "Enabled": true,
+  "DefaultRootObject": "index.html",
+  "Origins": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "Id": "S3-StaticAssets",
+        "DomainName": "mapvibe-static-assets.s3.us-east-1.amazonaws.com",
+        "OriginAccessControlId": "E2KLJ7K2JPSHW3",
+        "S3OriginConfig": {
+          "OriginAccessIdentity": ""
+        }
+      },
+      {
+        "Id": "S3-Photos",
+        "DomainName": "mapvibe-photos.s3.us-east-1.amazonaws.com",
+        "OriginAccessControlId": "E27JL44SJXNW6N",
+        "S3OriginConfig": {
+          "OriginAccessIdentity": ""
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-StaticAssets",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"]
+    },
+    "Compress": true,
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  },
+  "CacheBehaviors": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "PathPattern": "/photos/*",
+        "TargetOriginId": "S3-Photos",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "AllowedMethods": {
+          "Quantity": 2,
+          "Items": ["GET", "HEAD"]
+        },
+        "Compress": true,
+        "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+      }
+    ]
+  },
+  "CustomErrorResponses": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "ErrorCode": 404,
+        "ResponsePagePath": "/index.html",
+        "ResponseCode": "200",
+        "ErrorCachingMinTTL": 300
+      },
+      {
+        "ErrorCode": 403,
+        "ResponsePagePath": "/index.html",
+        "ResponseCode": "200",
+        "ErrorCachingMinTTL": 300
+      }
+    ]
+  },
+  "PriceClass": "PriceClass_100"
+}

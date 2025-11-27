@@ -42,7 +42,7 @@ export function HomePage() {
           hasConversation ? "h-[50vh] bg-fixed" : "h-[calc(100vh-64px)] bg-fixed"
         }`}
         style={{
-          backgroundImage: "url('/images/hero-bg.jpg')",
+          backgroundImage: "url('/images/hero-bg.avif')",
         }}
       >
         {/* Parallax overlay */}

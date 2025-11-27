@@ -112,3 +112,6 @@ packages/types/src/database.ts
 
 CLAUDE.md
 .factory/
+
+# Cloudfront Information
+infrastructure/s3-cloudfront/cloudfront-output.json

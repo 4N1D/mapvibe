@@ -19,8 +19,14 @@ Amplify.configure({
         oauth: {
           domain: import.meta.env.VITE_COGNITO_DOMAIN,
           scopes: ["openid", "email", "profile"],
-          redirectSignIn: ["http://localhost:5173/auth/callback"],
-          redirectSignOut: ["http://localhost:5173/"],
+          redirectSignIn: [
+            "http://localhost:5173/auth/callback",
+            "https://d1oasw0quh6m55.cloudfront.net/auth/callback",
+          ],
+          redirectSignOut: [
+            "http://localhost:5173/",
+            "https://d1oasw0quh6m55.cloudfront.net/",
+          ],
           responseType: "code",
         },
       },

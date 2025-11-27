@@ -51,7 +51,11 @@ export function Header() {
                 to="/"
                 className="flex items-center gap-2"
               >
-                <span className="text-2xl font-bold text-gray-900">MapVibe</span>
+                <img
+                  src="/images/logo.png"
+                  alt="mapvibe-logo"
+                  className="h-8 w-auto object-contain transition-opacity hover:opacity-80"
+                />
               </Link>
             </div>
 

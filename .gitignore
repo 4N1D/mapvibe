@@ -110,8 +110,23 @@ scripts/
 # Generated files (will be created by codegen)
 packages/types/src/database.ts
 
-CLAUDE.md
+AGENTS.md
 .factory/
 
 # Cloudfront Information
 infrastructure/s3-cloudfront/cloudfront-output.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

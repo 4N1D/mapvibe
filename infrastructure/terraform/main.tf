@@ -208,7 +208,7 @@ output "domain_name" {
 }
 
 output "name_servers" {
-  description = "Name servers - CẬP NHẬT VÀO TENTEN.VN"
+  description = "Name servers"
   value       = module.dns.zone_name_servers
 }
 

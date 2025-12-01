@@ -6,7 +6,7 @@ output "zone_id" {
 }
 
 output "zone_name_servers" {
-  description = "Name servers - UPDATE THESE IN TENTEN.VN"
+  description = "Name servers"
   value       = aws_route53_zone.main.name_servers
 }
 

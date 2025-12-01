@@ -139,7 +139,25 @@ module "dns" {
   project_name           = var.project_name
   domain_name            = "mapvibe.site"
   cloudfront_domain_name = module.cdn.cloudfront_domain_name
-  api_domain_name        = "" # Sẽ thêm sau khi có API Gateway
+  api_domain_name        = "" # Không dùng nữa, API Gateway tự tạo record
+}
+
+# ============================================
+# API GATEWAY MODULE
+# ============================================
+
+module "api_gateway" {
+  source = "./modules/api-gateway"
+
+  environment         = var.environment
+  project_name        = var.project_name
+  domain_name         = "mapvibe.site"
+  acm_certificate_arn = module.dns.certificate_arn
+  route53_zone_id     = module.dns.zone_id
+
+  # Lambda integrations
+  places_lambda_name       = module.lambda_places.function_name
+  places_lambda_invoke_arn = module.lambda_places.invoke_arn
 }
 
 # ============================================
@@ -215,4 +233,15 @@ output "name_servers" {
 output "certificate_arn" {
   description = "ACM Certificate ARN"
   value       = module.dns.certificate_arn
+}
+
+# API Gateway Outputs
+output "api_gateway_url" {
+  description = "API Gateway custom domain URL"
+  value       = module.api_gateway.custom_domain_url
+}
+
+output "api_gateway_endpoint" {
+  description = "API Gateway default endpoint"
+  value       = module.api_gateway.api_endpoint
 }

@@ -1,0 +1,11 @@
+{
+  "name": "mapvibe-db-migration",
+  "version": "1.0.0",
+  "description": "Lambda function to run database migrations using Kysely",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
+    "kysely": "^0.28.8",
+    "pg": "^8.16.3"
+  }
+}

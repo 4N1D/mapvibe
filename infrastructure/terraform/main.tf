@@ -94,6 +94,23 @@ module "lambda_migration" {
 }
 
 # ============================================
+# LAMBDA PLACES API MODULE
+# ============================================
+
+module "lambda_places" {
+  source = "./modules/lambda-places"
+
+  environment           = var.environment
+  project_name          = var.project_name
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  rds_security_group_id = module.rds.security_group_id
+  db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
+  db_host               = module.rds.address
+  db_name               = module.rds.database_name
+}
+
+# ============================================
 # S3 + CLOUDFRONT MODULE
 # ============================================
 
@@ -105,6 +122,24 @@ module "cdn" {
 
   environment = var.environment
   web_acl_arn = "arn:aws:wafv2:us-east-1:487692781272:global/webacl/CreatedByCloudFront-a44b6ad5/06badb70-63dd-4ad2-9679-fc8e449b92f7"
+
+  # Custom domain
+  domain_aliases      = ["mapvibe.site", "www.mapvibe.site"]
+  acm_certificate_arn = module.dns.certificate_arn
+}
+
+# ============================================
+# ROUTE 53 + ACM MODULE
+# ============================================
+
+module "dns" {
+  source = "./modules/route53-acm"
+
+  environment            = var.environment
+  project_name           = var.project_name
+  domain_name            = "mapvibe.site"
+  cloudfront_domain_name = module.cdn.cloudfront_domain_name
+  api_domain_name        = "" # Sẽ thêm sau khi có API Gateway
 }
 
 # ============================================
@@ -154,4 +189,30 @@ output "migration_lambda_name" {
 output "migration_invoke_command" {
   description = "Command to invoke migration Lambda"
   value       = module.lambda_migration.invoke_command
+}
+
+output "places_api_url" {
+  description = "Places API Lambda URL"
+  value       = module.lambda_places.function_url
+}
+
+output "places_api_function_name" {
+  description = "Places API Lambda function name"
+  value       = module.lambda_places.function_name
+}
+
+# DNS Outputs
+output "domain_name" {
+  description = "Domain name"
+  value       = module.dns.domain_name
+}
+
+output "name_servers" {
+  description = "Name servers - CẬP NHẬT VÀO TENTEN.VN"
+  value       = module.dns.zone_name_servers
+}
+
+output "certificate_arn" {
+  description = "ACM Certificate ARN"
+  value       = module.dns.certificate_arn
 }

@@ -28,3 +28,15 @@ variable "web_acl_arn" {
   type        = string
   default     = null
 }
+
+variable "domain_aliases" {
+  description = "Custom domain aliases for CloudFront (e.g., mapvibe.site, www.mapvibe.site)"
+  type        = list(string)
+  default     = []
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for custom domain (required if domain_aliases is set)"
+  type        = string
+  default     = null
+}

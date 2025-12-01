@@ -34,6 +34,11 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "mapvibe-rds-sg-${var.environment}"
   }
+
+  # Ignore ingress changes - Lambda modules add their own rules
+  lifecycle {
+    ignore_changes = [ingress]
+  }
 }
 
 # DB Subnet Group

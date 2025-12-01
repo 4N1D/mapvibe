@@ -125,6 +125,7 @@ resource "aws_cloudfront_distribution" "main" {
   price_class         = "PriceClass_All"
   http_version        = "http2"
   web_acl_id          = var.web_acl_arn
+  aliases             = length(var.domain_aliases) > 0 ? var.domain_aliases : null
 
   # Origin 1: Static Assets
   origin {
@@ -188,7 +189,10 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.acm_certificate_arn == null ? true : false
+    acm_certificate_arn            = var.acm_certificate_arn
+    ssl_support_method             = var.acm_certificate_arn != null ? "sni-only" : null
+    minimum_protocol_version       = var.acm_certificate_arn != null ? "TLSv1.2_2021" : null
   }
 
   tags = {

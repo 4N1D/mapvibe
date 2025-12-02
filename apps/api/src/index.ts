@@ -10,6 +10,12 @@ import {
   createHandler,
   batchHandler,
 } from './handlers/places';
+import {
+  createHandler as reviewCreateHandler,
+  voteHandler as reviewVoteHandler,
+  commentHandler as reviewCommentHandler,
+  hotHandler as reviewHotHandler,
+} from './handlers/reviews';
 
 // Route definitions
 interface RouteDefinition {
@@ -56,6 +62,32 @@ const routes: RouteDefinition[] = [
     pattern: /^\/places\/batch$/,
     paramNames: [],
     handler: batchHandler,
+  },
+
+  // Reviews routes
+  {
+    method: 'POST',
+    pattern: /^\/reviews$/,
+    paramNames: [],
+    handler: reviewCreateHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/vote$/,
+    paramNames: [],
+    handler: reviewVoteHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/comment$/,
+    paramNames: [],
+    handler: reviewCommentHandler,
+  },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/hot$/,
+    paramNames: [],
+    handler: reviewHotHandler,
   },
 
   // Add more routes here as you build them:

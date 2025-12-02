@@ -1,0 +1,26 @@
+{
+  "name": "@mapvibe/api",
+  "version": "1.0.0",
+  "description": "MapVibe Backend API",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/local-server.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js \"--external:@aws-sdk/*\"",
+    "build:watch": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:@aws-sdk/* --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
+    "kysely": "^0.28.0",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.10.0",
+    "dotenv": "^16.0.0",
+    "esbuild": "^0.20.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

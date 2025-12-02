@@ -50,3 +50,15 @@ variable "multi_az" {
   type        = bool
   default     = false
 }
+
+variable "publicly_accessible" {
+  description = "Make RDS publicly accessible (for MVP development only)"
+  type        = bool
+  default     = false
+}
+
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs (required if publicly_accessible = true)"
+  type        = list(string)
+  default     = []
+}

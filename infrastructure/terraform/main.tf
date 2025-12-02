@@ -69,12 +69,14 @@ module "rds" {
   environment        = var.environment
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
+  public_subnet_ids  = module.vpc.public_subnet_ids
   db_password        = random_password.db_password.result
 
   # MVP settings - tiết kiệm chi phí
-  instance_class    = "db.t3.micro"  # ~$15/tháng
-  allocated_storage = 20              # 20GB
-  multi_az          = false           # Single AZ
+  instance_class      = "db.t3.micro"  # ~$15/tháng
+  allocated_storage   = 20              # 20GB
+  multi_az            = false           # Single AZ
+  publicly_accessible = true            # MVP only - cho phép local dev & DataGrip
 }
 
 # ============================================
@@ -94,11 +96,13 @@ module "lambda_migration" {
 }
 
 # ============================================
-# LAMBDA PLACES API MODULE
+# LAMBDA API MODULE
 # ============================================
 
-module "lambda_places" {
-  source = "./modules/lambda-places"
+# Note: Run `cd apps/api && bun run build` before terraform apply
+
+module "lambda_api" {
+  source = "./modules/lambda-api"
 
   environment           = var.environment
   project_name          = var.project_name
@@ -156,8 +160,8 @@ module "api_gateway" {
   route53_zone_id     = module.dns.zone_id
 
   # Lambda integrations
-  places_lambda_name       = module.lambda_places.function_name
-  places_lambda_invoke_arn = module.lambda_places.invoke_arn
+  places_lambda_name       = module.lambda_api.function_name
+  places_lambda_invoke_arn = module.lambda_api.invoke_arn
 }
 
 # ============================================
@@ -209,14 +213,14 @@ output "migration_invoke_command" {
   value       = module.lambda_migration.invoke_command
 }
 
-output "places_api_url" {
-  description = "Places API Lambda URL"
-  value       = module.lambda_places.function_url
+output "api_lambda_url" {
+  description = "API Lambda URL (direct)"
+  value       = module.lambda_api.function_url
 }
 
-output "places_api_function_name" {
-  description = "Places API Lambda function name"
-  value       = module.lambda_places.function_name
+output "api_lambda_function_name" {
+  description = "API Lambda function name"
+  value       = module.lambda_api.function_name
 }
 
 # DNS Outputs

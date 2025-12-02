@@ -41,10 +41,10 @@ resource "aws_security_group" "rds" {
   }
 }
 
-# DB Subnet Group
+# DB Subnet Group (use public subnets for MVP dev access)
 resource "aws_db_subnet_group" "main" {
   name       = "mapvibe-db-subnet-${var.environment}"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids = var.publicly_accessible ? var.public_subnet_ids : var.private_subnet_ids
 
   tags = {
     Name = "mapvibe-db-subnet-${var.environment}"
@@ -97,7 +97,7 @@ resource "aws_db_instance" "main" {
   # Network
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = false
+  publicly_accessible    = var.publicly_accessible
   multi_az               = var.multi_az
 
   # Backup

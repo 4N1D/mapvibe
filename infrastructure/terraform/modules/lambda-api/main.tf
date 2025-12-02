@@ -1,15 +1,24 @@
-# Lambda Places API Module
+# Lambda API Module
+# References code from apps/api/
 
-# Archive source code
+# ============================================
+# BUILD & ARCHIVE
+# ============================================
+
+# Note: Run `cd apps/api && bun run build` then copy dist to this folder
+# cp -r apps/api/dist/* infrastructure/terraform/modules/lambda-api/dist/
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/src"
-  output_path = "${path.module}/lambda-places.zip"
+  source_dir  = "${path.module}/dist"
+  output_path = "${path.module}/lambda-api.zip"
 }
 
-# IAM Role for Lambda
+# ============================================
+# IAM ROLE
+# ============================================
+
 resource "aws_iam_role" "lambda" {
-  name = "${var.project_name}-places-lambda-role-${var.environment}"
+  name = "${var.project_name}-api-lambda-role-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -23,15 +32,14 @@ resource "aws_iam_role" "lambda" {
   })
 
   tags = {
-    Name        = "${var.project_name}-places-lambda-role-${var.environment}"
+    Name        = "${var.project_name}-api-lambda-role-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
   }
 }
 
-# IAM Policy for Lambda
 resource "aws_iam_role_policy" "lambda" {
-  name = "${var.project_name}-places-lambda-policy-${var.environment}"
+  name = "${var.project_name}-api-lambda-policy-${var.environment}"
   role = aws_iam_role.lambda.id
 
   policy = jsonencode({
@@ -47,10 +55,8 @@ resource "aws_iam_role_policy" "lambda" {
         Resource = "arn:aws:logs:*:*:*"
       },
       {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = var.db_secret_arn
       },
       {
@@ -66,10 +72,13 @@ resource "aws_iam_role_policy" "lambda" {
   })
 }
 
-# Security Group for Lambda
+# ============================================
+# SECURITY GROUP
+# ============================================
+
 resource "aws_security_group" "lambda" {
-  name        = "${var.project_name}-places-lambda-sg-${var.environment}"
-  description = "Security group for Places Lambda"
+  name        = "${var.project_name}-api-lambda-sg-${var.environment}"
+  description = "Security group for API Lambda"
   vpc_id      = var.vpc_id
 
   egress {
@@ -81,7 +90,7 @@ resource "aws_security_group" "lambda" {
   }
 
   tags = {
-    Name        = "${var.project_name}-places-lambda-sg-${var.environment}"
+    Name        = "${var.project_name}-api-lambda-sg-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
   }
@@ -95,13 +104,16 @@ resource "aws_security_group_rule" "lambda_to_rds" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.lambda.id
   security_group_id        = var.rds_security_group_id
-  description              = "Allow Places Lambda to connect to RDS"
+  description              = "Allow API Lambda to connect to RDS"
 }
 
-# Lambda Function
-resource "aws_lambda_function" "places" {
+# ============================================
+# LAMBDA FUNCTION
+# ============================================
+
+resource "aws_lambda_function" "api" {
   filename         = data.archive_file.lambda_zip.output_path
-  function_name    = "${var.project_name}-places-api-${var.environment}"
+  function_name    = "${var.project_name}-api-${var.environment}"
   role             = aws_iam_role.lambda.arn
   handler          = "index.handler"
   runtime          = "nodejs18.x"
@@ -119,20 +131,23 @@ resource "aws_lambda_function" "places" {
       DB_HOST       = var.db_host
       DB_NAME       = var.db_name
       DB_SECRET_ARN = var.db_secret_arn
-      ENVIRONMENT   = var.environment
+      NODE_ENV      = var.environment
     }
   }
 
   tags = {
-    Name        = "${var.project_name}-places-api-${var.environment}"
+    Name        = "${var.project_name}-api-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
   }
 }
 
-# Lambda Function URL (for testing without API Gateway)
-resource "aws_lambda_function_url" "places" {
-  function_name      = aws_lambda_function.places.function_name
+# ============================================
+# LAMBDA URL (for direct testing)
+# ============================================
+
+resource "aws_lambda_function_url" "api" {
+  function_name      = aws_lambda_function.api.function_name
   authorization_type = "NONE"
 
   cors {
@@ -143,9 +158,12 @@ resource "aws_lambda_function_url" "places" {
   }
 }
 
-# CloudWatch Log Group
+# ============================================
+# CLOUDWATCH LOGS
+# ============================================
+
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${aws_lambda_function.places.function_name}"
+  name              = "/aws/lambda/${aws_lambda_function.api.function_name}"
   retention_in_days = 14
 
   tags = {

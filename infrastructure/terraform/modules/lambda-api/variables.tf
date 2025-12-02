@@ -1,27 +1,27 @@
-# Lambda Places Module Variables
+# Lambda API Module Variables
 
 variable "environment" {
-  description = "Environment name (mvp, dev, prod)"
+  description = "Environment name"
   type        = string
 }
 
 variable "project_name" {
-  description = "Project name for resource naming"
+  description = "Project name"
   type        = string
 }
 
 variable "vpc_id" {
-  description = "VPC ID where Lambda will be deployed"
+  description = "VPC ID"
   type        = string
 }
 
 variable "private_subnet_ids" {
-  description = "List of private subnet IDs for Lambda"
+  description = "List of private subnet IDs"
   type        = list(string)
 }
 
 variable "rds_security_group_id" {
-  description = "RDS security group ID to allow Lambda access"
+  description = "RDS security group ID"
   type        = string
 }
 
@@ -36,6 +36,6 @@ variable "db_name" {
 }
 
 variable "db_secret_arn" {
-  description = "ARN of the Secrets Manager secret containing DB credentials"
+  description = "ARN of Secrets Manager secret for DB credentials"
   type        = string
 }

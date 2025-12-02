@@ -7,6 +7,8 @@ import {
   getByIdHandler,
   searchHandler,
   nearbyHandler,
+  createHandler,
+  batchHandler,
 } from './handlers/places';
 
 // Route definitions
@@ -43,6 +45,18 @@ const routes: RouteDefinition[] = [
     paramNames: [],
     handler: searchHandler,
   },
+  {
+    method: 'POST',
+    pattern: /^\/places$/,
+    paramNames: [],
+    handler: createHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/places\/batch$/,
+    paramNames: [],
+    handler: batchHandler,
+  },
 
   // Add more routes here as you build them:
   // { method: 'GET', pattern: /^\/reviews$/, paramNames: [], handler: reviewsListHandler },
@@ -74,10 +88,18 @@ function matchRoute(
 export async function handler(
   event: APIGatewayEvent
 ): Promise<APIGatewayResponse> {
-  console.log(`[API] ${event.httpMethod} ${event.path}`);
+  const httpMethod =
+    event.httpMethod || event.requestContext?.http?.method || 'GET';
+  const path =
+    event.path ||
+    event.rawPath ||
+    event.requestContext?.http?.path ||
+    '/';
+
+  console.log(`[API] ${httpMethod} ${path}`);
 
   // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
+  if (httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -87,11 +109,11 @@ export async function handler(
 
   try {
     // Find matching route
-    const matched = matchRoute(event.httpMethod, event.path);
+    const matched = matchRoute(httpMethod, path);
 
     if (!matched) {
-      console.log(`[API] Route not found: ${event.httpMethod} ${event.path}`);
-      return notFound(`Route not found: ${event.httpMethod} ${event.path}`);
+      console.log(`[API] Route not found: ${httpMethod} ${path}`);
+      return notFound(`Route not found: ${httpMethod} ${path}`);
     }
 
     // Add path parameters to event

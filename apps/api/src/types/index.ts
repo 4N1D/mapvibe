@@ -1,7 +1,14 @@
 // API Gateway Event types
 export interface APIGatewayEvent {
-  httpMethod: string;
-  path: string;
+  httpMethod?: string;
+  path?: string;
+  rawPath?: string;
+  requestContext?: {
+    http?: {
+      method?: string;
+      path?: string;
+    };
+  };
   pathParameters?: Record<string, string> | null;
   queryStringParameters?: Record<string, string> | null;
   headers?: Record<string, string> | null;

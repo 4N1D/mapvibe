@@ -63,7 +63,7 @@ export async function getDb(): Promise<Kysely<any>> {
         database: creds.database,
         user: creds.user,
         password: creds.password,
-        ssl: isLambda ? { rejectUnauthorized: false } : false,
+        ssl: { rejectUnauthorized: false },
         max: isLambda ? 1 : 10,
       }),
     }),

@@ -59,6 +59,18 @@ resource "aws_apigatewayv2_route" "places_search" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "places_create" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /places"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "places_batch" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /places/batch"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
 resource "aws_apigatewayv2_route" "places_nearby" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /places/nearby"

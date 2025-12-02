@@ -6,6 +6,7 @@ stages:
   - install
   - build
   - test
+  - deploy
 
 # Cache dependencies for faster builds
 cache:
@@ -44,16 +45,6 @@ install:
 # ===========================
 # STAGE 2: BUILD
 # ===========================
-
-# Build database package (skip - runs TypeScript directly)
-build:database:
-  stage: build
-  needs: [install]
-  script:
-    - echo "🗄️ Database package uses TypeScript directly - no build needed"
-    - echo "✅ Skipping build for database package"
-  only:
-    - branches
 
 # Build ui-components package
 build:ui-components:
@@ -97,3 +88,94 @@ build:web:
 #     - bun test
 #   only:
 #     - branches
+
+
+
+# ===========================
+# STAGE 5: DEPLOY
+# ===========================
+
+# Deploy Frontend to S3 + CloudFront
+deploy:frontend:
+  stage: deploy
+  image: amazon/aws-cli:latest
+  needs: [build:web]
+  script:
+    - echo "🚀 Deploying frontend to S3..."
+    - aws s3 sync apps/web/dist s3://$S3_BUCKET_NAME --delete
+    - echo "🔄 Invalidating CloudFront cache..."
+    - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DIST_ID --paths "/*"
+    - echo "✅ Frontend deployed successfully"
+  rules:
+    # Trigger on MR to dev when frontend changed
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+      changes:
+        - apps/web/**/*
+        - packages/ui-components/**/*
+      when: manual
+    # Trigger on dev branch when frontend changed
+    - if: $CI_COMMIT_BRANCH == "dev"
+      changes:
+        - apps/web/**/*
+        - packages/ui-components/**/*
+      when: manual
+  allow_failure: false
+
+# Deploy Lambda API (requires Terraform)
+deploy:lambda-api:
+  stage: deploy
+  image: hashicorp/terraform:latest
+  needs: []
+  script:
+    - echo "🚀 Deploying Lambda API..."
+    - cd infrastructure/terraform
+    - terraform init
+    - terraform apply -target=module.lambda_api -auto-approve
+    - echo "✅ Lambda API deployed successfully"
+  rules:
+    # Trigger on MR to dev when API changed
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+      changes:
+        - apps/api/**/*
+        - infrastructure/terraform/modules/lambda-api/**/*
+      when: manual
+    # Trigger on dev branch when API changed
+    - if: $CI_COMMIT_BRANCH == "dev"
+      changes:
+        - apps/api/**/*
+        - infrastructure/terraform/modules/lambda-api/**/*
+      when: manual
+  allow_failure: false
+
+# Deploy Infrastructure + Run Migrations (Terraform)
+deploy:infrastructure:
+  stage: deploy
+  image: hashicorp/terraform:latest
+  needs: []
+  before_script:
+    - apk add --no-cache aws-cli
+  script:
+    - echo "🏗️ Deploying infrastructure..."
+    - cd infrastructure/terraform
+    - terraform init
+    - terraform plan
+    - terraform apply -auto-approve
+    - echo "✅ Infrastructure deployed"
+    - echo ""
+    - echo "🗄️ Running database migrations..."
+    - aws lambda invoke --function-name mapvibe-db-migration-mvp --payload '{}' --cli-binary-format raw-in-base64-out response.json
+    - cat response.json
+    - echo ""
+    - echo "✅ Migrations completed"
+  rules:
+    # Trigger on MR to dev when terraform or migrations changed
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+      changes:
+        - infrastructure/terraform/**/*
+      when: manual
+    # Trigger on dev branch when terraform or migrations changed
+    - if: $CI_COMMIT_BRANCH == "dev"
+      changes:
+        - infrastructure/terraform/**/*
+      when: manual
+  allow_failure: false

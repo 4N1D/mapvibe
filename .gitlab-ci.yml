@@ -1,6 +1,5 @@
 # GitLab CI/CD Pipeline for MapVibe Monorepo
 
-# Workflow rules - ONLY ONE pipeline per commit
 # Prevents duplicate pipelines (branch + MR)
 workflow:
   rules:

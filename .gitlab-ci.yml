@@ -81,8 +81,7 @@ build:web:
       - apps/web/dist/
     expire_in: 1 week
   rules:
-    - changes:
-        - .gitlab-ci.yml
+    - if: $CI_COMMIT_MESSAGE =~ /\[ci-only\]/
       when: never
     - when: on_success
 

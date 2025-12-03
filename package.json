@@ -1,16 +1,20 @@
 {
   "name": "mapvibe",
   "version": "0.1.0",
+  "type": "module",
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
     "eslint": "^9.39.1",
+    "globals": "^16.5.0",
     "kysely-codegen": "^0.19.0",
     "kysely-migration-cli": "^0.4.2",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.1"
   },
   "engines": {
     "node": ">=24.11.1",

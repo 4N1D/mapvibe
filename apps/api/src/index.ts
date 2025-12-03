@@ -1,5 +1,5 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from './types';
-import { corsHeaders, notFound, error } from './middlewares/response';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "./types";
+import { corsHeaders, notFound, error } from "./middlewares/response";
 
 // Import handlers
 import {
@@ -9,7 +9,7 @@ import {
   nearbyHandler,
   createHandler,
   batchHandler,
-} from './handlers/places';
+} from "./handlers/places";
 
 // Route definitions
 interface RouteDefinition {
@@ -22,37 +22,37 @@ interface RouteDefinition {
 const routes: RouteDefinition[] = [
   // Places routes
   {
-    method: 'GET',
+    method: "GET",
     pattern: /^\/places$/,
     paramNames: [],
     handler: listHandler,
   },
   {
-    method: 'GET',
+    method: "GET",
     pattern: /^\/places\/nearby$/,
     paramNames: [],
     handler: nearbyHandler,
   },
   {
-    method: 'GET',
+    method: "GET",
     pattern: /^\/places\/([^/]+)$/,
-    paramNames: ['id'],
+    paramNames: ["id"],
     handler: getByIdHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/places\/search$/,
     paramNames: [],
     handler: searchHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/places$/,
     paramNames: [],
     handler: createHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/places\/batch$/,
     paramNames: [],
     handler: batchHandler,
@@ -85,25 +85,18 @@ function matchRoute(
 }
 
 // Lambda handler
-export async function handler(
-  event: APIGatewayEvent
-): Promise<APIGatewayResponse> {
-  const httpMethod =
-    event.httpMethod || event.requestContext?.http?.method || 'GET';
-  const path =
-    event.path ||
-    event.rawPath ||
-    event.requestContext?.http?.path ||
-    '/';
+export async function handler(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+  const httpMethod = event.httpMethod || event.requestContext?.http?.method || "GET";
+  const path = event.path || event.rawPath || event.requestContext?.http?.path || "/";
 
   console.log(`[API] ${httpMethod} ${path}`);
 
   // Handle CORS preflight
-  if (httpMethod === 'OPTIONS') {
+  if (httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: '',
+      body: "",
     };
   }
 
@@ -122,8 +115,8 @@ export async function handler(
     // Execute handler
     return await matched.handler.handle(event);
   } catch (err) {
-    console.error('[API] Unhandled error:', err);
-    return error((err as Error).message || 'Internal server error', 500);
+    console.error("[API] Unhandled error:", err);
+    return error((err as Error).message || "Internal server error", 500);
   }
 }
 

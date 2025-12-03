@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require("pg");
 
 let pool = null;
 
@@ -8,7 +8,7 @@ async function getPool() {
   // Get credentials from environment or Secrets Manager
   let dbConfig = {
     host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '5432'),
+    port: parseInt(process.env.DB_PORT || "5432"),
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -21,7 +21,7 @@ async function getPool() {
     const {
       SecretsManagerClient,
       GetSecretValueCommand,
-    } = require('@aws-sdk/client-secrets-manager');
+    } = require("@aws-sdk/client-secrets-manager");
     const client = new SecretsManagerClient({});
     const response = await client.send(
       new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN })
@@ -36,7 +36,7 @@ async function getPool() {
 }
 
 exports.handler = async (event, context) => {
-  console.log('Cognito Trigger Event:', JSON.stringify(event, null, 2));
+  console.log("Cognito Trigger Event:", JSON.stringify(event, null, 2));
 
   const triggerSource = event.triggerSource;
   const userAttributes = event.request.userAttributes;
@@ -45,12 +45,12 @@ exports.handler = async (event, context) => {
     // Handle different trigger types
     switch (triggerSource) {
       // Email/password signup - after user confirms email
-      case 'PostConfirmation_ConfirmSignUp':
+      case "PostConfirmation_ConfirmSignUp":
         await createUserRecord(userAttributes);
         break;
 
       // Google OAuth - first time login
-      case 'PostAuthentication_Authentication':
+      case "PostAuthentication_Authentication":
         // Only for federated (Google) users
         if (userAttributes.identities) {
           await createUserRecordIfNotExists(userAttributes);
@@ -58,8 +58,8 @@ exports.handler = async (event, context) => {
         break;
 
       // Pre Token Generation - can also sync user here for OAuth
-      case 'TokenGeneration_HostedAuth':
-      case 'TokenGeneration_Authentication':
+      case "TokenGeneration_HostedAuth":
+      case "TokenGeneration_Authentication":
         await createUserRecordIfNotExists(userAttributes);
         break;
 
@@ -70,7 +70,7 @@ exports.handler = async (event, context) => {
     // Return event to Cognito
     return event;
   } catch (error) {
-    console.error('Error in Cognito trigger:', error);
+    console.error("Error in Cognito trigger:", error);
     // Don't throw - let user continue even if DB sync fails
     // We can retry later or sync on next login
     return event;
@@ -83,11 +83,9 @@ async function createUserRecord(userAttributes) {
   const userId = userAttributes.sub;
   const email = userAttributes.email;
   const displayName =
-    userAttributes.name ||
-    userAttributes.preferred_username ||
-    email.split('@')[0];
+    userAttributes.name || userAttributes.preferred_username || email.split("@")[0];
   const avatar = userAttributes.picture || null;
-  const emailVerified = userAttributes.email_verified === 'true';
+  const emailVerified = userAttributes.email_verified === "true";
 
   console.log(`Creating user record for: ${email} (${userId})`);
 
@@ -98,13 +96,7 @@ async function createUserRecord(userAttributes) {
     RETURNING id
   `;
 
-  const result = await db.query(query, [
-    userId,
-    email,
-    displayName,
-    avatar,
-    emailVerified,
-  ]);
+  const result = await db.query(query, [userId, email, displayName, avatar, emailVerified]);
 
   if (result.rowCount > 0) {
     console.log(`User created: ${userId}`);
@@ -122,9 +114,7 @@ async function createUserRecordIfNotExists(userAttributes) {
   const email = userAttributes.email;
 
   // Check if user exists
-  const checkResult = await db.query('SELECT id FROM users WHERE id = $1', [
-    userId,
-  ]);
+  const checkResult = await db.query("SELECT id FROM users WHERE id = $1", [userId]);
 
   if (checkResult.rows.length === 0) {
     // User doesn't exist, create it
@@ -132,9 +122,7 @@ async function createUserRecordIfNotExists(userAttributes) {
   }
 
   // Update last_login_at
-  await db.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [
-    userId,
-  ]);
+  await db.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [userId]);
 
   console.log(`User exists, updated last_login: ${userId}`);
 }

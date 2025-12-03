@@ -143,7 +143,7 @@ module "dns" {
   project_name           = var.project_name
   domain_name            = "mapvibe.site"
   cloudfront_domain_name = module.cdn.cloudfront_domain_name
-  api_domain_name        = "" # Không dùng nữa, API Gateway tự tạo record
+  cognito_user_pool_id   = var.cognito_user_pool_id
 }
 
 # ============================================

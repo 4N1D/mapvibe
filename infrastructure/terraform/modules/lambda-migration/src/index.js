@@ -1,16 +1,16 @@
-const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
-const { Kysely, PostgresDialect, Migrator, FileMigrationProvider } = require('kysely');
-const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
+const { Kysely, PostgresDialect, Migrator, FileMigrationProvider } = require("kysely");
+const { Pool } = require("pg");
+const fs = require("fs");
+const path = require("path");
 
 const secretsClient = new SecretsManagerClient();
 
 async function getDbCredentials() {
   const command = new GetSecretValueCommand({
-    SecretId: process.env.DB_SECRET_ARN
+    SecretId: process.env.DB_SECRET_ARN,
   });
-  
+
   const response = await secretsClient.send(command);
   return JSON.parse(response.SecretString);
 }
@@ -33,7 +33,7 @@ async function createKyselyInstance(credentials) {
 
 // Query mode - run raw SQL
 async function handleQuery(db, sql) {
-  console.log('Executing query:', sql);
+  console.log("Executing query:", sql);
   const result = await db.executeQuery({
     sql,
     parameters: [],
@@ -41,7 +41,7 @@ async function handleQuery(db, sql) {
   return {
     statusCode: 200,
     body: JSON.stringify({
-      message: 'Query executed',
+      message: "Query executed",
       rowCount: result.rows.length,
       rows: result.rows,
     }),
@@ -53,9 +53,9 @@ async function handleMigration(db, shouldRollback) {
   const migrator = new Migrator({
     db,
     provider: new FileMigrationProvider({
-      fs: require('fs/promises'),
+      fs: require("fs/promises"),
       path,
-      migrationFolder: path.join(__dirname, 'migrations'),
+      migrationFolder: path.join(__dirname, "migrations"),
     }),
   });
 
@@ -63,24 +63,24 @@ async function handleMigration(db, shouldRollback) {
   let error;
 
   if (shouldRollback) {
-    console.log('Rolling back last migration...');
+    console.log("Rolling back last migration...");
     ({ error, results } = await migrator.migrateDown());
   } else {
-    console.log('Running migrations to latest...');
+    console.log("Running migrations to latest...");
     ({ error, results } = await migrator.migrateToLatest());
   }
 
   const migrationResults = [];
   results?.forEach((it) => {
-    if (it.status === 'Success') {
+    if (it.status === "Success") {
       console.log(`✅ Migration "${it.migrationName}" executed successfully`);
-      migrationResults.push({ name: it.migrationName, status: 'Success' });
-    } else if (it.status === 'Error') {
+      migrationResults.push({ name: it.migrationName, status: "Success" });
+    } else if (it.status === "Error") {
       console.error(`❌ Failed to execute migration "${it.migrationName}"`);
-      migrationResults.push({ name: it.migrationName, status: 'Error' });
-    } else if (it.status === 'NotExecuted') {
+      migrationResults.push({ name: it.migrationName, status: "Error" });
+    } else if (it.status === "NotExecuted") {
       console.log(`⏭️ Migration "${it.migrationName}" was not executed (already applied)`);
-      migrationResults.push({ name: it.migrationName, status: 'NotExecuted' });
+      migrationResults.push({ name: it.migrationName, status: "NotExecuted" });
     }
   });
 
@@ -89,14 +89,14 @@ async function handleMigration(db, shouldRollback) {
   return {
     statusCode: 200,
     body: JSON.stringify({
-      message: shouldRollback ? 'Rollback completed' : 'Migrations completed successfully',
+      message: shouldRollback ? "Rollback completed" : "Migrations completed successfully",
       results: migrationResults,
     }),
   };
 }
 
 exports.handler = async (event) => {
-  console.log('Lambda invoked with event:', JSON.stringify(event));
+  console.log("Lambda invoked with event:", JSON.stringify(event));
 
   let db;
 
@@ -105,20 +105,20 @@ exports.handler = async (event) => {
     console.log(`Connecting to database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
 
     db = await createKyselyInstance(credentials);
-    console.log('Database connected');
+    console.log("Database connected");
 
     // Determine action
-    const action = event.action || 'migrate';
+    const action = event.action || "migrate";
 
-    if (action === 'query' && event.sql) {
+    if (action === "query" && event.sql) {
       return await handleQuery(db, event.sql);
-    } else if (action === 'migrate' || event.rollback !== undefined) {
+    } else if (action === "migrate" || event.rollback !== undefined) {
       return await handleMigration(db, event.rollback === true);
     } else {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          message: 'Invalid action',
+          message: "Invalid action",
           usage: {
             migrate: '{ } or { "action": "migrate" }',
             rollback: '{ "rollback": true }',
@@ -128,18 +128,18 @@ exports.handler = async (event) => {
       };
     }
   } catch (error) {
-    console.error('Error:', error);
+    console.error("Error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({
-        message: 'Error',
+        message: "Error",
         error: error.message,
       }),
     };
   } finally {
     if (db) {
       await db.destroy();
-      console.log('Database connection closed');
+      console.log("Database connection closed");
     }
   }
 };

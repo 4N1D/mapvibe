@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, error } from '../../middlewares/response';
+import crypto from "crypto";
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, error } from "../../middlewares/response";
 
 interface CreatePlaceBody {
   name_vi: string;
@@ -25,9 +25,9 @@ export const handler: Handler = {
       // Parse body
       let body: CreatePlaceBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const {
@@ -41,14 +41,12 @@ export const handler: Handler = {
         cuisine_types = [],
         price_min,
         price_max,
-        status = 'approved',
+        status = "approved",
       } = body;
 
       // Basic validation
       if (!name_vi || !address || geo_lat == null || geo_lng == null) {
-        return badRequest(
-          'Missing required fields: name_vi, address, geo_lat, geo_lng'
-        );
+        return badRequest("Missing required fields: name_vi, address, geo_lat, geo_lng");
       }
 
       const finalSlug =
@@ -56,12 +54,12 @@ export const handler: Handler = {
         String(name_vi)
           .trim()
           .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9\-]/g, '');
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
 
       // Insert into restaurants table
       const [created] = await db
-        .insertInto('restaurants')
+        .insertInto("restaurants")
         .values({
           id: crypto.randomUUID(),
           name_vi,
@@ -70,11 +68,11 @@ export const handler: Handler = {
           district,
           ward,
           geo_lat,
-        geo_lng,
-        // DB column is JSON – store as valid JSON string
-        cuisine_types: Array.isArray(cuisine_types)
-          ? JSON.stringify(cuisine_types)
-          : JSON.stringify([]),
+          geo_lng,
+          // DB column is JSON – store as valid JSON string
+          cuisine_types: Array.isArray(cuisine_types)
+            ? JSON.stringify(cuisine_types)
+            : JSON.stringify([]),
           price_min,
           price_max,
           status,
@@ -84,10 +82,8 @@ export const handler: Handler = {
 
       return success(created, 201);
     } catch (err) {
-      console.error('[places/create] Error:', err);
+      console.error("[places/create] Error:", err);
       return error((err as Error).message);
     }
   },
 };
-
-

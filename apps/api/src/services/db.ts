@@ -1,5 +1,5 @@
-import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
+import { Kysely, PostgresDialect } from "kysely";
+import { Pool } from "pg";
 
 // Check if running on AWS Lambda
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -19,13 +19,13 @@ async function getCredentials(): Promise<DBCredentials> {
   if (isLambda && process.env.DB_SECRET_ARN) {
     // AWS Lambda: Get credentials from Secrets Manager
     const { SecretsManagerClient, GetSecretValueCommand } = await import(
-      '@aws-sdk/client-secrets-manager'
+      "@aws-sdk/client-secrets-manager"
     );
     const client = new SecretsManagerClient({});
     const response = await client.send(
       new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN })
     );
-    const secret = JSON.parse(response.SecretString || '{}');
+    const secret = JSON.parse(response.SecretString || "{}");
 
     return {
       host: process.env.DB_HOST || secret.host,
@@ -38,11 +38,11 @@ async function getCredentials(): Promise<DBCredentials> {
 
   // Local development: Get credentials from environment variables
   return {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'mapvibe',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '',
+    host: process.env.DB_HOST || "localhost",
+    port: parseInt(process.env.DB_PORT || "5432"),
+    database: process.env.DB_NAME || "mapvibe",
+    user: process.env.DB_USER || "postgres",
+    password: process.env.DB_PASSWORD || "",
   };
 }
 
@@ -52,7 +52,7 @@ export async function getDb(): Promise<Kysely<any>> {
   const creds = await getCredentials();
 
   console.log(
-    `[DB] Connecting to ${creds.host}/${creds.database} (${isLambda ? 'Lambda' : 'Local'})`
+    `[DB] Connecting to ${creds.host}/${creds.database} (${isLambda ? "Lambda" : "Local"})`
   );
 
   db = new Kysely({

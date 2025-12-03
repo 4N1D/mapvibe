@@ -6,26 +6,26 @@
  * Test: curl http://localhost:3000/places
  */
 
-import 'dotenv/config';
-import http from 'http';
-import { URL } from 'url';
-import { handler } from './index';
-import type { APIGatewayEvent } from './types';
+import "dotenv/config";
+import http from "http";
+import { URL } from "url";
+import { handler } from "./index";
+import type { APIGatewayEvent } from "./types";
 
-const PORT = parseInt(process.env.PORT || '3000');
+const PORT = parseInt(process.env.PORT || "3000");
 
 const server = http.createServer(async (req, res) => {
   // Parse URL
-  const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  const url = new URL(req.url || "/", `http://localhost:${PORT}`);
 
   // Collect body
-  let body = '';
-  req.on('data', (chunk) => (body += chunk));
+  let body = "";
+  req.on("data", (chunk) => (body += chunk));
 
-  req.on('end', async () => {
+  req.on("end", async () => {
     // Build event similar to API Gateway
     const event: APIGatewayEvent = {
-      httpMethod: req.method || 'GET',
+      httpMethod: req.method || "GET",
       path: url.pathname,
       queryStringParameters: Object.fromEntries(url.searchParams),
       pathParameters: null,
@@ -44,7 +44,7 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`← ${response.statusCode}`);
     } catch (err) {
-      console.error('Error:', err);
+      console.error("Error:", err);
       res.writeHead(500);
       res.end(JSON.stringify({ error: (err as Error).message }));
     }
@@ -57,7 +57,7 @@ server.listen(PORT, () => {
 ║         MapVibe API - Local Development              ║
 ╠══════════════════════════════════════════════════════╣
 ║  Server: http://localhost:${PORT}                        ║
-║  Mode:   ${process.env.NODE_ENV || 'development'}                              ║
+║  Mode:   ${process.env.NODE_ENV || "development"}                              ║
 ╠══════════════════════════════════════════════════════╣
 ║  Available routes:                                   ║
 ║  GET  /places          - List places                 ║

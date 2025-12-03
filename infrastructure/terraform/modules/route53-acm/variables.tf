@@ -26,8 +26,8 @@ variable "cloudfront_hosted_zone_id" {
   default     = "Z2FDTNDATAQYW2"
 }
 
-variable "api_domain_name" {
-  description = "API endpoint domain (Lambda URL or API Gateway)"
+variable "cognito_user_pool_id" {
+  description = "Cognito User Pool ID for custom domain setup"
   type        = string
   default     = ""
 }

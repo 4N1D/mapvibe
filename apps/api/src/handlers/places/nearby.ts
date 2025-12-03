@@ -1,7 +1,7 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -10,13 +10,13 @@ export const handler: Handler = {
 
       // Parse query parameters
       const params = event.queryStringParameters || {};
-      const lat = parseFloat(params.lat || '');
-      const lng = parseFloat(params.lng || '');
-      const radius = Math.min(parseFloat(params.radius || '5'), 50); // km, max 50km
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
+      const lat = parseFloat(params.lat || "");
+      const lng = parseFloat(params.lng || "");
+      const radius = Math.min(parseFloat(params.radius || "5"), 50); // km, max 50km
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
 
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-        return badRequest('Valid lat and lng are required');
+        return badRequest("Valid lat and lng are required");
       }
 
       // PostGIS distance query
@@ -57,7 +57,7 @@ export const handler: Handler = {
         count: places.rows.length,
       });
     } catch (err) {
-      console.error('[places/nearby] Error:', err);
+      console.error("[places/nearby] Error:", err);
       return error((err as Error).message);
     }
   },

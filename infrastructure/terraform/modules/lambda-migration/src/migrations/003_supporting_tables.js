@@ -1,7 +1,7 @@
-const { sql } = require('kysely');
+const { sql } = require("kysely");
 
 async function up(db) {
-  console.log('Creating supporting tables...');
+  console.log("Creating supporting tables...");
 
   // Photos table
   await sql`
@@ -30,7 +30,7 @@ async function up(db) {
       processed_at TIMESTAMP
     )
   `.execute(db);
-  console.log('  ✓ photos table created');
+  console.log("  ✓ photos table created");
 
   // Comments table
   await sql`
@@ -56,7 +56,7 @@ async function up(db) {
       )
     )
   `.execute(db);
-  console.log('  ✓ comments table created');
+  console.log("  ✓ comments table created");
 
   // Votes table
   await sql`
@@ -69,7 +69,7 @@ async function up(db) {
       CONSTRAINT check_vote_type CHECK (vote_type IN ('upvote', 'downvote'))
     )
   `.execute(db);
-  console.log('  ✓ votes table created');
+  console.log("  ✓ votes table created");
 
   // Favorites table
   await sql`
@@ -80,7 +80,7 @@ async function up(db) {
       PRIMARY KEY (user_id, restaurant_id)
     )
   `.execute(db);
-  console.log('  ✓ favorites table created');
+  console.log("  ✓ favorites table created");
 
   // Restaurant edit suggestions
   await sql`
@@ -98,7 +98,7 @@ async function up(db) {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `.execute(db);
-  console.log('  ✓ restaurant_edit_suggestions table created');
+  console.log("  ✓ restaurant_edit_suggestions table created");
 
   // Audit logs
   await sql`
@@ -117,9 +117,9 @@ async function up(db) {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `.execute(db);
-  console.log('  ✓ audit_logs table created');
+  console.log("  ✓ audit_logs table created");
 
-  console.log('Supporting tables created successfully');
+  console.log("Supporting tables created successfully");
 }
 
 async function down(db) {

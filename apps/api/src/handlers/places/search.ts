@@ -1,6 +1,6 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, error } from '../../middlewares/response';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, error } from "../../middlewares/response";
 
 interface SearchBody {
   query: string;
@@ -17,47 +17,44 @@ export const handler: Handler = {
       // Parse body
       let body: SearchBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { query, district, limit = 20, offset = 0 } = body;
 
       if (!query || query.length < 2) {
-        return badRequest('Query must be at least 2 characters');
+        return badRequest("Query must be at least 2 characters");
       }
 
       // Full-text search with ILIKE
       let searchQuery = db
-        .selectFrom('restaurants')
+        .selectFrom("restaurants")
         .select([
-          'id',
-          'name_vi',
-          'slug',
-          'address',
-          'district',
-          'geo_lat',
-          'geo_lng',
-          'cuisine_types',
-          'price_min',
-          'price_max',
-          'rating_overall',
-          'review_count',
+          "id",
+          "name_vi",
+          "slug",
+          "address",
+          "district",
+          "geo_lat",
+          "geo_lng",
+          "cuisine_types",
+          "price_min",
+          "price_max",
+          "rating_overall",
+          "review_count",
         ])
-        .where('status', '=', 'approved')
+        .where("status", "=", "approved")
         .where((eb) =>
-          eb.or([
-            eb('name_vi', 'ilike', `%${query}%`),
-            eb('address', 'ilike', `%${query}%`),
-          ])
+          eb.or([eb("name_vi", "ilike", `%${query}%`), eb("address", "ilike", `%${query}%`)])
         )
-        .orderBy('rating_overall', 'desc')
+        .orderBy("rating_overall", "desc")
         .limit(Math.min(limit, 100))
         .offset(offset);
 
       if (district) {
-        searchQuery = searchQuery.where('district', '=', district);
+        searchQuery = searchQuery.where("district", "=", district);
       }
 
       const places = await searchQuery.execute();
@@ -68,7 +65,7 @@ export const handler: Handler = {
         count: places.length,
       });
     } catch (err) {
-      console.error('[places/search] Error:', err);
+      console.error("[places/search] Error:", err);
       return error((err as Error).message);
     }
   },

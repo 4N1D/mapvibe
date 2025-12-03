@@ -23,10 +23,7 @@ Amplify.configure({
             "http://localhost:5173/auth/callback",
             "https://d1oasw0quh6m55.cloudfront.net/auth/callback",
           ],
-          redirectSignOut: [
-            "http://localhost:5173/",
-            "https://d1oasw0quh6m55.cloudfront.net/",
-          ],
+          redirectSignOut: ["http://localhost:5173/", "https://d1oasw0quh6m55.cloudfront.net/"],
           responseType: "code",
         },
       },
@@ -79,7 +76,7 @@ export const getCurrentUser = async (): Promise<any> => {
   try {
     const user = await amplifyGetCurrentUser();
     return user;
-  } catch (error) {
+  } catch {
     return null;
   }
 };

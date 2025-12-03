@@ -112,6 +112,8 @@ module "lambda_api" {
   db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
   db_host               = module.rds.address
   db_name               = module.rds.database_name
+  photos_bucket_name    = module.cdn.photos_bucket_name
+  cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
 
 # ============================================

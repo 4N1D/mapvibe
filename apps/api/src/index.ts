@@ -19,6 +19,7 @@ import {
 } from "./handlers/reviews";
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
 import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
+import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
 
 // Route definitions
 interface RouteDefinition {
@@ -117,6 +118,14 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/([^/]+)$/,
     paramNames: ["id"],
     handler: getUserByIdHandler,
+  },
+
+  // Photos routes
+  {
+    method: "POST",
+    pattern: /^\/photos\/get-upload-url$/,
+    paramNames: [],
+    handler: photoGetUploadUrlHandler,
   },
 ];
 

@@ -1,8 +1,8 @@
-const { sql } = require('kysely');
+const { sql } = require("kysely");
 
 async function up(db) {
-  console.log('Creating core tables...');
-  
+  console.log("Creating core tables...");
+
   // Users table
   await sql`
     CREATE TABLE IF NOT EXISTS users (
@@ -22,7 +22,7 @@ async function up(db) {
       CONSTRAINT check_account_status CHECK (account_status IN ('active', 'suspended', 'banned'))
     )
   `.execute(db);
-  console.log('  ✓ users table created');
+  console.log("  ✓ users table created");
 
   // Location addresses table
   await sql`
@@ -54,7 +54,7 @@ async function up(db) {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `.execute(db);
-  console.log('  ✓ location_addresses table created');
+  console.log("  ✓ location_addresses table created");
 
   // Street abbreviations
   await sql`
@@ -68,7 +68,7 @@ async function up(db) {
       CONSTRAINT unique_abbr UNIQUE(abbreviation, full_text)
     )
   `.execute(db);
-  console.log('  ✓ street_abbreviations table created');
+  console.log("  ✓ street_abbreviations table created");
 
   // Restaurants table
   await sql`
@@ -112,7 +112,7 @@ async function up(db) {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `.execute(db);
-  console.log('  ✓ restaurants table created');
+  console.log("  ✓ restaurants table created");
 
   // Review posts table
   await sql`
@@ -137,7 +137,7 @@ async function up(db) {
       CONSTRAINT check_text_length CHECK (char_length(text) >= 100)
     )
   `.execute(db);
-  console.log('  ✓ review_posts table created');
+  console.log("  ✓ review_posts table created");
 
   // Restaurant reviews table
   await sql`
@@ -168,9 +168,9 @@ async function up(db) {
       CONSTRAINT check_review_text_length CHECK (char_length(text) >= 100)
     )
   `.execute(db);
-  console.log('  ✓ restaurant_reviews table created');
+  console.log("  ✓ restaurant_reviews table created");
 
-  console.log('Core tables created successfully');
+  console.log("Core tables created successfully");
 }
 
 async function down(db) {

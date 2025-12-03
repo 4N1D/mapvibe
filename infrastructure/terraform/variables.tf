@@ -17,3 +17,9 @@ variable "project_name" {
   type        = string
   default     = "mapvibe"
 }
+
+variable "cognito_user_pool_id" {
+  description = "Cognito User Pool ID (for custom domain setup)"
+  type        = string
+  default     = "us-east-1_2bhVHgAvY"
+}

@@ -17,7 +17,7 @@ export function HeroSearch({ onSearch }: HeroSearchProps) {
       textarea.style.height = "auto";
       const newHeight = textarea.scrollHeight;
       textarea.style.height = `${currentHeight}px`;
-      textarea.offsetHeight;
+      void textarea.offsetHeight;
       textarea.style.height = `${newHeight}px`;
     }
   };

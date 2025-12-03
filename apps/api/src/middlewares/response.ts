@@ -1,10 +1,10 @@
-import type { APIGatewayResponse } from '../types';
+import type { APIGatewayResponse } from "../types";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-  'Content-Type': 'application/json',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+  "Content-Type": "application/json",
 };
 
 export function success<T>(data: T, statusCode = 200): APIGatewayResponse {
@@ -23,15 +23,15 @@ export function error(message: string, statusCode = 500): APIGatewayResponse {
   };
 }
 
-export function notFound(message = 'Not found'): APIGatewayResponse {
+export function notFound(message = "Not found"): APIGatewayResponse {
   return error(message, 404);
 }
 
-export function badRequest(message = 'Bad request'): APIGatewayResponse {
+export function badRequest(message = "Bad request"): APIGatewayResponse {
   return error(message, 400);
 }
 
-export function unauthorized(message = 'Unauthorized'): APIGatewayResponse {
+export function unauthorized(message = "Unauthorized"): APIGatewayResponse {
   return error(message, 401);
 }
 

@@ -81,6 +81,11 @@ build:web:
     paths:
       - apps/web/dist/
     expire_in: 1 week
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+      when: never
+    - when: on_success
 
 # ===========================
 # STAGE 3: DEPLOY

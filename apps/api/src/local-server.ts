@@ -10,7 +10,17 @@ import "dotenv/config";
 import http from "http";
 import { URL } from "url";
 import { handler } from "./index";
-import type { APIGatewayEvent } from "./types";
+import type { APIGatewayEvent, APIGatewayResponse } from "./types";
+
+// Type guard: Kiểm tra xem response có phải APIGatewayResponse không
+function isAPIGatewayResponse(response: unknown): response is APIGatewayResponse {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'statusCode' in response &&
+    'body' in response
+  );
+}
 
 const PORT = parseInt(process.env.PORT || "3000");
 
@@ -37,6 +47,13 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const response = await handler(event);
+
+      // Local server chỉ handle API Gateway responses
+      if (!isAPIGatewayResponse(response)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid response type for local server' }));
+        return;
+      }
 
       // Set headers
       res.writeHead(response.statusCode, response.headers);

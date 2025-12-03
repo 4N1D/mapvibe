@@ -55,23 +55,10 @@ install:
 # STAGE 2: BUILD
 # ===========================
 
-# Build ui-components package
-build:ui-components:
-  stage: build
-  needs: [install]
-  script:
-    - echo "🎨 Building UI components..."
-    - cd packages/ui-components
-    - bun run build
-  artifacts:
-    paths:
-      - packages/ui-components/dist/
-    expire_in: 1 day
-
 # Build web app
 build:web:
   stage: build
-  needs: [install, build:ui-components]
+  needs: [install]
   script:
     - echo "🌐 Building web application..."
     - cd apps/web

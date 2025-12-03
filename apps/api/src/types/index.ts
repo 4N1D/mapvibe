@@ -1,3 +1,19 @@
+// JWT Claims from Cognito
+export interface JWTClaims {
+  sub?: string;
+  email?: string;
+  'cognito:username'?: string;
+  [key: string]: string | undefined;
+}
+
+// API Gateway Authorizer types
+export interface APIGatewayAuthorizer {
+  jwt?: {
+    claims?: JWTClaims;
+  };
+  claims?: JWTClaims;
+}
+
 // API Gateway Event types
 export interface APIGatewayEvent {
   httpMethod?: string;
@@ -8,6 +24,7 @@ export interface APIGatewayEvent {
       method?: string;
       path?: string;
     };
+    authorizer?: APIGatewayAuthorizer;
   };
   pathParameters?: Record<string, string> | null;
   queryStringParameters?: Record<string, string> | null;

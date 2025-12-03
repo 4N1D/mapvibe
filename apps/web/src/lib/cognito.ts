@@ -22,8 +22,13 @@ Amplify.configure({
           redirectSignIn: [
             "http://localhost:5173/auth/callback",
             "https://d1oasw0quh6m55.cloudfront.net/auth/callback",
+            "https://mapvibe.site/auth/callback",
           ],
-          redirectSignOut: ["http://localhost:5173/", "https://d1oasw0quh6m55.cloudfront.net/"],
+          redirectSignOut: [
+            "http://localhost:5173/",
+            "https://d1oasw0quh6m55.cloudfront.net/",
+            "https://mapvibe.site",
+          ],
           responseType: "code",
         },
       },

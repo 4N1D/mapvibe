@@ -15,6 +15,7 @@ import {
   voteHandler as reviewVoteHandler,
   commentHandler as reviewCommentHandler,
   hotHandler as reviewHotHandler,
+  listHandler as reviewListHandler,
 } from './handlers/reviews';
 
 // Route definitions
@@ -65,6 +66,12 @@ const routes: RouteDefinition[] = [
   },
 
   // Reviews routes
+  {
+    method: 'GET',
+    pattern: /^\/reviews$/,
+    paramNames: [],
+    handler: reviewListHandler,
+  },
   {
     method: 'POST',
     pattern: /^\/reviews$/,

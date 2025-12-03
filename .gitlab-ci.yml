@@ -102,7 +102,7 @@ deploy:frontend:
     name: amazon/aws-cli:latest
     entrypoint: [""]
   needs: [build:web]
-  before_script: []  # Override default (no bun in aws-cli image)
+  before_script: []
   script:
     - echo "🚀 Deploying frontend to S3..."
     - aws s3 sync apps/web/dist s3://$S3_BUCKET_NAME --delete
@@ -122,7 +122,9 @@ deploy:infrastructure:
   image:
     name: hashicorp/terraform:latest
     entrypoint: [""]
-  needs: [deploy:frontend]
+  needs:
+    - job: deploy:frontend
+      optional: true
   before_script:
     - apk add --no-cache aws-cli curl bash
     - curl -fsSL https://bun.sh/install | bash

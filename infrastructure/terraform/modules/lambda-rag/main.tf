@@ -112,7 +112,6 @@ resource "aws_lambda_function" "rag" {
 
   environment {
     variables = {
-      AWS_REGION   = var.aws_region
       DB_SECRET_ARN = var.db_secret_arn
       DB_HOST       = var.db_host
       DB_NAME       = var.db_name

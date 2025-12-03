@@ -21,7 +21,6 @@ import {
   cleanupExpiredHandler as reviewCleanupExpiredHandler,
 } from './handlers/reviews';
 
-} from "./handlers/reviews";
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
 import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
 

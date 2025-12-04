@@ -46,8 +46,20 @@ export const handler: Handler = {
       `;
 
       const whereClause = restaurantId
-        ? sql` WHERE restaurant_id = ${restaurantId} `
-        : sql``;
+        ? sql` WHERE restaurant_id = ${restaurantId} AND (
+            (upvote_count * 2.0)
+            + (comment_count * 1.5)
+            + (share_count * 2.0)
+            + (view_count * 0.2)
+            - (downvote_count * 1.0)
+          ) > 0 `
+        : sql` WHERE (
+            (upvote_count * 2.0)
+            + (comment_count * 1.5)
+            + (share_count * 2.0)
+            + (view_count * 0.2)
+            - (downvote_count * 1.0)
+          ) > 0 `;
 
       const orderLimit = sql` ORDER BY score DESC LIMIT ${limit} `;
 

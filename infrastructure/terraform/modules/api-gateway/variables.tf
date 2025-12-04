@@ -35,3 +35,15 @@ variable "places_lambda_invoke_arn" {
   description = "Places Lambda invoke ARN"
   type        = string
 }
+
+variable "rag_lambda_name" {
+  description = "RAG search Lambda function name"
+  type        = string
+  default     = ""
+}
+
+variable "rag_lambda_invoke_arn" {
+  description = "RAG search Lambda invoke ARN"
+  type        = string
+  default     = ""
+}

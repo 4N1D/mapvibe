@@ -178,6 +178,10 @@ module "api_gateway" {
   # Lambda integrations
   places_lambda_name       = module.lambda_api.function_name
   places_lambda_invoke_arn = module.lambda_api.invoke_arn
+
+  # RAG Lambda integration
+  rag_lambda_name       = module.lambda_rag.function_name
+  rag_lambda_invoke_arn = module.lambda_rag.invoke_arn
 }
 
 # ============================================

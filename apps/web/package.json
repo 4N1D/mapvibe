@@ -14,10 +14,8 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.1.0",
-    "@mapvibe/constants": "workspace:*",
     "@mapvibe/types": "workspace:*",
     "@mapvibe/ui-components": "workspace:*",
-    "@mapvibe/utils": "workspace:*",
     "aws-amplify": "^6.15.8",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",

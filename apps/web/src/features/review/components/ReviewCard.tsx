@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@mapvibe/ui-components";
 import { Heart, MessageCircle } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
-import { Skeleton, SkeletonText, SkeletonCircle } from "@/components/ui";
+import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
 
 interface ReviewCardProps {
   data?: HotReview;

@@ -3,8 +3,11 @@ import { TrendingUp } from "lucide-react";
 import { ReactNode } from "react";
 
 interface MapVibeLoaderProps {
+  /** Text hiển thị dưới loader */
   text?: string;
+  /** Icon ở giữa (default: TrendingUp) */
   centerIcon?: ReactNode;
+  /** Size: sm (section), md (default), lg (full page) */
   size?: "sm" | "md" | "lg";
 }
 
@@ -61,15 +64,8 @@ export function MapVibeLoader({
               animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
             >
-              <svg
-                className={config.pin}
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5
-     2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-                />
+              <svg className={config.pin} fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
               </svg>
             </motion.div>
           ))}
@@ -99,3 +95,5 @@ export function MapVibeLoader({
     </div>
   );
 }
+
+export type { MapVibeLoaderProps };

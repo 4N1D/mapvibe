@@ -48,3 +48,5 @@ export function SkeletonCircle({ size = 40, className = "" }: SkeletonCircleProp
     />
   );
 }
+
+export type { SkeletonProps, SkeletonTextProps, SkeletonCircleProps };

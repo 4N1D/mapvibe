@@ -3,6 +3,7 @@
 # Prevents duplicate pipelines (branch + MR)
 workflow:
   rules:
+    - when: never
     # Run MR pipeline when MR is created/updated
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Skip branch pipeline if MR already exists for this branch

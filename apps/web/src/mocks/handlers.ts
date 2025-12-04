@@ -29,7 +29,7 @@ const allRestaurants = generateRestaurants(6);
 // MSW Handlers
 export const handlers = [
   // Search API
-  http.post("*/api/search", async ({ request }) => {
+  http.post("*/search", async ({ request }) => {
     // Nếu không dùng mock → cho real API xử lý
     if (!USE_MOCK_SEARCH) {
       return passthrough();

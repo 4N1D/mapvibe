@@ -18,7 +18,7 @@ Amplify.configure({
       loginWith: {
         oauth: {
           domain: import.meta.env.VITE_COGNITO_DOMAIN,
-          scopes: ["openid", "email", "profile"],
+          scopes: ["openid", "email", "profile", "aws.cognito.signin.user.admin"],
           redirectSignIn: [
             "http://localhost:5173/auth/callback",
             "https://d1oasw0quh6m55.cloudfront.net/auth/callback",

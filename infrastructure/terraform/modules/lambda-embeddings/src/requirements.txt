@@ -1,0 +1,4 @@
+boto3
+pg8000
+sqlalchemy
+

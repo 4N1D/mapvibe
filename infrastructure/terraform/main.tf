@@ -116,8 +116,75 @@ module "lambda_api" {
   cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
 
+# ============================================
+# LAMBDA RAG MODULE
+# ============================================
+
 module "lambda_rag" {
   source = "./modules/lambda-rag"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  aws_region          = var.aws_region
+
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  db_security_group_id = module.rds.security_group_id
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+}
+
+# ============================================
+# LAMBDA OCR MENU MODULE
+# ============================================
+
+module "lambda_ocr_menu" {
+  source = "./modules/lambda-ocr-menu"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  aws_region          = var.aws_region
+
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  db_security_group_id = module.rds.security_group_id
+
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+
+  photos_bucket_name = "mapvibe-photos"  # Must match s3-cloudfront module default
+}
+
+# ============================================
+# LAMBDA REKOGNITION MODULE
+# ============================================
+
+module "lambda_rekognition" {
+  source = "./modules/lambda-rekognition"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  aws_region          = var.aws_region
+
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  db_security_group_id = module.rds.security_group_id
+
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+
+  photos_bucket_name = "mapvibe-photos"  # Must match s3-cloudfront module default
+}
+
+# ============================================
+# LAMBDA EMBEDDINGS MODULE
+# ============================================
+
+module "lambda_embeddings" {
+  source = "./modules/lambda-embeddings"
 
   project_name        = var.project_name
   environment         = var.environment
@@ -148,6 +215,90 @@ module "cdn" {
   # Custom domain
   domain_aliases      = ["mapvibe.site", "www.mapvibe.site"]
   acm_certificate_arn = module.dns.certificate_arn
+}
+
+# ============================================
+# S3 EVENT NOTIFICATIONS (Trigger Lambda)
+# ============================================
+
+# Data source để lấy S3 bucket
+data "aws_s3_bucket" "photos" {
+  bucket = "mapvibe-photos"
+}
+
+# Lambda permission: Cho phép S3 invoke Lambda OCR Menu
+resource "aws_lambda_permission" "allow_s3_ocr_menu" {
+  statement_id  = "AllowExecutionFromS3Bucket"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_ocr_menu.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = data.aws_s3_bucket.photos.arn
+}
+
+# Lambda permission: Cho phép S3 invoke Lambda Rekognition
+resource "aws_lambda_permission" "allow_s3_rekognition" {
+  statement_id  = "AllowExecutionFromS3Bucket"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_rekognition.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = data.aws_s3_bucket.photos.arn
+}
+
+# S3 Notification: Trigger OCR Menu Lambda khi upload ảnh menu
+resource "aws_s3_bucket_notification" "photos_ocr_menu" {
+  bucket = data.aws_s3_bucket.photos.id
+
+  lambda_function {
+    lambda_function_arn = module.lambda_ocr_menu.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "menus/"  # Chỉ xử lý ảnh trong folder menus/
+    filter_suffix       = ".jpg"     # Hoặc .png, .jpeg, etc.
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_ocr_menu.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "menus/"
+    filter_suffix       = ".jpeg"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_ocr_menu.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "menus/"
+    filter_suffix       = ".png"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_ocr_menu
+  ]
+}
+
+# S3 Notification: Trigger Rekognition Lambda cho TẤT CẢ ảnh
+resource "aws_s3_bucket_notification" "photos_rekognition" {
+  bucket = data.aws_s3_bucket.photos.id
+
+  lambda_function {
+    lambda_function_arn = module.lambda_rekognition.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".jpg"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_rekognition.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".jpeg"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_rekognition.function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".png"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_rekognition
+  ]
 }
 
 # ============================================
@@ -298,4 +449,42 @@ output "api_gateway_endpoint" {
 output "rag_lambda_url" {
   description = "RAG search Lambda URL"
   value       = module.lambda_rag.function_url
+}
+
+# Lambda OCR Menu Outputs
+output "ocr_menu_lambda_name" {
+  description = "OCR Menu Lambda function name"
+  value       = module.lambda_ocr_menu.function_name
+}
+
+output "ocr_menu_lambda_arn" {
+  description = "OCR Menu Lambda function ARN"
+  value       = module.lambda_ocr_menu.function_arn
+}
+
+# Lambda Rekognition Outputs
+output "rekognition_lambda_name" {
+  description = "Rekognition Lambda function name"
+  value       = module.lambda_rekognition.function_name
+}
+
+output "rekognition_lambda_arn" {
+  description = "Rekognition Lambda function ARN"
+  value       = module.lambda_rekognition.function_arn
+}
+
+# Lambda Embeddings Outputs
+output "embeddings_lambda_name" {
+  description = "Embeddings Lambda function name"
+  value       = module.lambda_embeddings.function_name
+}
+
+output "embeddings_sqs_queue_url" {
+  description = "SQS queue URL for embedding jobs"
+  value       = module.lambda_embeddings.sqs_queue_url
+}
+
+output "embeddings_sqs_queue_arn" {
+  description = "SQS queue ARN for embedding jobs"
+  value       = module.lambda_embeddings.sqs_queue_arn
 }

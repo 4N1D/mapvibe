@@ -450,7 +450,7 @@ class RAGService:
 def health_check():
     return {"status": "ok", "service": "VN Food RAG"}
 
-@app.post("/api/search")
+@app.post("/search")
 async def search_endpoint(payload: SearchPayload):
     # --- LOG START REQUEST ---
     try:

@@ -89,13 +89,13 @@ resource "aws_apigatewayv2_route" "places_nearby" {
 # RAG Search routes
 resource "aws_apigatewayv2_route" "rag_search" {
   api_id    = aws_apigatewayv2_api.main.id
-  route_key = "POST /api/search"
+  route_key = "POST /search"
   target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 
 resource "aws_apigatewayv2_route" "rag_health" {
   api_id    = aws_apigatewayv2_api.main.id
-  route_key = "GET /api/rag/health"
+  route_key = "GET /rag/health"
   target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 

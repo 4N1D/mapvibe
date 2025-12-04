@@ -101,7 +101,6 @@ secrets.json
 
 # Project folders (local only, not tracked in Git)
 docs/
-scripts/
 .claude/
 
 # Bun

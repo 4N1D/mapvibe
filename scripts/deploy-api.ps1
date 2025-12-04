@@ -14,6 +14,8 @@ function Exit-OnError {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] $msg" -ForegroundColor Red
         exit 1
+    }
+}
 
 # Step 1: Build API
 Write-Host "`n==> [1/3] Building API..." -ForegroundColor Cyan
@@ -24,7 +26,11 @@ Pop-Location
 
 # Step 2: Copy dist to terraform
 Write-Host "`n==> [2/3] Copying dist..." -ForegroundColor Cyan
-Copy-Item -Path "$API_DIR\dist\*" -Destination $LAMBDA_DIR -Recurse -Force
+$LAMBDA_DIST_DIR = "$LAMBDA_DIR\dist"
+if (-not (Test-Path $LAMBDA_DIST_DIR)) {
+    New-Item -ItemType Directory -Path $LAMBDA_DIST_DIR -Force | Out-Null
+}
+Copy-Item -Path "$API_DIR\dist\*" -Destination $LAMBDA_DIST_DIR -Recurse -Force
 
 # Step 3: Terraform init + apply
 Write-Host "`n==> [3/3] Terraform deploy..." -ForegroundColor Cyan

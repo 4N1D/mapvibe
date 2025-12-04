@@ -121,3 +121,31 @@ export interface SearchResponse {
   current_context: string;
   restaurants: RestaurantSearchResult[];
 }
+
+export interface ReviewPhoto {
+  url: string;
+  caption?: string;
+}
+
+export interface HotReview {
+  id: string;
+  author_id: string;
+  author_name: string;
+  restaurant_id: string | null;
+  text: string;
+  photos: ReviewPhoto[];
+  upvote_count: number;
+  downvote_count: number;
+  comment_count: number;
+  share_count: number;
+  view_count: number;
+  created_at: string;
+  score: string;
+  tag: "hot" | "new" | "normal" | "trending";
+}
+
+export interface HotReviewsResponse {
+  restaurant_id: string | null;
+  count: number;
+  reviews: HotReview[];
+}

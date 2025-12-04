@@ -1,1 +1,1 @@
-export { handler as getUploadUrlHandler } from "./get-upload-url";
+export { handler as getUploadUrlHandler } from "./upload-url";

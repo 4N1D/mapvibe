@@ -35,6 +35,20 @@ variable "places_lambda_invoke_arn" {
   description = "Places Lambda invoke ARN"
   type        = string
 }
+variable "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  type        = string
+}
+
+variable "cognito_client_id" {
+  description = "Cognito App Client ID"
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+}
 
 variable "rag_lambda_name" {
   description = "RAG search Lambda function name"

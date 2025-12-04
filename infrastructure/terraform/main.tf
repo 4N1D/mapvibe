@@ -73,10 +73,10 @@ module "rds" {
   db_password        = random_password.db_password.result
 
   # MVP settings - tiết kiệm chi phí
-  instance_class      = "db.t3.micro"  # ~$15/tháng
-  allocated_storage   = 20              # 20GB
-  multi_az            = false           # Single AZ
-  publicly_accessible = true            # MVP only - cho phép local dev & DataGrip
+  instance_class      = "db.t3.micro" # ~$15/tháng
+  allocated_storage   = 20            # 20GB
+  multi_az            = false         # Single AZ
+  publicly_accessible = true          # MVP only - cho phép local dev & DataGrip
 }
 
 # ============================================
@@ -112,6 +112,8 @@ module "lambda_api" {
   db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
   db_host               = module.rds.address
   db_name               = module.rds.database_name
+  photos_bucket_name    = module.cdn.photos_bucket_name
+  cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
 
 module "lambda_rag" {
@@ -178,10 +180,33 @@ module "api_gateway" {
   # Lambda integrations
   places_lambda_name       = module.lambda_api.function_name
   places_lambda_invoke_arn = module.lambda_api.invoke_arn
-
+  aws_region               = var.aws_region
+  cognito_user_pool_id     = var.cognito_user_pool_id
+  cognito_client_id        = "3s6480dj3u1luo6ksp8sqh66sh"
   # RAG Lambda integration
   rag_lambda_name       = module.lambda_rag.function_name
   rag_lambda_invoke_arn = module.lambda_rag.invoke_arn
+}
+
+# ============================================
+# S3 TRIGGER LAMBDA
+# ============================================
+
+module "lambda_s3_trigger" {
+  source = "./modules/lambda-s3-trigger"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  aws_region            = var.aws_region
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  db_host               = module.rds.address
+  db_name               = module.rds.database_name
+  db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
+  rds_security_group_id = module.rds.security_group_id
+  s3_bucket_id          = module.cdn.photos_bucket_name
+  s3_bucket_arn         = module.cdn.photos_bucket_arn
+  cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
 
 # ============================================

@@ -10,6 +10,21 @@ import {
   createHandler,
   batchHandler,
 } from "./handlers/places";
+import {
+  createHandler as reviewCreateHandler,
+  voteHandler as reviewVoteHandler,
+  commentHandler as reviewCommentHandler,
+  hotHandler as reviewHotHandler,
+  listHandler as reviewListHandler,
+  submitNewPlaceHandler as reviewSubmitNewPlaceHandler,
+  approveLocationHandler as reviewApproveLocationHandler,
+  cleanupExpiredHandler as reviewCleanupExpiredHandler,
+} from './handlers/reviews';
+
+import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
+import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
+import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
+
 
 // Route definitions
 interface RouteDefinition {
@@ -58,10 +73,83 @@ const routes: RouteDefinition[] = [
     handler: batchHandler,
   },
 
-  // Add more routes here as you build them:
-  // { method: 'GET', pattern: /^\/reviews$/, paramNames: [], handler: reviewsListHandler },
-  // { method: 'POST', pattern: /^\/reviews$/, paramNames: [], handler: reviewsCreateHandler },
-  // { method: 'POST', pattern: /^\/auth\/login$/, paramNames: [], handler: authLoginHandler },
+  // Reviews routes
+  {
+    method: "GET",
+    pattern: /^\/reviews$/,
+    paramNames: [],
+    handler: reviewListHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/reviews$/,
+    paramNames: [],
+    handler: reviewCreateHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/reviews\/vote$/,
+    paramNames: [],
+    handler: reviewVoteHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/reviews\/comment$/,
+    paramNames: [],
+    handler: reviewCommentHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/reviews\/hot$/,
+    paramNames: [],
+    handler: reviewHotHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/submit-new-place$/,
+    paramNames: [],
+    handler: reviewSubmitNewPlaceHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/approve-location$/,
+    paramNames: [],
+    handler: reviewApproveLocationHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/cleanup-expired$/,
+    paramNames: [],
+    handler: reviewCleanupExpiredHandler,
+  },
+
+  // Users routes
+  {
+    method: "GET",
+    pattern: /^\/users\/me$/,
+    paramNames: [],
+    handler: getMeHandler,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/users\/me$/,
+    paramNames: [],
+    handler: updateMeHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: getUserByIdHandler,
+  },
+
+  // Photos routes
+  {
+    method: "POST",
+    pattern: /^\/photos\/upload-url$/,
+    paramNames: [],
+    handler: photoGetUploadUrlHandler,
+  },
 ];
 
 // Find matching route
@@ -84,10 +172,37 @@ function matchRoute(
   return null;
 }
 
-// Lambda handler
-export async function handler(event: APIGatewayEvent): Promise<APIGatewayResponse> {
-  const httpMethod = event.httpMethod || event.requestContext?.http?.method || "GET";
-  const path = event.path || event.rawPath || event.requestContext?.http?.path || "/";
+// Check if event is from Cognito trigger
+function isCognitoTriggerEvent(
+  event: APIGatewayEvent | CognitoTriggerEvent
+): event is CognitoTriggerEvent {
+  return (
+    'triggerSource' in event &&
+    'userPoolId' in event &&
+    'request' in event
+  );
+}
+
+// Lambda handler - handles both API Gateway and Cognito triggers
+export async function handler(
+  event: APIGatewayEvent | CognitoTriggerEvent
+): Promise<APIGatewayResponse | CognitoTriggerEvent> {
+  // Handle Cognito trigger events
+  if (isCognitoTriggerEvent(event)) {
+    console.log(`[Cognito] Trigger: ${event.triggerSource}`);
+    return await handleCognitoTrigger(event);
+  }
+
+  // Handle API Gateway events
+  const httpMethod =
+    (event as APIGatewayEvent).httpMethod ||
+    (event as APIGatewayEvent).requestContext?.http?.method ||
+    "GET";
+  const path =
+    (event as APIGatewayEvent).path ||
+    (event as APIGatewayEvent).rawPath ||
+    (event as APIGatewayEvent).requestContext?.http?.path ||
+    "/";
 
   console.log(`[API] ${httpMethod} ${path}`);
 

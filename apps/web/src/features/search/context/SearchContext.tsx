@@ -55,10 +55,10 @@ export function SearchProvider({ children }: { children: ReactNode }) {
                 query: content,
                 is_new_topic: isNewTopic,
               },
-              { signal, timeout: 40000 }
+              { signal, timeout: 20000 }
             ),
           3,
-          10000
+          3000
         );
 
         // Add AI response

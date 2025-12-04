@@ -258,7 +258,7 @@ class RAGService:
         clean_query = " | ".join(query_text.replace("!", "").replace("&", "").split())
 
         sql_base = f"""
-        SELECT id, name_vi, address, price_min, price_max, "opening_hours", business_type,
+        SELECT id, name_vi, slug, address, price_min, price_max, "opening_hours", business_type,
             (
                 {w_text} * (
                 ts_rank_cd(search_vector, to_tsquery('simple', unaccent(:query_ts))) / 
@@ -407,15 +407,16 @@ class RAGService:
             price_display = f"{p_min:,} - {p_max:,} VNĐ" if (p_min or p_max) else "Đang cập nhật"
             item = {
                 "id": row.id, 
-                "name": row.name, 
+                "name": row.name_vi,
+                "slug": row.slug,
                 "address": row.address or "N/A",
                 "priceRange": price_display, 
                 "hours": row.opening_hours or "N/A",
-                "category": row.category, 
+                "business_type": row.business_type, 
                 "score": f"{row.final_score:.2f}"
             }
             restaurants_data.append(item)
-            context_str += f"- {item['name']} ({item['address']}) | Giá: {item['priceRange']} | Giờ: {item['hours']} | Loại: {item['category']}\n"
+            context_str += f"- {item['name']} ({item['address']}) | Giá: {item['priceRange']} | Giờ: {item['hours']} | Loại: {item['business_type']}\n"
 
 
         tone_instruction = "Trả lời ngắn gọn, thân thiện, lịch sự."

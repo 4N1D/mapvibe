@@ -21,6 +21,9 @@ interface SubmitNewPlaceBody {
   text: string;
   features?: string[];
   photos?: Photo[];
+  cuisine_types?: string[];
+  price_min?: number;
+  price_max?: number;
 }
 
 interface DuplicateCandidate {
@@ -62,6 +65,9 @@ export const handler: Handler = {
         text,
         features = [],
         photos = [],
+        cuisine_types,
+        price_min,
+        price_max,
       } = body;
 
       // Validate required fields
@@ -230,6 +236,9 @@ export const handler: Handler = {
             status,
             review_count,
             created_by_user_id,
+            cuisine_types,
+            price_min,
+            price_max,
             created_at,
             updated_at
           ) VALUES (
@@ -246,6 +255,9 @@ export const handler: Handler = {
             'pending',
             1,
             ${author_id},
+            ${cuisine_types ? JSON.stringify(cuisine_types) : null}::json,
+            ${price_min || null},
+            ${price_max || null},
             NOW(),
             NOW()
           )

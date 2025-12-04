@@ -14,6 +14,8 @@ function Exit-OnError {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] $msg" -ForegroundColor Red
         exit 1
+    }
+}
 
 # Step 1: Build API
 Write-Host "`n==> [1/3] Building API..." -ForegroundColor Cyan

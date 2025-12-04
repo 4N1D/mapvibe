@@ -123,16 +123,16 @@ module "lambda_api" {
 module "lambda_rag" {
   source = "./modules/lambda-rag"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  aws_region          = var.aws_region
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
 
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
   db_security_group_id = module.rds.security_group_id
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
+  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
+  db_host              = module.rds.address
+  db_name              = module.rds.database_name
 }
 
 # ============================================
@@ -142,19 +142,19 @@ module "lambda_rag" {
 module "lambda_ocr_menu" {
   source = "./modules/lambda-ocr-menu"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  aws_region          = var.aws_region
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
 
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
   db_security_group_id = module.rds.security_group_id
 
   db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
   db_host       = module.rds.address
   db_name       = module.rds.database_name
 
-  photos_bucket_name = "mapvibe-photos"  # Must match s3-cloudfront module default
+  photos_bucket_name = "mapvibe-photos" # Must match s3-cloudfront module default
 }
 
 # ============================================
@@ -164,19 +164,19 @@ module "lambda_ocr_menu" {
 module "lambda_rekognition" {
   source = "./modules/lambda-rekognition"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  aws_region          = var.aws_region
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
 
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
   db_security_group_id = module.rds.security_group_id
 
   db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
   db_host       = module.rds.address
   db_name       = module.rds.database_name
 
-  photos_bucket_name = "mapvibe-photos"  # Must match s3-cloudfront module default
+  photos_bucket_name = "mapvibe-photos" # Must match s3-cloudfront module default
 }
 
 # ============================================
@@ -186,12 +186,12 @@ module "lambda_rekognition" {
 module "lambda_embeddings" {
   source = "./modules/lambda-embeddings"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  aws_region          = var.aws_region
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
 
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
   db_security_group_id = module.rds.security_group_id
 
   db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
@@ -251,8 +251,8 @@ resource "aws_s3_bucket_notification" "photos_ocr_menu" {
   lambda_function {
     lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/"  # Chỉ xử lý ảnh trong folder menus/
-    filter_suffix       = ".jpg"     # Hoặc .png, .jpeg, etc.
+    filter_prefix       = "menus/" # Chỉ xử lý ảnh trong folder menus/
+    filter_suffix       = ".jpg"   # Hoặc .png, .jpeg, etc.
   }
 
   lambda_function {
@@ -359,6 +359,35 @@ module "lambda_s3_trigger" {
   s3_bucket_arn         = module.cdn.photos_bucket_arn
   cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
+
+# ============================================
+# COGNITO LAMBDA TRIGGERS
+# ============================================
+
+# Permission cho Cognito gọi Lambda API
+resource "aws_lambda_permission" "cognito_trigger" {
+  statement_id  = "AllowCognitoInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_api.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/${var.cognito_user_pool_id}"
+}
+
+data "aws_caller_identity" "current" {}
+
+# Cấu hình Lambda Trigger bằng null_resource + AWS CLI
+resource "null_resource" "cognito_lambda_trigger" {
+  triggers = {
+    lambda_arn = module.lambda_api.function_arn
+  }
+
+  provisioner "local-exec" {
+    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${var.cognito_user_pool_id} --lambda-config PreTokenGeneration=${module.lambda_api.function_arn}"
+  }
+
+  depends_on = [aws_lambda_permission.cognito_trigger]
+}
+
 
 # ============================================
 # OUTPUTS

@@ -21077,6 +21077,7 @@ async function handleCognitoTrigger(event) {
         break;
       case "TokenGeneration_HostedAuth":
       case "TokenGeneration_Authentication":
+      case "TokenGeneration_RefreshTokens":
         await createUserRecordIfNotExists(userAttributes);
         break;
       default:

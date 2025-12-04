@@ -49,6 +49,7 @@ export async function handleCognitoTrigger(
 
       case 'TokenGeneration_HostedAuth':
       case 'TokenGeneration_Authentication':
+      case 'TokenGeneration_RefreshTokens':
         await createUserRecordIfNotExists(userAttributes);
         break;
 

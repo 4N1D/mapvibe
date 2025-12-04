@@ -36,10 +36,8 @@ resource "aws_apigatewayv2_integration" "places" {
   payload_format_version = "2.0"
 }
 
-# RAG Search Lambda Integration (if provided)
+# RAG Search Lambda Integration
 resource "aws_apigatewayv2_integration" "rag" {
-  count = var.rag_lambda_invoke_arn != "" ? 1 : 0
-
   api_id                 = aws_apigatewayv2_api.main.id
   integration_type       = "AWS_PROXY"
   integration_uri        = var.rag_lambda_invoke_arn
@@ -90,19 +88,15 @@ resource "aws_apigatewayv2_route" "places_nearby" {
 
 # RAG Search routes
 resource "aws_apigatewayv2_route" "rag_search" {
-  count = var.rag_lambda_invoke_arn != "" ? 1 : 0
-
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /api/search"
-  target    = "integrations/${aws_apigatewayv2_integration.rag[0].id}"
+  target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 
 resource "aws_apigatewayv2_route" "rag_health" {
-  count = var.rag_lambda_invoke_arn != "" ? 1 : 0
-
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /api/rag/health"
-  target    = "integrations/${aws_apigatewayv2_integration.rag[0].id}"
+  target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 
 # ============================================
@@ -158,8 +152,6 @@ resource "aws_lambda_permission" "places" {
 }
 
 resource "aws_lambda_permission" "rag" {
-  count = var.rag_lambda_invoke_arn != "" ? 1 : 0
-
   statement_id  = "AllowAPIGatewayInvokeRAG"
   action        = "lambda:InvokeFunction"
   function_name = var.rag_lambda_name

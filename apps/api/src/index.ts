@@ -16,9 +16,14 @@ import {
   commentHandler as reviewCommentHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
-} from "./handlers/reviews";
+  submitNewPlaceHandler as reviewSubmitNewPlaceHandler,
+  approveLocationHandler as reviewApproveLocationHandler,
+  cleanupExpiredHandler as reviewCleanupExpiredHandler,
+} from './handlers/reviews';
+
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
 import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
+
 
 // Route definitions
 interface RouteDefinition {
@@ -97,6 +102,24 @@ const routes: RouteDefinition[] = [
     pattern: /^\/reviews\/hot$/,
     paramNames: [],
     handler: reviewHotHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/submit-new-place$/,
+    paramNames: [],
+    handler: reviewSubmitNewPlaceHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/approve-location$/,
+    paramNames: [],
+    handler: reviewApproveLocationHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/cleanup-expired$/,
+    paramNames: [],
+    handler: reviewCleanupExpiredHandler,
   },
 
   // Users routes

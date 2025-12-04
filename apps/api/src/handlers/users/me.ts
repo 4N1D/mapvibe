@@ -1,6 +1,7 @@
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
 import { getDb } from '../../services/db';
 import { success, badRequest, unauthorized, notFound, error } from '../../middlewares/response';
+import { getUserIdFromEvent } from '@/utils/auth';
 
 // GET /users/me - Get current user profile
 export const getMeHandler: Handler = {
@@ -165,29 +166,6 @@ export const getUserByIdHandler: Handler = {
     }
   },
 };
-
-// Helper to extract user ID from event
-function getUserIdFromEvent(event: APIGatewayEvent): string | null {
-  const authorizer = event.requestContext?.authorizer;
-
-  // API Gateway v2 with JWT authorizer
-  if (authorizer?.jwt?.claims?.sub) {
-    return authorizer.jwt.claims.sub;
-  }
-
-  // API Gateway v1 with Cognito authorizer
-  if (authorizer?.claims?.sub) {
-    return authorizer.claims.sub;
-  }
-
-  // Custom header (for testing)
-  const authHeader = event.headers?.['x-user-id'];
-  if (authHeader) {
-    return authHeader;
-  }
-
-  return null;
-}
 
 interface UpdateProfileBody {
   display_name?: string;

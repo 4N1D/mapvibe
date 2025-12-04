@@ -164,6 +164,9 @@ module "api_gateway" {
   # Lambda integrations
   places_lambda_name       = module.lambda_api.function_name
   places_lambda_invoke_arn = module.lambda_api.invoke_arn
+  aws_region               = var.aws_region
+  cognito_user_pool_id     = var.cognito_user_pool_id
+  cognito_client_id        = "3s6480dj3u1luo6ksp8sqh66sh"
 }
 
 # ============================================

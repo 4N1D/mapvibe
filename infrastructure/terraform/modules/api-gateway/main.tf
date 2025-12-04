@@ -36,6 +36,23 @@ resource "aws_apigatewayv2_integration" "places" {
   payload_format_version = "2.0"
 }
 
+
+# ============================================
+# COGNITO AUTHORIZER
+# ============================================
+
+resource "aws_apigatewayv2_authorizer" "cognito" {
+  api_id           = aws_apigatewayv2_api.main.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${var.project_name}-cognito-authorizer"
+
+  jwt_configuration {
+    audience = [var.cognito_client_id]
+    issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${var.cognito_user_pool_id}"
+  }
+}
+
 # ============================================
 # ROUTES
 # ============================================
@@ -79,18 +96,24 @@ resource "aws_apigatewayv2_route" "photos_upload_url" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /photos/upload-url"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_me_get" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /users/me"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_me_put" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "PUT /users/me"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_get" {
@@ -109,18 +132,24 @@ resource "aws_apigatewayv2_route" "reviews_create" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_vote" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/vote"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_comment" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/comment"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_hot" {

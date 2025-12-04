@@ -235,69 +235,59 @@ resource "aws_lambda_permission" "allow_s3_ocr_menu" {
   source_arn    = data.aws_s3_bucket.photos.arn
 }
 
-# Lambda permission: Cho phép S3 invoke Lambda Rekognition
-resource "aws_lambda_permission" "allow_s3_rekognition" {
-  statement_id  = "AllowExecutionFromS3Bucket"
-  action        = "lambda:InvokeFunction"
-  function_name = module.lambda_rekognition.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = data.aws_s3_bucket.photos.arn
-}
 
-# S3 Notification: Trigger OCR Menu Lambda khi upload ảnh menu
-resource "aws_s3_bucket_notification" "photos_ocr_menu" {
+
+# S3 Notification: Gộp TẤT CẢ triggers vào 1 resource (AWS chỉ cho phép 1 notification config per bucket)
+resource "aws_s3_bucket_notification" "photos_all" {
   bucket = data.aws_s3_bucket.photos.id
 
-  lambda_function {
-    lambda_function_arn = module.lambda_ocr_menu.function_arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/" # Chỉ xử lý ảnh trong folder menus/
-    filter_suffix       = ".jpg"   # Hoặc .png, .jpeg, etc.
-  }
-
+  # OCR Menu triggers - chỉ cho folder menus/
   lambda_function {
     lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "menus/"
-    filter_suffix       = ".jpeg"
-  }
-
-  lambda_function {
-    lambda_function_arn = module.lambda_ocr_menu.function_arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/"
-    filter_suffix       = ".png"
-  }
-
-  depends_on = [
-    aws_lambda_permission.allow_s3_ocr_menu
-  ]
-}
-
-# S3 Notification: Trigger Rekognition Lambda cho TẤT CẢ ảnh
-resource "aws_s3_bucket_notification" "photos_rekognition" {
-  bucket = data.aws_s3_bucket.photos.id
-
-  lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
-    events              = ["s3:ObjectCreated:*"]
     filter_suffix       = ".jpg"
   }
 
   lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
+    lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "menus/"
     filter_suffix       = ".jpeg"
   }
 
   lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
+    lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "menus/"
+    filter_suffix       = ".png"
+  }
+
+  # S3 Trigger Lambda - cho tất cả ảnh (trừ menus/)
+  lambda_function {
+    lambda_function_arn = module.lambda_s3_trigger.function_arn
+    events              = ["s3:ObjectCreated:Put"]
+    filter_prefix       = "reviews/"
+    filter_suffix       = ".jpg"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_s3_trigger.function_arn
+    events              = ["s3:ObjectCreated:Put"]
+    filter_prefix       = "reviews/"
+    filter_suffix       = ".jpeg"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.lambda_s3_trigger.function_arn
+    events              = ["s3:ObjectCreated:Put"]
+    filter_prefix       = "reviews/"
     filter_suffix       = ".png"
   }
 
   depends_on = [
-    aws_lambda_permission.allow_s3_rekognition
+    aws_lambda_permission.allow_s3_ocr_menu,
+    module.lambda_s3_trigger
   ]
 }
 

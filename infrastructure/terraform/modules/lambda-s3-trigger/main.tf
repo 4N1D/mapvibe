@@ -135,7 +135,7 @@ resource "aws_security_group_rule" "lambda_to_rds" {
   description              = "Allow S3 Trigger Lambda to connect to RDS"
 }
 # ============================================
-# S3 PERMISSION & NOTIFICATION
+# S3 PERMISSION (Notification is managed in main.tf)
 # ============================================
 resource "aws_lambda_permission" "s3" {
   statement_id  = "AllowS3Invoke"
@@ -143,17 +143,6 @@ resource "aws_lambda_permission" "s3" {
   function_name = aws_lambda_function.s3_trigger.function_name
   principal     = "s3.amazonaws.com"
   source_arn    = var.s3_bucket_arn
-}
-
-resource "aws_s3_bucket_notification" "photos" {
-  bucket = var.s3_bucket_id
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.s3_trigger.arn
-    events              = ["s3:ObjectCreated:Put"]
-  }
-
-  depends_on = [aws_lambda_permission.s3]
 }
 
 

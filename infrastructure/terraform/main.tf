@@ -116,6 +116,22 @@ module "lambda_api" {
   cloudfront_domain     = module.cdn.cloudfront_domain_name
 }
 
+module "lambda_rag" {
+  source = "./modules/lambda-rag"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  aws_region          = var.aws_region
+
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  db_security_group_id = module.rds.security_group_id
+
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+}
+
 # ============================================
 # S3 + CLOUDFRONT MODULE
 # ============================================
@@ -167,6 +183,9 @@ module "api_gateway" {
   aws_region               = var.aws_region
   cognito_user_pool_id     = var.cognito_user_pool_id
   cognito_client_id        = "3s6480dj3u1luo6ksp8sqh66sh"
+  # RAG Lambda integration
+  rag_lambda_name       = module.lambda_rag.function_name
+  rag_lambda_invoke_arn = module.lambda_rag.invoke_arn
 }
 
 # ============================================
@@ -274,4 +293,9 @@ output "api_gateway_url" {
 output "api_gateway_endpoint" {
   description = "API Gateway default endpoint"
   value       = module.api_gateway.api_endpoint
+}
+
+output "rag_lambda_url" {
+  description = "RAG search Lambda URL"
+  value       = module.lambda_rag.function_url
 }

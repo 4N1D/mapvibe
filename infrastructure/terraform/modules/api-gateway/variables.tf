@@ -49,3 +49,13 @@ variable "aws_region" {
   description = "AWS region"
   type        = string
 }
+
+variable "rag_lambda_name" {
+  description = "RAG search Lambda function name"
+  type        = string
+}
+
+variable "rag_lambda_invoke_arn" {
+  description = "RAG search Lambda invoke ARN"
+  type        = string
+}

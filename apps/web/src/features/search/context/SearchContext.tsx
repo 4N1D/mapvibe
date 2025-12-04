@@ -181,7 +181,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         const { data } = await retryRequest(
           () =>
             apiClient.post(
-              "/api/search",
+              "/search",
               {
                 session_id: sessionIdRef.current,
                 query: content,

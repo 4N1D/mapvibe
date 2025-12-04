@@ -4,13 +4,13 @@
 workflow:
   rules:
     - when: never
-    # Run MR pipeline when MR is created/updated
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # Skip branch pipeline if MR already exists for this branch
-    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
-      when: never
-    # Run branch pipeline for dev/prod (direct pushes)
-    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "prod"
+    # # Run MR pipeline when MR is created/updated
+    # - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # # Skip branch pipeline if MR already exists for this branch
+    # - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+    #   when: never
+    # # Run branch pipeline for dev/prod (direct pushes)
+    # - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "prod"
 
 # Define pipeline stages
 stages:

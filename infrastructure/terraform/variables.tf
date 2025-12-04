@@ -23,3 +23,9 @@ variable "cognito_user_pool_id" {
   type        = string
   default     = "us-east-1_2bhVHgAvY"
 }
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "mapvibe"
+}

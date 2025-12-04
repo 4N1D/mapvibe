@@ -39,3 +39,15 @@ variable "db_secret_arn" {
   description = "ARN of Secrets Manager secret for DB credentials"
   type        = string
 }
+
+variable "photos_bucket_name" {
+  description = "S3 bucket name for photo uploads"
+  type        = string
+  default     = "mapvibe-photos"
+}
+
+variable "cloudfront_domain" {
+  description = "CloudFront domain for CDN URLs"
+  type        = string
+  default     = ""
+}

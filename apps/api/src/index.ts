@@ -123,7 +123,7 @@ const routes: RouteDefinition[] = [
   // Photos routes
   {
     method: "POST",
-    pattern: /^\/photos\/get-upload-url$/,
+    pattern: /^\/photos\/upload-url$/,
     paramNames: [],
     handler: photoGetUploadUrlHandler,
   },

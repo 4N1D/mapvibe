@@ -2,14 +2,15 @@ import crypto from "crypto";
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { getPresignedUploadUrl, generatePhotoKey } from "../../services/s3";
-import { success, badRequest, error } from "../../middlewares/response";
+import { success, badRequest, unauthorized, error } from "../../middlewares/response";
+import { getUserIdFromEvent } from "@/utils/auth";
 
 type PhotoType = "food" | "interior" | "exterior" | "menu" | "other";
 
 interface GetUploadUrlBody {
-  user_id: string;
   photo_type: PhotoType;
   content_type: string;
+  file_size?: number;
   restaurant_id?: string;
   location_address_id?: string;
   review_post_id?: string;
@@ -22,9 +23,16 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
   "image/gif": "gif",
 };
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
+      const userId = getUserIdFromEvent(event);
+      if (!userId) {
+        return unauthorized("Authentication required");
+      }
+
       const db = await getDb();
 
       let body: GetUploadUrlBody;
@@ -35,15 +43,15 @@ export const handler: Handler = {
       }
 
       const {
-        user_id,
         photo_type,
         content_type,
+        file_size,
         restaurant_id,
         location_address_id,
         review_post_id,
       } = body;
 
-      if (!user_id) {
+      if (!userId) {
         return badRequest("user_id is required");
       }
 
@@ -57,11 +65,21 @@ export const handler: Handler = {
         );
       }
 
+      if (typeof file_size === "number") {
+        if (file_size < 0) {
+          return badRequest("file_size must be a positive number");
+        }
+
+        if (file_size > MAX_FILE_SIZE) {
+          return badRequest(`File too large. Maximum: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+        }
+      }
+
       // Verify user exists
       const user = await db
         .selectFrom("users")
         .select("id")
-        .where("id", "=", user_id)
+        .where("id", "=", userId)
         .executeTakeFirst();
 
       if (!user) {
@@ -70,7 +88,7 @@ export const handler: Handler = {
 
       // Generate S3 key
       const extension = ALLOWED_CONTENT_TYPES[content_type];
-      const s3Key = generatePhotoKey(user_id, photo_type, extension);
+      const s3Key = generatePhotoKey(userId, photo_type, extension);
 
       // Get presigned URL (5 minutes expiry)
       const presignedResult = await getPresignedUploadUrl(s3Key, content_type, 300);
@@ -84,7 +102,7 @@ export const handler: Handler = {
           location_address_id: location_address_id ?? null,
           restaurant_id: restaurant_id ?? null,
           review_post_id: review_post_id ?? null,
-          uploaded_by: user_id,
+          uploaded_by: userId,
           photo_type,
           s3_url: presignedResult.cdnUrl,
           s3_thumbnail_url: null,

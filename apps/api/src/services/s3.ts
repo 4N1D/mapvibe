@@ -33,7 +33,7 @@ export async function getPresignedUploadUrl(
   const client = getS3Client();
 
   // Add photos/ prefix to S3 key to match CloudFront path pattern
-  const s3Key = `photos/${key}`;
+  const s3Key = key;
 
   const command = new PutObjectCommand({
     Bucket: S3_PHOTOS_BUCKET,

@@ -7,6 +7,7 @@
     "dev": "tsx watch src/local-server.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js \"--external:@aws-sdk/*\"",
     "build:watch": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:@aws-sdk/* --watch",
+    "deploy": "pwsh ../../scripts/deploy-api.ps1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },

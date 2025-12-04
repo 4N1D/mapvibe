@@ -32,6 +32,10 @@
     "codegen": {
       "cache": false,
       "outputs": ["packages/types/src/database.ts"]
+    },
+    "deploy": {
+      "dependsOn": ["build"],
+      "cache": false
     }
   }
 }

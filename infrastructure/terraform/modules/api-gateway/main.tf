@@ -36,6 +36,31 @@ resource "aws_apigatewayv2_integration" "places" {
   payload_format_version = "2.0"
 }
 
+# RAG Search Lambda Integration
+resource "aws_apigatewayv2_integration" "rag" {
+  api_id                 = aws_apigatewayv2_api.main.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.rag_lambda_invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
+# ============================================
+# COGNITO AUTHORIZER
+# ============================================
+
+resource "aws_apigatewayv2_authorizer" "cognito" {
+  api_id           = aws_apigatewayv2_api.main.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${var.project_name}-cognito-authorizer"
+
+  jwt_configuration {
+    audience = [var.cognito_client_id]
+    issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${var.cognito_user_pool_id}"
+  }
+}
+
 # ============================================
 # ROUTES
 # ============================================
@@ -79,18 +104,24 @@ resource "aws_apigatewayv2_route" "photos_upload_url" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /photos/upload-url"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_me_get" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /users/me"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_me_put" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "PUT /users/me"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "users_get" {
@@ -109,18 +140,24 @@ resource "aws_apigatewayv2_route" "reviews_create" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_vote" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/vote"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_comment" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/comment"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_apigatewayv2_route" "reviews_hot" {
@@ -145,6 +182,19 @@ resource "aws_apigatewayv2_route" "reviews_cleanup_expired" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/cleanup-expired"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+# RAG Search routes
+resource "aws_apigatewayv2_route" "rag_search" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /search"
+  target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
+}
+
+resource "aws_apigatewayv2_route" "rag_health" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /rag/health"
+  target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 
 # ============================================
@@ -195,6 +245,14 @@ resource "aws_lambda_permission" "places" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = var.places_lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "rag" {
+  statement_id  = "AllowAPIGatewayInvokeRAG"
+  action        = "lambda:InvokeFunction"
+  function_name = var.rag_lambda_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }

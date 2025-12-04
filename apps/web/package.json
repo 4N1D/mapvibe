@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist .vite"
+    "clean": "rm -rf dist .vite",
+    "deploy": "vite build && aws s3 sync dist s3://mapvibe-static-assets/ --delete && aws cloudfront create-invalidation --distribution-id E16I1673T1Y4CB --paths \"/*\""
   },
   "dependencies": {
     "@faker-js/faker": "^10.1.0",

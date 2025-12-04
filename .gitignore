@@ -133,3 +133,8 @@ terraform.rc
 
 #Lambda response query
 response.json
+
+# Lambda RAG: chỉ track main.py + requirements.txt
+infrastructure/terraform/modules/lambda-rag/src/**
+!infrastructure/terraform/modules/lambda-rag/src/main.py
+!infrastructure/terraform/modules/lambda-rag/src/requirements.txt

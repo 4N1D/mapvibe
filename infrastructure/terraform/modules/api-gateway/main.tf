@@ -39,8 +39,6 @@ resource "aws_apigatewayv2_integration" "places" {
 # ============================================
 # ROUTES
 # ============================================
-
-# Places routes
 resource "aws_apigatewayv2_route" "places_list" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /places"
@@ -74,6 +72,78 @@ resource "aws_apigatewayv2_route" "places_batch" {
 resource "aws_apigatewayv2_route" "places_nearby" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /places/nearby"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "photos_upload_url" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /photos/upload-url"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "users_me_get" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /users/me"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "users_me_put" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "PUT /users/me"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "users_get" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /users/{id}"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_list" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /reviews"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_create" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_vote" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/vote"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_comment" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/comment"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_hot" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /reviews/hot"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_submit_new_place" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/submit-new-place"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_approve_location" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/approve-location"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_cleanup_expired" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/cleanup-expired"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 

@@ -1,63 +1,51 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { getCurrentUser, getUserAttributes } from "@/lib/cognito";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const AuthCallbackPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Đang xử lý đăng nhập...");
+  const { isAuthenticated } = useAuth();
+  const hasRedirected = useRef(false);
 
+  // Handle OAuth error from URL params
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      const code = searchParams.get("code");
-      const error = searchParams.get("error");
+    const error = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
 
-      console.log("[Callback] URL params:", {
-        code: code ? "present" : "missing",
-        error,
-      });
+    if (error && !hasRedirected.current) {
+      hasRedirected.current = true;
+      console.error("[Callback] OAuth error:", error, errorDescription);
+      setStatus(`Đăng nhập thất bại: ${errorDescription || error}`);
+      setTimeout(() => navigate("/", { replace: true }), 2000);
+    }
+  }, [searchParams, navigate]);
 
-      if (error) {
-        console.error("[Callback] OAuth error:", error);
-        setStatus(`Đăng nhập thất bại: ${error}`);
-        setTimeout(() => navigate("/", { replace: true }), 2000);
-        return;
+  // Redirect ngay khi authenticated (không cần chờ loading)
+  useEffect(() => {
+    if (hasRedirected.current) return;
+
+    if (isAuthenticated) {
+      hasRedirected.current = true;
+      setStatus("Đăng nhập thành công!");
+      setTimeout(() => navigate("/", { replace: true }), 500);
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Fallback timeout: nếu sau 10s vẫn chưa authenticated, redirect về home
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        console.log("[Callback] Timeout reached, redirecting to home");
+        navigate("/", { replace: true });
       }
+    }, 10000);
 
-      setStatus("Đang xác thực...");
-      await new Promise((resolve) => setTimeout(resolve, 3500));
-
-      let attempts = 0;
-      const maxAttempts = 10;
-
-      while (attempts < maxAttempts) {
-        try {
-          console.log(`[Callback] Attempt ${attempts + 1}/${maxAttempts}`);
-          const user = await getCurrentUser();
-          console.log("[Callback] getCurrentUser result:", user);
-
-          if (user) {
-            const attrs = await getUserAttributes();
-            console.log("[Callback] User attributes:", attrs);
-            setStatus("Đăng nhập thành công!");
-            setTimeout(() => navigate("/", { replace: true }), 500);
-            return;
-          }
-        } catch (err) {
-          console.log("[Callback] Auth check error:", err);
-        }
-        attempts++;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      console.log("[Callback] Max attempts reached, redirecting anyway");
-      setStatus("Đang chuyển hướng...");
-      navigate("/", { replace: true });
-    };
-
-    checkAuthAndRedirect();
-  }, [navigate, searchParams]);
+    return () => clearTimeout(timeout);
+  }, [navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 to-amber-100">

@@ -76,41 +76,25 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
           </div>
         )}
 
-        {/* Tags */}
-        <div className="absolute left-2 top-2 flex gap-1">
-          {tags.map((tag) => (
+        {/* Tag */}
+        {data.tag && data.tag !== "normal" && (
+          <div className="absolute left-2 top-2">
             <span
-              key={tag}
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                tag === "hot"
+                data.tag === "hot"
                   ? "bg-red-500 text-white"
-                  : tag === "trending"
+                  : data.tag === "trending"
                     ? "bg-orange-500 text-white"
                     : "bg-blue-500 text-white"
               }`}
             >
-              {tag === "hot" ? "🔥 Hot" : tag === "trending" ? "📈 Trending" : "✨ New"}
+              {data.tag === "hot" ? "🔥 Hot" : data.tag === "trending" ? "📈 Trending" : "✨ New"}
             </span>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <CardContent className="space-y-3 p-4">
-        {/* Tag */}
-        {data.tag && (
-          <span
-            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-              data.tag === "hot"
-                ? "bg-red-100 text-red-600"
-                : data.tag === "new"
-                  ? "bg-blue-100 text-blue-600"
-                  : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {data.tag}
-          </span>
-        )}
-
         {/* Review content */}
         <p className="line-clamp-3 text-sm text-gray-600">{data.text}</p>
 

@@ -25,6 +25,15 @@ import {
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
 import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
 import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
+import {
+  infoHandler as restaurantInfoHandler,
+  commentsListHandler as restaurantCommentsListHandler,
+  commentsCreateHandler as restaurantCommentsCreateHandler,
+  reviewsListHandler as restaurantReviewsListHandler,
+  reviewsCreateHandler as restaurantReviewsCreateHandler,
+  photosListHandler as restaurantPhotosListHandler,
+  menuHandler as restaurantMenuHandler,
+} from "./handlers/restaurants";
 
 
 // Route definitions
@@ -156,6 +165,50 @@ const routes: RouteDefinition[] = [
     pattern: /^\/photos\/upload-url$/,
     paramNames: [],
     handler: photoGetUploadUrlHandler,
+  },
+
+  // Restaurants routes
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/info$/,
+    paramNames: ["slug"],
+    handler: restaurantInfoHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/comments$/,
+    paramNames: ["slug"],
+    handler: restaurantCommentsListHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/([^/]+)\/comments$/,
+    paramNames: ["slug"],
+    handler: restaurantCommentsCreateHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/reviews$/,
+    paramNames: ["slug"],
+    handler: restaurantReviewsListHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/([^/]+)\/reviews$/,
+    paramNames: ["slug"],
+    handler: restaurantReviewsCreateHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/photos$/,
+    paramNames: ["slug"],
+    handler: restaurantPhotosListHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/menu$/,
+    paramNames: ["slug"],
+    handler: restaurantMenuHandler,
   },
 ];
 

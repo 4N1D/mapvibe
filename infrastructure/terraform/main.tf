@@ -136,6 +136,25 @@ module "lambda_rag" {
 }
 
 # ============================================
+# LAMBDA REVIEW AGGREGATE MODULE
+# ============================================
+
+module "lambda_review_aggregate" {
+  source = "./modules/lambda-review-aggregate"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  db_security_group_id = module.rds.security_group_id
+  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
+  db_host              = module.rds.address
+  db_name              = module.rds.database_name
+}
+
+# ============================================
 # LAMBDA OCR MENU MODULE
 # ============================================
 
@@ -327,6 +346,9 @@ module "api_gateway" {
   # RAG Lambda integration
   rag_lambda_name       = module.lambda_rag.function_name
   rag_lambda_invoke_arn = module.lambda_rag.invoke_arn
+  # Review aggregate Lambda integration
+  aggregate_lambda_name       = module.lambda_review_aggregate.function_name
+  aggregate_lambda_invoke_arn = module.lambda_review_aggregate.invoke_arn
 }
 
 # ============================================

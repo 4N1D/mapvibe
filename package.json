@@ -29,6 +29,7 @@
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "deploy:infra": "turbo run deploy --filter=infrastructure",
+    "plan:infra": "turbo run plan --filter=infrastructure",
     "deploy:web": "turbo run deploy --filter=web",
     "deploy:api": "pwsh ./scripts/deploy-api.ps1",
     "migrate": "aws lambda invoke --function-name mapvibe-db-migration-mvp --payload \"{}\" --cli-binary-format raw-in-base64-out --region us-east-1 response.json && cat response.json",

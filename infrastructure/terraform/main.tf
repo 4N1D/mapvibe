@@ -83,12 +83,19 @@ module "cognito" {
 
   project_name  = var.project_name
   environment   = var.environment
-  callback_urls = ["http://localhost:5173/callback", "https://mapvibe.site/callback"]
-  logout_urls   = ["http://localhost:5173", "https://mapvibe.site"]
+  callback_urls = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback"]
+  logout_urls   = ["http://localhost:5173/", "https://mapvibe.site/"]
 
   # Google OAuth (optional - leave empty to disable)
   google_client_id     = var.google_client_id
   google_client_secret = var.google_client_secret
+
+  # Custom domain for Cognito Hosted UI
+  custom_domain       = "login.mapvibe.site"
+  acm_certificate_arn = module.dns.certificate_arn
+  route53_zone_id     = module.dns.zone_id
+
+  depends_on = [module.dns]
 }
 
 # ============================================
@@ -162,16 +169,11 @@ module "lambda_rag" {
 module "lambda_review_aggregate" {
   source = "./modules/lambda-review-aggregate"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
-  db_host              = module.rds.address
-  db_name              = module.rds.database_name
+  project_name  = var.project_name
+  environment   = var.environment
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
 }
 
 # ============================================
@@ -329,8 +331,6 @@ module "dns" {
   project_name           = var.project_name
   domain_name            = "mapvibe.site"
   cloudfront_domain_name = module.cdn.cloudfront_domain_name
-  cognito_user_pool_id   = module.cognito.user_pool_id
-  enable_cognito_domain  = true
 }
 
 # ============================================

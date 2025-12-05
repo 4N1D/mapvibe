@@ -119,8 +119,31 @@ resource "aws_cognito_user_pool_client" "web" {
   depends_on = [aws_cognito_identity_provider.google]
 }
 
-# User Pool Domain (for hosted UI)
-resource "aws_cognito_user_pool_domain" "main" {
+# User Pool Domain - Cognito prefix (fallback)
+resource "aws_cognito_user_pool_domain" "prefix" {
+  count        = var.custom_domain == "" ? 1 : 0
   domain       = "${var.project_name}-${var.environment}"
   user_pool_id = aws_cognito_user_pool.main.id
+}
+
+# User Pool Domain - Custom domain (if configured)
+resource "aws_cognito_user_pool_domain" "custom" {
+  count           = var.custom_domain != "" ? 1 : 0
+  domain          = var.custom_domain
+  certificate_arn = var.acm_certificate_arn
+  user_pool_id    = aws_cognito_user_pool.main.id
+}
+
+# Route53 Record for Custom Domain
+resource "aws_route53_record" "cognito_custom_domain" {
+  count   = var.custom_domain != "" ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.custom_domain
+  type    = "A"
+
+  alias {
+    name                   = aws_cognito_user_pool_domain.custom[0].cloudfront_distribution
+    zone_id                = aws_cognito_user_pool_domain.custom[0].cloudfront_distribution_zone_id
+    evaluate_target_health = false
+  }
 }

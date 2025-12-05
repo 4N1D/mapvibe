@@ -14,13 +14,13 @@ variable "project_name" {
 variable "static_assets_bucket_name" {
   description = "S3 bucket name for static assets (frontend)"
   type        = string
-  default     = "mapvibe-static-assets"
+  default     = "mapvibe-static-assets-mvp"
 }
 
 variable "photos_bucket_name" {
   description = "S3 bucket name for user photos"
   type        = string
-  default     = "mapvibe-photos"
+  default     = "mapvibe-photos-mvp"
 }
 
 variable "web_acl_arn" {

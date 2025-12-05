@@ -89,30 +89,4 @@ resource "aws_route53_record" "www" {
   }
 }
 
-# ============================================
-# COGNITO CUSTOM DOMAIN
-# ============================================
-
-# Cognito User Pool Domain (custom domain)
-resource "aws_cognito_user_pool_domain" "auth" {
-  count           = var.enable_cognito_domain ? 1 : 0
-  domain          = "auth.${var.domain_name}"
-  certificate_arn = aws_acm_certificate.main.arn
-  user_pool_id    = var.cognito_user_pool_id
-
-  depends_on = [aws_acm_certificate_validation.main]
-}
-
-# Route53 A Record for Cognito custom domain
-resource "aws_route53_record" "auth" {
-  count   = var.enable_cognito_domain ? 1 : 0
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "auth.${var.domain_name}"
-  type    = "A"
-
-  alias {
-    name                   = aws_cognito_user_pool_domain.auth[0].cloudfront_distribution
-    zone_id                = aws_cognito_user_pool_domain.auth[0].cloudfront_distribution_zone_id
-    evaluate_target_health = false
-  }
-}
+# NOTE: Cognito custom domain is managed in cognito module to avoid circular dependency

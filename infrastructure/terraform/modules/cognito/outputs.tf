@@ -22,12 +22,12 @@ output "client_id" {
 
 output "domain" {
   description = "Cognito User Pool domain"
-  value       = aws_cognito_user_pool_domain.main.domain
+  value       = var.custom_domain != "" ? var.custom_domain : aws_cognito_user_pool_domain.prefix[0].domain
 }
 
 output "hosted_ui_url" {
   description = "Hosted UI URL"
-  value       = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
+  value       = var.custom_domain != "" ? "https://${var.custom_domain}" : "https://${aws_cognito_user_pool_domain.prefix[0].domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
 }
 
 data "aws_region" "current" {}

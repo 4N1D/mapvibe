@@ -8,7 +8,7 @@ terraform {
     organization = "aws-firstcloudjourney"
 
     workspaces {
-      name = "mapvibe"
+      name = "mapvibe-new"
     }
   }
 

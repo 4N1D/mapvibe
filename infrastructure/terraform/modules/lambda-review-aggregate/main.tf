@@ -25,15 +25,10 @@ resource "aws_iam_role" "lambda" {
   })
 }
 
-# Basic + VPC
+# Basic execution role
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
 # Secrets + Bedrock
@@ -64,35 +59,7 @@ resource "aws_iam_role_policy" "lambda_extra" {
 }
 
 #############################################
-# SECURITY GROUP
-#############################################
-
-resource "aws_security_group" "lambda" {
-  name        = "${var.project_name}-review-aggregate-sg-${var.environment}"
-  description = "SG for review aggregation Lambda"
-  vpc_id      = var.vpc_id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# Allow DB access
-resource "aws_security_group_rule" "lambda_to_rds" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.lambda.id
-  security_group_id        = var.db_security_group_id
-  description              = "Allow review aggregate Lambda to connect to RDS"
-}
-
-#############################################
-# LAMBDA FUNCTION
+# LAMBDA FUNCTION (runs outside VPC)
 #############################################
 
 resource "aws_lambda_function" "aggregate" {
@@ -105,17 +72,11 @@ resource "aws_lambda_function" "aggregate" {
   memory_size      = 512
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
       DB_SECRET_ARN = var.db_secret_arn
       DB_HOST       = var.db_host
       DB_NAME       = var.db_name
-      AWS_REGION    = var.aws_region
     }
   }
 }

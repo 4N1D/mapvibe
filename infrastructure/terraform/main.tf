@@ -1,5 +1,6 @@
 # MapVibe Infrastructure - MVP
 # Main configuration file
+# NOTE: Lambda runs outside VPC, RDS is publicly accessible
 
 # ============================================
 # PROVIDER CONFIGURATION
@@ -7,6 +8,20 @@
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+# Provider for WAF (must be us-east-1 for CloudFront)
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
 
   default_tags {
     tags = {
@@ -60,23 +75,38 @@ module "vpc" {
 }
 
 # ============================================
+# COGNITO MODULE
+# ============================================
+
+module "cognito" {
+  source = "./modules/cognito"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  callback_urls = ["http://localhost:5173/callback", "https://mapvibe.site/callback"]
+  logout_urls   = ["http://localhost:5173", "https://mapvibe.site"]
+
+  # Google OAuth (optional - leave empty to disable)
+  google_client_id     = var.google_client_id
+  google_client_secret = var.google_client_secret
+}
+
+# ============================================
 # RDS MODULE
 # ============================================
 
 module "rds" {
   source = "./modules/rds"
 
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  db_password        = random_password.db_password.result
+  environment       = var.environment
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  db_password       = random_password.db_password.result
 
-  # MVP settings - tiết kiệm chi phí
-  instance_class      = "db.t3.micro" # ~$15/tháng
-  allocated_storage   = 20            # 20GB
-  multi_az            = false         # Single AZ
-  publicly_accessible = true          # MVP only - cho phép local dev & DataGrip
+  # MVP settings
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+  multi_az          = false
 }
 
 # ============================================
@@ -86,13 +116,10 @@ module "rds" {
 module "lambda_migration" {
   source = "./modules/lambda-migration"
 
-  environment          = var.environment
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
-  db_host              = module.rds.address
-  db_name              = module.rds.database_name
+  environment   = var.environment
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
 }
 
 # ============================================
@@ -104,16 +131,13 @@ module "lambda_migration" {
 module "lambda_api" {
   source = "./modules/lambda-api"
 
-  environment           = var.environment
-  project_name          = var.project_name
-  vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  rds_security_group_id = module.rds.security_group_id
-  db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
-  db_host               = module.rds.address
-  db_name               = module.rds.database_name
-  photos_bucket_name    = module.cdn.photos_bucket_name
-  cloudfront_domain     = module.cdn.cloudfront_domain_name
+  environment        = var.environment
+  project_name       = var.project_name
+  db_secret_arn      = aws_secretsmanager_secret.db_credentials.arn
+  db_host            = module.rds.address
+  db_name            = module.rds.database_name
+  photos_bucket_name = module.cdn.photos_bucket_name
+  cloudfront_domain  = module.cdn.cloudfront_domain_name
 }
 
 # ============================================
@@ -123,16 +147,12 @@ module "lambda_api" {
 module "lambda_rag" {
   source = "./modules/lambda-rag"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
-  db_host              = module.rds.address
-  db_name              = module.rds.database_name
+  project_name  = var.project_name
+  environment   = var.environment
+  aws_region    = var.aws_region
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
 }
 
 # ============================================
@@ -142,19 +162,13 @@ module "lambda_rag" {
 module "lambda_ocr_menu" {
   source = "./modules/lambda-ocr-menu"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
-
-  photos_bucket_name = "mapvibe-photos" # Must match s3-cloudfront module default
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  db_secret_arn      = aws_secretsmanager_secret.db_credentials.arn
+  db_host            = module.rds.address
+  db_name            = module.rds.database_name
+  photos_bucket_name = module.cdn.photos_bucket_name
 }
 
 # ============================================
@@ -164,19 +178,13 @@ module "lambda_ocr_menu" {
 module "lambda_rekognition" {
   source = "./modules/lambda-rekognition"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
-
-  photos_bucket_name = "mapvibe-photos" # Must match s3-cloudfront module default
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  db_secret_arn      = aws_secretsmanager_secret.db_credentials.arn
+  db_host            = module.rds.address
+  db_name            = module.rds.database_name
+  photos_bucket_name = module.cdn.photos_bucket_name
 }
 
 # ============================================
@@ -186,31 +194,38 @@ module "lambda_rekognition" {
 module "lambda_embeddings" {
   source = "./modules/lambda-embeddings"
 
-  project_name = var.project_name
-  environment  = var.environment
-  aws_region   = var.aws_region
-
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  db_security_group_id = module.rds.security_group_id
-
+  project_name  = var.project_name
+  environment   = var.environment
+  aws_region    = var.aws_region
   db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
   db_host       = module.rds.address
   db_name       = module.rds.database_name
 }
 
 # ============================================
-# S3 + CLOUDFRONT MODULE
+# WAF MODULE (for CloudFront)
 # ============================================
 
-# WAF: Sử dụng WAF hiện có (CloudFront Security Bundle yêu cầu)
-# Để thêm rules, vào AWS Console > WAF > CreatedByCloudFront-a44b6ad5
+module "waf" {
+  source = "./modules/waf"
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+# ============================================
+# S3 + CLOUDFRONT MODULE
+# ============================================
 
 module "cdn" {
   source = "./modules/s3-cloudfront"
 
   environment = var.environment
-  web_acl_arn = "arn:aws:wafv2:us-east-1:487692781272:global/webacl/CreatedByCloudFront-a44b6ad5/06badb70-63dd-4ad2-9679-fc8e449b92f7"
+  web_acl_arn = module.waf.web_acl_arn
 
   # Custom domain
   domain_aliases      = ["mapvibe.site", "www.mapvibe.site"]
@@ -221,25 +236,18 @@ module "cdn" {
 # S3 EVENT NOTIFICATIONS (Trigger Lambda)
 # ============================================
 
-# Data source để lấy S3 bucket
-data "aws_s3_bucket" "photos" {
-  bucket = "mapvibe-photos"
-}
-
 # Lambda permission: Cho phép S3 invoke Lambda OCR Menu
 resource "aws_lambda_permission" "allow_s3_ocr_menu" {
   statement_id  = "AllowExecutionFromS3Bucket"
   action        = "lambda:InvokeFunction"
   function_name = module.lambda_ocr_menu.function_name
   principal     = "s3.amazonaws.com"
-  source_arn    = data.aws_s3_bucket.photos.arn
+  source_arn    = module.cdn.photos_bucket_arn
 }
 
-
-
-# S3 Notification: Gộp TẤT CẢ triggers vào 1 resource (AWS chỉ cho phép 1 notification config per bucket)
+# S3 Notification: Gộp TẤT CẢ triggers vào 1 resource
 resource "aws_s3_bucket_notification" "photos_all" {
-  bucket = data.aws_s3_bucket.photos.id
+  bucket = module.cdn.photos_bucket_name
 
   # OCR Menu triggers - chỉ cho folder menus/
   lambda_function {
@@ -302,7 +310,8 @@ module "dns" {
   project_name           = var.project_name
   domain_name            = "mapvibe.site"
   cloudfront_domain_name = module.cdn.cloudfront_domain_name
-  cognito_user_pool_id   = var.cognito_user_pool_id
+  cognito_user_pool_id   = module.cognito.user_pool_id
+  enable_cognito_domain  = true
 }
 
 # ============================================
@@ -322,8 +331,8 @@ module "api_gateway" {
   places_lambda_name       = module.lambda_api.function_name
   places_lambda_invoke_arn = module.lambda_api.invoke_arn
   aws_region               = var.aws_region
-  cognito_user_pool_id     = var.cognito_user_pool_id
-  cognito_client_id        = "3s6480dj3u1luo6ksp8sqh66sh"
+  cognito_user_pool_id     = module.cognito.user_pool_id
+  cognito_client_id        = module.cognito.client_id
   # RAG Lambda integration
   rag_lambda_name       = module.lambda_rag.function_name
   rag_lambda_invoke_arn = module.lambda_rag.invoke_arn
@@ -336,18 +345,15 @@ module "api_gateway" {
 module "lambda_s3_trigger" {
   source = "./modules/lambda-s3-trigger"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  aws_region            = var.aws_region
-  vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  db_host               = module.rds.address
-  db_name               = module.rds.database_name
-  db_secret_arn         = aws_secretsmanager_secret.db_credentials.arn
-  rds_security_group_id = module.rds.security_group_id
-  s3_bucket_id          = module.cdn.photos_bucket_name
-  s3_bucket_arn         = module.cdn.photos_bucket_arn
-  cloudfront_domain     = module.cdn.cloudfront_domain_name
+  project_name      = var.project_name
+  environment       = var.environment
+  aws_region        = var.aws_region
+  db_host           = module.rds.address
+  db_name           = module.rds.database_name
+  db_secret_arn     = aws_secretsmanager_secret.db_credentials.arn
+  s3_bucket_id      = module.cdn.photos_bucket_name
+  s3_bucket_arn     = module.cdn.photos_bucket_arn
+  cloudfront_domain = module.cdn.cloudfront_domain_name
 }
 
 # ============================================
@@ -360,7 +366,7 @@ resource "aws_lambda_permission" "cognito_trigger" {
   action        = "lambda:InvokeFunction"
   function_name = module.lambda_api.function_name
   principal     = "cognito-idp.amazonaws.com"
-  source_arn    = "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/${var.cognito_user_pool_id}"
+  source_arn    = module.cognito.user_pool_arn
 }
 
 data "aws_caller_identity" "current" {}
@@ -372,7 +378,7 @@ resource "null_resource" "cognito_lambda_trigger" {
   }
 
   provisioner "local-exec" {
-    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${var.cognito_user_pool_id} --lambda-config PreTokenGeneration=${module.lambda_api.function_arn}"
+    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${module.cognito.user_pool_id} --lambda-config PreTokenGeneration=${module.lambda_api.function_arn}"
   }
 
   depends_on = [aws_lambda_permission.cognito_trigger]
@@ -506,4 +512,26 @@ output "embeddings_sqs_queue_url" {
 output "embeddings_sqs_queue_arn" {
   description = "SQS queue ARN for embedding jobs"
   value       = module.lambda_embeddings.sqs_queue_arn
+}
+
+# Cognito Outputs
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = module.cognito.user_pool_id
+}
+
+output "cognito_client_id" {
+  description = "Cognito User Pool Client ID"
+  value       = module.cognito.client_id
+}
+
+output "cognito_hosted_ui_url" {
+  description = "Cognito Hosted UI URL"
+  value       = module.cognito.hosted_ui_url
+}
+
+# WAF Outputs
+output "waf_web_acl_arn" {
+  description = "WAF Web ACL ARN"
+  value       = module.waf.web_acl_arn
 }

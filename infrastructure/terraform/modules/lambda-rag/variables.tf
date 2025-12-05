@@ -1,3 +1,6 @@
+# Lambda RAG Module Variables
+# NOTE: VPC variables removed - Lambda runs outside VPC (MVP)
+
 variable "project_name" {
   type        = string
   description = "Project name"
@@ -8,21 +11,6 @@ variable "environment" {
   description = "Deployment environment (dev/stage/prod)"
 }
 
-variable "vpc_id" {
-  type        = string
-  description = "VPC ID"
-}
-
-variable "private_subnet_ids" {
-  type        = list(string)
-  description = "Private subnet IDs for Lambda"
-}
-
-variable "db_security_group_id" {
-  type        = string
-  description = "RDS security group ID"
-}
-
 variable "db_secret_arn" {
   type        = string
   description = "Secrets Manager ARN for DB credentials"
@@ -30,7 +18,7 @@ variable "db_secret_arn" {
 
 variable "db_host" {
   type        = string
-  description = "Database host"
+  description = "Database host (public endpoint)"
 }
 
 variable "db_name" {

@@ -31,3 +31,9 @@ variable "cognito_user_pool_id" {
   type        = string
   default     = ""
 }
+
+variable "enable_cognito_domain" {
+  description = "Whether to create Cognito custom domain resources"
+  type        = bool
+  default     = false
+}

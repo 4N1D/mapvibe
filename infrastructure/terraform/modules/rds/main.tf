@@ -1,5 +1,6 @@
 # RDS PostgreSQL Module for MapVibe
 # Creates RDS instance with PostGIS support
+# NOTE: Publicly accessible for MVP - Lambda connects via internet
 
 # Security Group for RDS
 resource "aws_security_group" "rds" {
@@ -7,21 +8,13 @@ resource "aws_security_group" "rds" {
   description = "Security group for MapVibe RDS"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"] # Allow from VPC
-    description = "PostgreSQL from VPC"
-  }
-
-  # MVP only - allow public access for development
+  # Allow public access for Lambda (outside VPC) and development tools
   ingress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "PostgreSQL public access (MVP only)"
+    description = "PostgreSQL public access (MVP)"
   }
 
   egress {
@@ -34,17 +27,12 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "mapvibe-rds-sg-${var.environment}"
   }
-
-  # Ignore ingress changes - Lambda modules add their own rules
-  lifecycle {
-    ignore_changes = [ingress]
-  }
 }
 
-# DB Subnet Group (use public subnets for MVP dev access)
+# DB Subnet Group (public subnets for MVP)
 resource "aws_db_subnet_group" "main" {
   name       = "mapvibe-db-subnet-${var.environment}"
-  subnet_ids = var.publicly_accessible ? var.public_subnet_ids : var.private_subnet_ids
+  subnet_ids = var.public_subnet_ids
 
   tags = {
     Name = "mapvibe-db-subnet-${var.environment}"
@@ -59,13 +47,13 @@ resource "aws_db_parameter_group" "postgres" {
   parameter {
     name         = "shared_preload_libraries"
     value        = "pg_stat_statements"
-    apply_method = "pending-reboot"  # Requires DB restart to take effect
+    apply_method = "pending-reboot" # Requires DB restart to take effect
   }
 
   parameter {
     name         = "log_statement"
     value        = "all"
-    apply_method = "immediate"  # Can apply without restart
+    apply_method = "immediate" # Can apply without restart
   }
 
   tags = {
@@ -94,10 +82,10 @@ resource "aws_db_instance" "main" {
   username = var.db_username
   password = var.db_password
 
-  # Network
+  # Network (public for MVP)
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = var.publicly_accessible
+  publicly_accessible    = true
   multi_az               = var.multi_az
 
   # Backup

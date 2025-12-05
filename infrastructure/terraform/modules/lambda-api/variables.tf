@@ -1,4 +1,5 @@
 # Lambda API Module Variables
+# NOTE: VPC variables removed - Lambda runs outside VPC (MVP)
 
 variable "environment" {
   description = "Environment name"
@@ -10,23 +11,8 @@ variable "project_name" {
   type        = string
 }
 
-variable "vpc_id" {
-  description = "VPC ID"
-  type        = string
-}
-
-variable "private_subnet_ids" {
-  description = "List of private subnet IDs"
-  type        = list(string)
-}
-
-variable "rds_security_group_id" {
-  description = "RDS security group ID"
-  type        = string
-}
-
 variable "db_host" {
-  description = "Database host"
+  description = "Database host (public endpoint)"
   type        = string
 }
 

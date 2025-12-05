@@ -1,3 +1,6 @@
+# Lambda S3 Trigger Module Variables
+# NOTE: VPC variables removed - Lambda runs outside VPC (MVP)
+
 variable "project_name" {
   type = string
 }
@@ -10,16 +13,9 @@ variable "aws_region" {
   type = string
 }
 
-variable "vpc_id" {
-  type = string
-}
-
-variable "private_subnet_ids" {
-  type = list(string)
-}
-
 variable "db_host" {
-  type = string
+  type        = string
+  description = "Database host (public endpoint)"
 }
 
 variable "db_name" {
@@ -27,10 +23,6 @@ variable "db_name" {
 }
 
 variable "db_secret_arn" {
-  type = string
-}
-
-variable "rds_security_group_id" {
   type = string
 }
 

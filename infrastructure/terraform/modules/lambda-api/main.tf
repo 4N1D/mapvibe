@@ -1,5 +1,6 @@
 # Lambda API Module
 # References code from apps/api/
+# NOTE: Lambda runs outside VPC for simplicity (MVP)
 
 # ============================================
 # BUILD & ARCHIVE
@@ -60,15 +61,6 @@ resource "aws_iam_role_policy" "lambda" {
         Resource = var.db_secret_arn
       },
       {
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateNetworkInterface",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DeleteNetworkInterface"
-        ]
-        Resource = "*"
-      },
-      {
         Effect   = "Allow"
         Action   = ["s3:PutObject"]
         Resource = "arn:aws:s3:::${var.photos_bucket_name}/*"
@@ -78,42 +70,7 @@ resource "aws_iam_role_policy" "lambda" {
 }
 
 # ============================================
-# SECURITY GROUP
-# ============================================
-
-resource "aws_security_group" "lambda" {
-  name        = "${var.project_name}-api-lambda-sg-${var.environment}"
-  description = "Security group for API Lambda"
-  vpc_id      = var.vpc_id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound traffic"
-  }
-
-  tags = {
-    Name        = "${var.project_name}-api-lambda-sg-${var.environment}"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-# Allow Lambda to connect to RDS
-resource "aws_security_group_rule" "lambda_to_rds" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.lambda.id
-  security_group_id        = var.rds_security_group_id
-  description              = "Allow API Lambda to connect to RDS"
-}
-
-# ============================================
-# LAMBDA FUNCTION
+# LAMBDA FUNCTION (No VPC - connects to public RDS)
 # ============================================
 
 resource "aws_lambda_function" "api" {
@@ -126,18 +83,13 @@ resource "aws_lambda_function" "api" {
   memory_size      = 256
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
-      DB_HOST          = var.db_host
-      DB_NAME          = var.db_name
-      DB_SECRET_ARN    = var.db_secret_arn
-      NODE_ENV         = var.environment
-      S3_PHOTOS_BUCKET = var.photos_bucket_name
+      DB_HOST           = var.db_host
+      DB_NAME           = var.db_name
+      DB_SECRET_ARN     = var.db_secret_arn
+      NODE_ENV          = var.environment
+      S3_PHOTOS_BUCKET  = var.photos_bucket_name
       CLOUDFRONT_DOMAIN = var.cloudfront_domain
     }
   }

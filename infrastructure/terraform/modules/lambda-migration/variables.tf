@@ -1,4 +1,5 @@
 # Lambda Migration Module Variables
+# NOTE: VPC variables removed - Lambda runs outside VPC (MVP)
 
 variable "environment" {
   description = "Environment name"
@@ -11,28 +12,13 @@ variable "project_name" {
   default     = "mapvibe"
 }
 
-variable "vpc_id" {
-  description = "VPC ID"
-  type        = string
-}
-
-variable "private_subnet_ids" {
-  description = "Private subnet IDs for Lambda"
-  type        = list(string)
-}
-
-variable "db_security_group_id" {
-  description = "RDS security group ID (Lambda needs access)"
-  type        = string
-}
-
 variable "db_secret_arn" {
   description = "Secrets Manager ARN for DB credentials"
   type        = string
 }
 
 variable "db_host" {
-  description = "RDS endpoint (host only, no port)"
+  description = "RDS endpoint (public, host only, no port)"
   type        = string
 }
 

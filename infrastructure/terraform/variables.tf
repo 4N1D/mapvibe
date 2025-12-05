@@ -18,14 +18,22 @@ variable "project_name" {
   default     = "mapvibe"
 }
 
-variable "cognito_user_pool_id" {
-  description = "Cognito User Pool ID (for custom domain setup)"
-  type        = string
-  default     = "us-east-1_2bhVHgAvY"
-}
-
 variable "db_name" {
   description = "Database name"
   type        = string
   default     = "mapvibe"
+}
+
+# Google OAuth (optional - leave empty to disable Google Sign-In)
+variable "google_client_id" {
+  description = "Google OAuth Client ID from Google Cloud Console"
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret from Google Cloud Console"
+  type        = string
+  sensitive   = true
+  default     = ""
 }

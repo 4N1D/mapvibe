@@ -27,5 +27,5 @@ output "domain_name" {
 
 output "cognito_auth_domain" {
   description = "Cognito custom domain"
-  value       = var.cognito_user_pool_id != "" ? "auth.${var.domain_name}" : null
+  value       = var.enable_cognito_domain ? "auth.${var.domain_name}" : null
 }

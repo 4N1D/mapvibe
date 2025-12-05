@@ -95,7 +95,7 @@ resource "aws_route53_record" "www" {
 
 # Cognito User Pool Domain (custom domain)
 resource "aws_cognito_user_pool_domain" "auth" {
-  count           = var.cognito_user_pool_id != "" ? 1 : 0
+  count           = var.enable_cognito_domain ? 1 : 0
   domain          = "auth.${var.domain_name}"
   certificate_arn = aws_acm_certificate.main.arn
   user_pool_id    = var.cognito_user_pool_id
@@ -105,7 +105,7 @@ resource "aws_cognito_user_pool_domain" "auth" {
 
 # Route53 A Record for Cognito custom domain
 resource "aws_route53_record" "auth" {
-  count   = var.cognito_user_pool_id != "" ? 1 : 0
+  count   = var.enable_cognito_domain ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
   name    = "auth.${var.domain_name}"
   type    = "A"

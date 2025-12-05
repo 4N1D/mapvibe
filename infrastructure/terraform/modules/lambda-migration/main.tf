@@ -1,5 +1,6 @@
 # Lambda Migration Module
-# Runs database migrations from within VPC
+# Runs database migrations
+# NOTE: Lambda runs outside VPC for simplicity (MVP)
 
 # ============================================
 # IAM ROLE FOR LAMBDA
@@ -32,12 +33,6 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# VPC access for Lambda
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
 # Secrets Manager access
 resource "aws_iam_role_policy" "secrets_access" {
   name = "${var.project_name}-migration-secrets-policy-${var.environment}"
@@ -58,40 +53,7 @@ resource "aws_iam_role_policy" "secrets_access" {
 }
 
 # ============================================
-# SECURITY GROUP FOR LAMBDA
-# ============================================
-
-resource "aws_security_group" "lambda" {
-  name        = "${var.project_name}-migration-lambda-sg-${var.environment}"
-  description = "Security group for migration Lambda"
-  vpc_id      = var.vpc_id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound"
-  }
-
-  tags = {
-    Name = "${var.project_name}-migration-lambda-sg-${var.environment}"
-  }
-}
-
-# Allow Lambda to connect to RDS
-resource "aws_security_group_rule" "lambda_to_rds" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.lambda.id
-  security_group_id        = var.db_security_group_id
-  description              = "Allow Lambda to connect to RDS"
-}
-
-# ============================================
-# LAMBDA FUNCTION
+# LAMBDA FUNCTION (No VPC - connects to public RDS)
 # ============================================
 
 data "archive_file" "lambda_zip" {
@@ -107,13 +69,8 @@ resource "aws_lambda_function" "migration" {
   handler          = "index.handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime          = "nodejs18.x"
-  timeout          = 300  # 5 minutes for migrations
+  timeout          = 300
   memory_size      = 256
-
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
 
   environment {
     variables = {

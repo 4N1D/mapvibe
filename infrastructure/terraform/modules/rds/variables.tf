@@ -1,4 +1,5 @@
 # RDS Module Variables
+# NOTE: Simplified for MVP - RDS is publicly accessible
 
 variable "environment" {
   description = "Environment name (mvp, dev, prod)"
@@ -10,8 +11,8 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "private_subnet_ids" {
-  description = "List of private subnet IDs for DB subnet group"
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs for DB subnet group"
   type        = list(string)
 }
 
@@ -49,16 +50,4 @@ variable "multi_az" {
   description = "Enable Multi-AZ deployment"
   type        = bool
   default     = false
-}
-
-variable "publicly_accessible" {
-  description = "Make RDS publicly accessible (for MVP development only)"
-  type        = bool
-  default     = false
-}
-
-variable "public_subnet_ids" {
-  description = "List of public subnet IDs (required if publicly_accessible = true)"
-  type        = list(string)
-  default     = []
 }

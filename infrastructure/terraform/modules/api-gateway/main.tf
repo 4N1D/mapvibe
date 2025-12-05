@@ -45,6 +45,15 @@ resource "aws_apigatewayv2_integration" "rag" {
   payload_format_version = "2.0"
 }
 
+# Review aggregate Lambda Integration
+resource "aws_apigatewayv2_integration" "review_aggregate" {
+  api_id                 = aws_apigatewayv2_api.main.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.aggregate_lambda_invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
 # ============================================
 # COGNITO AUTHORIZER
 # ============================================
@@ -203,6 +212,12 @@ resource "aws_apigatewayv2_route" "rag_health" {
   target    = "integrations/${aws_apigatewayv2_integration.rag.id}"
 }
 
+resource "aws_apigatewayv2_route" "review_aggregate" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /reviews/aggregate-pending"
+  target    = "integrations/${aws_apigatewayv2_integration.review_aggregate.id}"
+}
+
 # ============================================
 # STAGE (Auto-deploy)
 # ============================================
@@ -259,6 +274,14 @@ resource "aws_lambda_permission" "rag" {
   statement_id  = "AllowAPIGatewayInvokeRAG"
   action        = "lambda:InvokeFunction"
   function_name = var.rag_lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "review_aggregate" {
+  statement_id  = "AllowAPIGatewayInvokeReviewAggregate"
+  action        = "lambda:InvokeFunction"
+  function_name = var.aggregate_lambda_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }

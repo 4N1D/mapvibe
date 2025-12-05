@@ -59,3 +59,13 @@ variable "rag_lambda_invoke_arn" {
   description = "RAG search Lambda invoke ARN"
   type        = string
 }
+
+variable "aggregate_lambda_name" {
+  description = "Review aggregate Lambda function name"
+  type        = string
+}
+
+variable "aggregate_lambda_invoke_arn" {
+  description = "Review aggregate Lambda invoke ARN"
+  type        = string
+}

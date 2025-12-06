@@ -6,3 +6,4 @@ export { SimilarPlaces } from "./components/SimilarPlaces";
 export { DirectionSidebar } from "./components/DirectionSidebar";
 export { IntroductionTab } from "./components/tabs/IntroductionTab";
 export { CommentsTab } from "./components/tabs/CommentsTab";
+export { ReviewsTab } from "./components/tabs/ReviewsTab";

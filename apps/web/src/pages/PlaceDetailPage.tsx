@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { Restaurant } from "@mapvibe/types";
 import { ArrowLeft } from "lucide-react";
-import { CommentsTab, ImageGalleryPreview, IntroductionTab, RestaurantInfo } from "@/features/place";
+import { CommentsTab, ImageGalleryPreview, IntroductionTab, RestaurantInfo, ReviewsTab } from "@/features/place";
 
 export function PlaceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -153,11 +153,7 @@ export function PlaceDetailPage() {
         return <CommentsTab restaurantId={restaurant.id} />
 
       case "nhan-xet":
-        return (
-          <div className="rounded-lg bg-white p-6 shadow-sm">
-            <p className="text-gray-500">TODO: ReviewsTab</p>
-          </div>
-        );
+        return <ReviewsTab restaurantId={restaurant.id} />;
 
       case "anh":
         return (

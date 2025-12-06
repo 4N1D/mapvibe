@@ -174,3 +174,38 @@ export interface CommentsResponse {
   total_pages: number;
   comments: Comment[];
 }
+
+// ============================================
+// Restaurant Review Types (for ReviewsTab)
+// ============================================
+export interface ReviewRatings {
+  quality: number;    // Chất lượng (1-10)
+  service: number;    // Dịch vụ (1-10)
+  location: number;   // Vị trí (1-10)
+  price: number;      // Giá cả (1-10)
+  ambiance: number;   // Không gian (1-10)
+}
+
+export interface RestaurantReview {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  restaurant_id: number;
+  content: string;
+  ratings: ReviewRatings;
+  overall_rating: number;  // Average of all ratings
+  photos: ReviewPhoto[];
+  like_count: number;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface RestaurantReviewsResponse {
+  restaurant_id: number;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  reviews: RestaurantReview[];
+}

@@ -130,9 +130,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-# Lambda zip files
-infrastructure/terraform/modules/**/*.zip
-
 #Lambda response query
 response.json
 

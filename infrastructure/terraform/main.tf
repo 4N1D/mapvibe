@@ -95,7 +95,10 @@ module "cognito" {
   acm_certificate_arn = module.dns.certificate_arn
   route53_zone_id     = module.dns.zone_id
 
-  depends_on = [module.dns]
+  # Lambda Triggers
+  lambda_trigger_arn = module.lambda_api.function_arn
+
+  depends_on = [module.dns, module.lambda_api]
 }
 
 # ============================================
@@ -380,37 +383,7 @@ module "lambda_s3_trigger" {
   cloudfront_domain = module.cdn.cloudfront_domain_name
 }
 
-# ============================================
-# COGNITO LAMBDA TRIGGERS
-# ============================================
-
-# Permission cho Cognito gọi Lambda API
-resource "aws_lambda_permission" "cognito_trigger" {
-  statement_id  = "AllowCognitoInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = module.lambda_api.function_name
-  principal     = "cognito-idp.amazonaws.com"
-  source_arn    = module.cognito.user_pool_arn
-}
-
 data "aws_caller_identity" "current" {}
-
-# Cấu hình Lambda Triggers bằng null_resource + AWS CLI
-# Triggers:
-# - PostConfirmation: Tạo user record khi đăng ký email
-# - PostAuthentication: Update last_login mỗi lần đăng nhập
-# - PreTokenGeneration: Thêm custom:roles claim vào token
-resource "null_resource" "cognito_lambda_trigger" {
-  triggers = {
-    lambda_arn = module.lambda_api.function_arn
-  }
-
-  provisioner "local-exec" {
-    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${module.cognito.user_pool_id} --lambda-config PostConfirmation=${module.lambda_api.function_arn},PostAuthentication=${module.lambda_api.function_arn},PreTokenGeneration=${module.lambda_api.function_arn}"
-  }
-
-  depends_on = [aws_lambda_permission.cognito_trigger]
-}
 
 
 # ============================================

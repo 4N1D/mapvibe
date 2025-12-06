@@ -29,5 +29,3 @@ output "hosted_ui_url" {
   description = "Hosted UI URL"
   value       = var.custom_domain != "" ? "https://${var.custom_domain}" : "https://${aws_cognito_user_pool_domain.prefix[0].domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
 }
-
-data "aws_region" "current" {}

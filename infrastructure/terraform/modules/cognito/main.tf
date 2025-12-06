@@ -1,7 +1,24 @@
 # Cognito User Pool Module for MapVibe
 # Manages user authentication with optional Google OAuth
 
+# Get current AWS account and region for permission ARN
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# Permission cho Cognito gọi Lambda (tạo trước User Pool với wildcard ARN)
+resource "aws_lambda_permission" "cognito_trigger" {
+  count         = var.lambda_trigger_arn != "" ? 1 : 0
+  statement_id  = "AllowCognitoInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_trigger_arn
+  principal     = "cognito-idp.amazonaws.com"
+  # Dùng wildcard để không phụ thuộc vào specific User Pool ARN (tránh circular dependency)
+  source_arn    = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
+}
+
 resource "aws_cognito_user_pool" "main" {
+  # Đảm bảo Lambda permission được tạo trước khi User Pool có lambda_config
+  depends_on = [aws_lambda_permission.cognito_trigger]
   name = "${var.project_name}-users-${var.environment}"
 
   # Username settings
@@ -57,6 +74,16 @@ resource "aws_cognito_user_pool" "main" {
 
   # MFA (optional for MVP)
   mfa_configuration = "OFF"
+
+  # Lambda Triggers (if provided)
+  dynamic "lambda_config" {
+    for_each = var.lambda_trigger_arn != "" ? [1] : []
+    content {
+      post_confirmation       = var.lambda_trigger_arn
+      post_authentication     = var.lambda_trigger_arn
+      pre_token_generation    = var.lambda_trigger_arn
+    }
+  }
 
   tags = {
     Name        = "${var.project_name}-users-${var.environment}"

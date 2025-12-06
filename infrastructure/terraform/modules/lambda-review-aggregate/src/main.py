@@ -69,7 +69,34 @@ def normalize_text(text_input: Optional[str], limit: int = 800) -> str:
     return cleaned[:limit]
 
 
-def fetch_reviews_and_comments(location_address_id: str):
+def check_location_status(location_address_id: str) -> Dict[str, Any]:
+    """Check location_address status and restaurant_id"""
+    if not engine:
+        raise Exception("Database engine not initialized")
+
+    with engine.connect() as conn:
+        location = conn.execute(
+            text(
+                """
+                SELECT status, restaurant_id
+                FROM location_addresses
+                WHERE id = :loc
+                """
+            ),
+            {"loc": location_address_id},
+        ).fetchone()
+
+        if not location:
+            raise ValueError(f"Location address {location_address_id} not found")
+
+        return {
+            "status": location.status,
+            "restaurant_id": location.restaurant_id,
+        }
+
+
+def fetch_pending_reviews_and_comments(location_address_id: str):
+    """Fetch reviews and comments for pending location (from review_posts)"""
     if not engine:
         raise Exception("Database engine not initialized")
 
@@ -126,13 +153,73 @@ def fetch_reviews_and_comments(location_address_id: str):
     return [serialize_review(r) for r in reviews], [serialize_comment(c) for c in comments]
 
 
-def build_prompt(reviews: List[Dict[str, Any]], comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    reviews_str = "\n".join(
-        [
-            f"- Review {r['id']} (upvotes {r['upvote_count']}): {r['text']} | features: {', '.join(r.get('features') or [])}"
-            for r in reviews
-        ]
-    ) or "None"
+def fetch_approved_reviews_and_comments(restaurant_id: str):
+    """Fetch reviews and comments for approved location (from restaurant_reviews)"""
+    if not engine:
+        raise Exception("Database engine not initialized")
+
+    with engine.connect() as conn:
+        reviews = conn.execute(
+            text(
+                """
+                SELECT id, text, upvote_count, created_at
+                FROM restaurant_reviews
+                WHERE restaurant_id = :rest_id
+                  AND upvote_count > 0
+                ORDER BY upvote_count DESC, created_at DESC
+                LIMIT 10
+                """
+            ),
+            {"rest_id": restaurant_id},
+        ).fetchall()
+
+        comments = conn.execute(
+            text(
+                """
+                SELECT c.id, c.text, c.upvote_count, c.created_at
+                FROM comments c
+                JOIN restaurant_reviews rr ON c.restaurant_review_id = rr.id
+                WHERE rr.restaurant_id = :rest_id
+                  AND c.upvote_count > 0
+                  AND c.status = 'published'
+                ORDER BY c.upvote_count DESC, c.created_at DESC
+                LIMIT 10
+                """
+            ),
+            {"rest_id": restaurant_id},
+        ).fetchall()
+
+    def serialize_review(row):
+        return {
+            "id": row.id,
+            "text": normalize_text(row.text),
+            "features": [],  # restaurant_reviews không có features, LLM sẽ suy luận
+            "upvote_count": int(row.upvote_count or 0),
+            "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
+        }
+
+    def serialize_comment(row):
+        return {
+            "id": row.id,
+            "text": normalize_text(row.text, limit=400),
+            "upvote_count": int(row.upvote_count or 0),
+            "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
+        }
+
+    return [serialize_review(r) for r in reviews], [serialize_comment(c) for c in comments]
+
+
+def build_prompt(
+    reviews: List[Dict[str, Any]], comments: List[Dict[str, Any]], source_type: str
+) -> List[Dict[str, Any]]:
+    # Build reviews string with features if available
+    reviews_lines = []
+    for r in reviews:
+        review_line = f"- Review {r['id']} (upvotes {r['upvote_count']}): {r['text']}"
+        if r.get("features"):
+            review_line += f" | features: {', '.join(r['features'])}"
+        reviews_lines.append(review_line)
+    reviews_str = "\n".join(reviews_lines) if reviews_lines else "None"
 
     comments_str = "\n".join(
         [f"- Comment {c['id']} (upvotes {c['upvote_count']}): {c['text']}" for c in comments]
@@ -147,13 +234,15 @@ def build_prompt(reviews: List[Dict[str, Any]], comments: List[Dict[str, Any]]) 
         "description, features. "
         "Nếu thiếu thông tin, trả về null cho field đó (features và cuisine_types: mảng, có thể rỗng). "
         "price_min/price_max là integer. opening_hours phải ở format 'HH:MM - HH:MM' hoặc null. "
-        "Không tự bịa địa chỉ hay toạ độ nếu không có căn cứ."
+        "Không tự bịa địa chỉ hay toạ độ nếu không có căn cứ. "
+        "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments."
     )
 
-    user_prompt = f"""Dữ liệu review (top 10 upvote, status pending):
+    status_text = "pending" if source_type == "pending" else "approved"
+    user_prompt = f"""Dữ liệu review (top 10 upvote, status {status_text}):
 {reviews_str}
 
-Top comment (top 10 upvote, status pending):
+Top comment (top 10 upvote, status {status_text}):
 {comments_str}
 
 Hãy tổng hợp và trả JSON."""
@@ -165,9 +254,28 @@ Hãy tổng hợp và trả JSON."""
 
 
 def aggregate(location_address_id: str):
-    reviews, comments = fetch_reviews_and_comments(location_address_id)
+    # Check location status and restaurant_id
+    location_info = check_location_status(location_address_id)
+    status = location_info["status"]
+    restaurant_id = location_info["restaurant_id"]
 
-    messages = build_prompt(reviews, comments)
+    # Determine source type and fetch data accordingly
+    if status == "approved" and restaurant_id:
+        # Approved location: use restaurant_reviews
+        source_type = "approved"
+        reviews, comments = fetch_approved_reviews_and_comments(restaurant_id)
+        logger.info(f"Processing approved location with restaurant_id: {restaurant_id}")
+    elif status == "pending":
+        # Pending location: use review_posts
+        source_type = "pending"
+        reviews, comments = fetch_pending_reviews_and_comments(location_address_id)
+        logger.info(f"Processing pending location: {location_address_id}")
+    else:
+        raise ValueError(
+            f"Invalid location status: {status}. Expected 'pending' or 'approved' with restaurant_id"
+        )
+
+    messages = build_prompt(reviews, comments, source_type)
     response = call_bedrock_retry(messages)
     if not response:
         raise Exception("Bedrock returned empty response")
@@ -186,6 +294,8 @@ def aggregate(location_address_id: str):
 
     return {
         "location_address_id": location_address_id,
+        "restaurant_id": restaurant_id if source_type == "approved" else None,
+        "source_type": source_type,
         "reviews_used": [r["id"] for r in reviews],
         "comments_used": [c["id"] for c in comments],
         "result": payload,

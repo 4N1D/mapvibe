@@ -60,6 +60,38 @@ const generateComments = (count: number, withReplies = true) => {
 // Store comments in memory for POST simulation
 const commentsStore = { data: generateComments(8) };
 
+// Generate mock restaurant reviews
+const generateRestaurantReviews = (count: number) => {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `review-${i + 1}`,
+    author_id: `user-${i + 1}`,
+    author_name: faker.person.fullName(),
+    author_avatar: null,
+    restaurant_id: 1,
+    content: faker.lorem.sentences({ min: 2, max: 5 }),
+    ratings: {
+      quality: faker.number.int({ min: 5, max: 10 }),
+      service: faker.number.int({ min: 5, max: 10 }),
+      location: faker.number.int({ min: 5, max: 10 }),
+      price: faker.number.int({ min: 5, max: 10 }),
+      ambiance: faker.number.int({ min: 5, max: 10 }),
+    },
+    overall_rating: faker.number.float({ min: 5, max: 10, fractionDigits: 1 }),
+    photos: faker.datatype.boolean()
+      ? Array.from({ length: faker.number.int({ min: 1, max: 4 }) }, (_, j) => ({
+          url: `https://images.unsplash.com/photo-${1546069901 + i * 1000 + j * 100}-ba9599a7e63c?w=400`,
+          caption: faker.lorem.sentence(),
+        }))
+      : [],
+    like_count: faker.number.int({ min: 0, max: 100 }),
+    comment_count: faker.number.int({ min: 0, max: 20 }),
+    created_at: faker.date.recent({ days: 30 }).toISOString(),
+  }));
+};
+
+// Store restaurant reviews
+const reviewsStore = { data: generateRestaurantReviews(12) };
+
 // Generate mock hot reviews
 const generateHotReviews = (count: number) => {
   const tags: Array<"hot" | "new" | "normal" | "trending"> = ["hot", "trending", "new", "normal"];
@@ -155,6 +187,54 @@ export const handlers = [
       count: reviews.length,
       reviews,
     });
+  }),
+
+  // Restaurant Reviews API - GET
+  http.get("*/reviews/restaurant/:restaurantId", ({ request }) => {
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "10");
+
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const paginatedReviews = reviewsStore.data.slice(start, end);
+
+    return HttpResponse.json({
+      restaurant_id: 1,
+      total: reviewsStore.data.length,
+      page,
+      limit,
+      total_pages: Math.ceil(reviewsStore.data.length / limit),
+      reviews: paginatedReviews,
+    });
+  }),
+
+  // Restaurant Reviews API - POST
+  http.post("*/reviews", async ({ request }) => {
+    const body = (await request.json()) as {
+      restaurant_id: number;
+      content: string;
+      ratings: Record<string, number>;
+      overall_rating: number;
+    };
+
+    const newReview = {
+      id: `review-${Date.now()}`,
+      author_id: "current-user",
+      author_name: "Bạn",
+      author_avatar: null,
+      restaurant_id: body.restaurant_id,
+      content: body.content,
+      ratings: body.ratings,
+      overall_rating: body.overall_rating,
+      photos: [],
+      like_count: 0,
+      comment_count: 0,
+      created_at: new Date().toISOString(),
+    };
+
+    reviewsStore.data.unshift(newReview);
+    return HttpResponse.json(newReview);
   }),
 
   // Comments API - GET

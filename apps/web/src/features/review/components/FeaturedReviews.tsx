@@ -25,9 +25,10 @@ export function FeaturedReviews() {
       try {
         setLoading(true);
         const response = await apiClient.get<HotReviewsResponse>("/reviews/hot");
-        setReviews(response.data.reviews);
+        setReviews(response.data?.reviews || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Không thể tải reviews");
+        setReviews([]); // Đảm bảo reviews luôn là mảng ngay cả khi có lỗi
       } finally {
         setLoading(false);
       }
@@ -76,14 +77,20 @@ export function FeaturedReviews() {
         <p className="mb-8 text-gray-600">Những bài đánh giá đang được quan tâm nhiều nhất</p>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {reviews.map((review) => (
-            <ReviewCard
-              key={review.id}
-              data={review}
-              tags={getReviewTags(review.score, review.upvote_count)}
-              formatTime={formatRelativeTime}
-            />
-          ))}
+          {reviews && reviews.length > 0 ? (
+            reviews.map((review) => (
+              <ReviewCard
+                key={review.id}
+                data={review}
+                tags={getReviewTags(review.score, review.upvote_count)}
+                formatTime={formatRelativeTime}
+              />
+            ))
+          ) : (
+            <p className="col-span-full text-center text-gray-500">
+              Hiện chưa có review nào
+            </p>
+          )}
         </div>
       </div>
     </div>

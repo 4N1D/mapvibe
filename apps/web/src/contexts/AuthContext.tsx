@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import {
   signIn as cognitoSignIn,
   signUp as cognitoSignUp,
@@ -43,35 +43,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from session on mount and listen for OAuth events
-  useEffect(() => {
-    // Listen for auth events from Amplify Hub
-    const hubListenerCancelToken = Hub.listen("auth", ({ payload }) => {
-      switch (payload.event) {
-        case "signedIn":
-        case "signInWithRedirect":
-          checkAuth();
-          break;
-        case "signInWithRedirect_failure":
-          console.error("[Auth] OAuth login failed:", payload.data);
-          break;
-        case "signedOut":
-          setUser(null);
-          break;
-      }
-    });
-
-    // Initial auth check
-    checkAuth();
-
-    // Cleanup listener on unmount
-    return () => hubListenerCancelToken();
-  }, []);
-
   /**
    * Check if user is authenticated
    */
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const cognitoUser = await getCurrentUser();
 
@@ -96,7 +71,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load user from session on mount and listen for OAuth events
+  useEffect(() => {
+    const hubListenerCancelToken = Hub.listen("auth", ({ payload }) => {
+      switch (payload.event) {
+        case "signedIn":
+        case "signInWithRedirect":
+          checkAuth();
+          break;
+        case "signInWithRedirect_failure":
+          console.error("[Auth] OAuth login failed:", payload.data);
+          break;
+        case "signedOut":
+          setUser(null);
+          break;
+      }
+    });
+
+    // Initial auth check
+    checkAuth();
+
+    // Cleanup listener on unmount
+    return () => hubListenerCancelToken();
+  }, [checkAuth]);
 
   /**
    * Sign in with email/password

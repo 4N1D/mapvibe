@@ -6,11 +6,11 @@ interface PhotosTabProps {
   restaurantId: number;
 }
 
-const CATEGORY_LABELS: Record<PhotoCategory, string> = {
+const CATEGORY_LABELS: Record<Exclude<PhotoCategory, "menu">, string> = {
   all: "Tất cả",
   food: "Thức ăn",
-  ambiance: "Không gian",
-  review: "Bình luận",
+  view: "Không gian",
+  comment: "Bình luận",
 };
 
 export function PhotosTab({ restaurantId }: PhotosTabProps) {
@@ -83,7 +83,7 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(CATEGORY_LABELS) as PhotoCategory[]).map((cat) => (
+        {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((cat) => (
           <button
             key={cat}
             onClick={() => handleCategoryChange(cat)}

@@ -94,13 +94,14 @@ const reviewsStore = { data: generateRestaurantReviews(12) };
 
 // Generate mock restaurant photos
 const generateRestaurantPhotos = (count: number) => {
-  const categories: Array<"food" | "ambiance" | "review"> = ["food", "ambiance", "review"];
+  const categories: Array<"food" | "view" | "comment" | "menu"> = ["food", "view", "comment", "menu"];
+  const menuCaptions = ["Thực đơn lẩu", "Thực đơn đồ uống", "Thực đơn tráng miệng", "Thực đơn chính", "Thực đơn combo"];
   return Array.from({ length: count }, (_, i) => ({
     id: `photo-${i + 1}`,
     url: `https://images.unsplash.com/photo-${1546069901 + i * 500}-ba9599a7e63c?w=800`,
     thumbnail_url: `https://images.unsplash.com/photo-${1546069901 + i * 500}-ba9599a7e63c?w=300`,
-    category: categories[i % 3],
-    caption: faker.lorem.sentence(),
+    category: categories[i % 4],
+    caption: categories[i % 4] === "menu" ? menuCaptions[i % 5] : faker.lorem.sentence(),
     author_id: `user-${(i % 5) + 1}`,
     author_name: faker.person.fullName(),
     created_at: faker.date.recent({ days: 60 }).toISOString(),
@@ -276,8 +277,9 @@ export const handlers = [
     const categoryCounts = {
       all: photosStore.data.length,
       food: photosStore.data.filter((p) => p.category === "food").length,
-      ambiance: photosStore.data.filter((p) => p.category === "ambiance").length,
-      review: photosStore.data.filter((p) => p.category === "review").length,
+      view: photosStore.data.filter((p) => p.category === "view").length,
+      comment: photosStore.data.filter((p) => p.category === "comment").length,
+      menu: photosStore.data.filter((p) => p.category === "menu").length,
     };
 
     return HttpResponse.json({

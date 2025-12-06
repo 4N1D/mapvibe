@@ -26,6 +26,32 @@ const generateRestaurants = (count: number) => {
 
 const allRestaurants = generateRestaurants(6);
 
+// Generate mock hot reviews
+const generateHotReviews = (count: number) => {
+  const tags: Array<"hot" | "new" | "normal" | "trending"> = ["hot", "trending", "new", "normal"];
+  return Array.from({ length: count }, (_, i) => ({
+    id: `review-${i + 1}`,
+    author_id: `user-${i + 1}`,
+    author_name: faker.person.fullName(),
+    restaurant_id: `${i + 1}`,
+    text: faker.lorem.sentences({ min: 2, max: 4 }),
+    photos: [
+      {
+        url: `https://images.unsplash.com/photo-${1546069901 + i * 1000}-ba9599a7e63c?w=400`,
+        caption: faker.lorem.sentence(),
+      },
+    ],
+    upvote_count: faker.number.int({ min: 5, max: 150 }),
+    downvote_count: faker.number.int({ min: 0, max: 10 }),
+    comment_count: faker.number.int({ min: 0, max: 30 }),
+    share_count: faker.number.int({ min: 0, max: 20 }),
+    view_count: faker.number.int({ min: 50, max: 500 }),
+    created_at: faker.date.recent({ days: 7 }).toISOString(),
+    score: faker.number.float({ min: 0.01, max: 0.1, fractionDigits: 3 }).toString(),
+    tag: tags[i % tags.length],
+  }));
+};
+
 // MSW Handlers
 export const handlers = [
   // Search API
@@ -84,6 +110,16 @@ export const handlers = [
   http.get("/api/place", () => {
     return HttpResponse.json({
       restaurants: allRestaurants.slice(0, 12),
+    });
+  }),
+
+  // Hot reviews API
+  http.get("*/reviews/hot", () => {
+    const reviews = generateHotReviews(6);
+    return HttpResponse.json({
+      restaurant_id: null,
+      count: reviews.length,
+      reviews,
     });
   }),
 ];

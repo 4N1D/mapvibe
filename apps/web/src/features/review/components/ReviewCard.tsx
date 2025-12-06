@@ -13,11 +13,11 @@ interface ReviewCardProps {
 export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardProps) {
   if (loading) {
     return (
-      <Card className="overflow-hidden">
+      <Card className="h-full flex flex-col overflow-hidden">
         {/* Image skeleton */}
         <Skeleton className="h-48 w-full rounded-none" />
 
-        <CardContent className="space-y-3 p-4">
+        <CardContent className="flex flex-1 flex-col p-4">
           {/* Tags skeleton */}
           <div className="flex gap-1">
             <Skeleton className="h-5 w-12" />
@@ -28,7 +28,7 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
           <SkeletonText lines={3} />
 
           {/* Author skeleton */}
-          <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+          <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">
             <div className="flex items-center gap-2">
               <SkeletonCircle size={24} />
               <div className="space-y-1">
@@ -49,7 +49,7 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
   if (!data) return null;
 
   return (
-    <Card className="cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
+    <Card className="h-full flex flex-col cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
       {/* Image */}
       <div className="relative h-48 bg-gray-200">
         {data.photos.length > 0 ? (
@@ -94,12 +94,12 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
         )}
       </div>
 
-      <CardContent className="space-y-3 p-4">
+      <CardContent className="flex flex-1 flex-col p-4">
         {/* Review content */}
         <p className="line-clamp-3 text-sm text-gray-600">{data.text}</p>
 
         {/* Reviewer info */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+        <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
               <span className="text-xs font-medium text-gray-600">

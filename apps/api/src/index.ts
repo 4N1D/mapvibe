@@ -29,6 +29,9 @@ import {
   infoHandler as restaurantInfoHandler,
   commentsListHandler as restaurantCommentsListHandler,
   commentsCreateHandler as restaurantCommentsCreateHandler,
+  commentsLikeHandler as restaurantCommentsLikeHandler,
+  commentsReportHandler as restaurantCommentsReportHandler,
+  commentsDeleteHandler as restaurantCommentsDeleteHandler,
   reviewsListHandler as restaurantReviewsListHandler,
   reviewsCreateHandler as restaurantReviewsCreateHandler,
   photosListHandler as restaurantPhotosListHandler,
@@ -174,6 +177,7 @@ const routes: RouteDefinition[] = [
     paramNames: ["slug"],
     handler: restaurantInfoHandler,
   },
+  // Comments routes
   {
     method: "GET",
     pattern: /^\/restaurants\/([^/]+)\/comments$/,
@@ -182,9 +186,27 @@ const routes: RouteDefinition[] = [
   },
   {
     method: "POST",
-    pattern: /^\/restaurants\/([^/]+)\/comments$/,
-    paramNames: ["slug"],
+    pattern: /^\/restaurants\/comments$/,
+    paramNames: [],
     handler: restaurantCommentsCreateHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/comments\/([^/]+)\/like$/,
+    paramNames: ["commentId"],
+    handler: restaurantCommentsLikeHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/comments\/([^/]+)\/report$/,
+    paramNames: ["commentId"],
+    handler: restaurantCommentsReportHandler,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/restaurants\/comments\/([^/]+)$/,
+    paramNames: ["commentId"],
+    handler: restaurantCommentsDeleteHandler,
   },
   {
     method: "GET",

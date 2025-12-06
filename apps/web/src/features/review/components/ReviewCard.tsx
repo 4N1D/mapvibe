@@ -18,11 +18,6 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
         <Skeleton className="h-48 w-full rounded-none" />
 
         <CardContent className="flex flex-1 flex-col p-4">
-          {/* Tags skeleton */}
-          <div className="flex gap-1">
-            <Skeleton className="h-5 w-12" />
-            <Skeleton className="h-5 w-16" />
-          </div>
 
           {/* Text skeleton */}
           <SkeletonText lines={3} />

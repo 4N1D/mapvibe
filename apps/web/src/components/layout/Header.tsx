@@ -68,7 +68,7 @@ export function Header() {
                 Trang chủ
               </Link>
               <Link
-                to="/explore"
+                to="/suggest"
                 className={navLinkStyles}
               >
                 Đề xuất địa điểm

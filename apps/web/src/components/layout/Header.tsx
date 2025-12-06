@@ -3,7 +3,7 @@ import { Button, cn } from "@mapvibe/ui-components";
 import { Link } from "react-router-dom";
 import { LoginModal } from "../auth/LoginModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, Settings, ChevronDown } from "lucide-react";
+import { LogOut, Settings, ChevronDown, User } from "lucide-react";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -116,6 +116,14 @@ export function Header() {
                       </div>
 
                       <Link
+                        to="/profile"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <User className="h-4 w-4" />
+                        Hồ sơ của tôi
+                      </Link>
+                      <Link
                         to="/settings"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         onClick={() => setUserMenuOpen(false)}
@@ -223,6 +231,14 @@ export function Header() {
                       </div>
                     </div>
 
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User className="h-4 w-4" />
+                      Hồ sơ của tôi
+                    </Link>
                     <Link
                       to="/settings"
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

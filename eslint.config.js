@@ -40,5 +40,11 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
       "no-console": "off",
     },
+  },
+  {
+    files: ["**/migrations/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
   }
 );

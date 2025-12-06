@@ -1,15 +1,45 @@
 import crypto from 'crypto';
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
 import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
+import { success, notFound, badRequest, error, unauthorized } from '../../middlewares/response';
+import { getUserIdFromEvent } from '../../utils/auth';
 
 interface CreateCommentBody {
-  author_id: string;
-  text: string;
-  parent_comment_id?: string;
+  slug: string;
+  content: string;
+  parent_id?: string | null;
 }
 
-// GET /restaurants/:slug/comments - Fetch comments list
+interface ReportCommentBody {
+  reason: 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other';
+  details?: string;
+}
+
+interface CommentReply {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar: string | null;
+  content: string;
+  like_count: number;
+  created_at: string;
+  parent_id: string;
+  reply_to_name: string | null;
+}
+
+interface CommentWithReplies {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar: string | null;
+  restaurant_id: string;
+  content: string;
+  like_count: number;
+  created_at: string;
+  replies: CommentReply[];
+}
+
+// GET /comments/:slug - Fetch comments list with nested replies
 export const listHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -31,65 +61,177 @@ export const listHandler: Handler = {
         return notFound('Restaurant not found');
       }
 
-      const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+      const restaurantId = restaurant.id;
 
-      // Fetch comments with author info, ordered by created_at DESC
-      const comments = await db
+      const params = event.queryStringParameters || {};
+      const page = Math.max(parseInt(params.page || '1'), 1);
+      const limit = Math.min(Math.max(parseInt(params.limit || '10'), 1), 100);
+      const offset = (page - 1) * limit;
+
+      // Fetch top-level comments (parent_id is null)
+      const topLevelComments = await db
         .selectFrom('comments')
         .innerJoin('users', 'users.id', 'comments.author_id')
         .select([
           'comments.id',
-          'comments.text',
-          'comments.parent_comment_id',
-          'comments.thread_depth',
+          'comments.text as content',
           'comments.like_count',
           'comments.created_at',
           'users.id as author_id',
           'users.display_name as author_name',
           'users.avatar as author_avatar',
         ])
-        .where('comments.restaurant_id', '=', restaurant.id)
+        .where('comments.restaurant_id', '=', restaurantId)
         .where('comments.status', '=', 'published')
+        .where('comments.parent_comment_id', 'is', null)
         .orderBy('comments.created_at', 'desc')
         .limit(limit)
         .offset(offset)
         .execute();
 
-      // Get total count
+      // Get total count of top-level comments
       const countResult = await db
         .selectFrom('comments')
         .select((eb) => eb.fn.count('id').as('total'))
-        .where('restaurant_id', '=', restaurant.id)
+        .where('restaurant_id', '=', restaurantId)
         .where('status', '=', 'published')
+        .where('parent_comment_id', 'is', null)
         .executeTakeFirst();
 
+      const total = Number(countResult?.total || 0);
+      const totalPages = Math.ceil(total / limit);
+
+      // Fetch all replies for these comments (including nested replies)
+      const topLevelIds = topLevelComments.map((c) => c.id);
+      
+      const repliesMap: Map<string, CommentReply[]> = new Map();
+      
+      // Build a map of comment id -> author name for reply_to_name
+      const authorNameMap: Map<string, string> = new Map();
+      for (const comment of topLevelComments) {
+        authorNameMap.set(comment.id, comment.author_name);
+      }
+
+      if (topLevelIds.length > 0) {
+        // Fetch ALL replies for this restaurant (not just direct replies)
+        // We'll filter and organize them after
+        const allReplies = await db
+          .selectFrom('comments')
+          .innerJoin('users', 'users.id', 'comments.author_id')
+          .select([
+            'comments.id',
+            'comments.text as content',
+            'comments.like_count',
+            'comments.created_at',
+            'comments.parent_comment_id',
+            'users.id as author_id',
+            'users.display_name as author_name',
+            'users.avatar as author_avatar',
+          ])
+          .where('comments.restaurant_id', '=', restaurantId)
+          .where('comments.status', '=', 'published')
+          .where('comments.parent_comment_id', 'is not', null)
+          .orderBy('comments.created_at', 'asc')
+          .execute();
+
+        // Build author name map for all replies
+        for (const reply of allReplies) {
+          authorNameMap.set(reply.id, reply.author_name);
+        }
+
+        // Build a map of comment id -> root parent id
+        const parentMap: Map<string, string> = new Map();
+        for (const reply of allReplies) {
+          parentMap.set(reply.id, reply.parent_comment_id!);
+        }
+
+        // Find the root parent (top-level comment) for each reply
+        const findRootParent = (commentId: string): string | null => {
+          let currentId = commentId;
+          while (parentMap.has(currentId)) {
+            currentId = parentMap.get(currentId)!;
+          }
+          return topLevelIds.includes(currentId) ? currentId : null;
+        };
+
+        // Group all replies under their root parent (top-level comment)
+        for (const reply of allReplies) {
+          const rootParentId = findRootParent(reply.id);
+          if (!rootParentId) continue;
+
+          if (!repliesMap.has(rootParentId)) {
+            repliesMap.set(rootParentId, []);
+          }
+
+          const directParentId = reply.parent_comment_id!;
+          repliesMap.get(rootParentId)!.push({
+            id: reply.id,
+            author_id: reply.author_id,
+            author_name: reply.author_name,
+            author_avatar: reply.author_avatar,
+            content: reply.content,
+            like_count: reply.like_count ?? 0,
+            created_at: reply.created_at?.toISOString() ?? new Date().toISOString(),
+            parent_id: directParentId,
+            reply_to_name: authorNameMap.get(directParentId) ?? null,
+          });
+        }
+      }
+
+      // Build response with nested replies
+      const comments: CommentWithReplies[] = topLevelComments.map((comment) => ({
+        id: comment.id,
+        author_id: comment.author_id,
+        author_name: comment.author_name,
+        author_avatar: comment.author_avatar,
+        restaurant_id: restaurantId,
+        content: comment.content,
+        like_count: comment.like_count ?? 0,
+        created_at: comment.created_at?.toISOString() ?? new Date().toISOString(),
+        replies: repliesMap.get(comment.id) || [],
+      }));
+
       return success({
-        restaurant_id: restaurant.id,
+        restaurant_id: restaurantId,
+        total,
+        page,
+        limit,
+        total_pages: totalPages,
         comments,
-        pagination: {
-          limit,
-          offset,
-          total: Number(countResult?.total || 0),
-        },
       });
     } catch (err) {
-      console.error('[restaurants/comments/list] Error:', err);
+      console.error('[comments/list] Error:', err);
       return error((err as Error).message);
     }
   },
 };
 
-// POST /restaurants/:slug/comments - Create comment
+// POST /comments - Create comment or reply
 export const createHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
       const db = await getDb();
-      const slug = event.pathParameters?.slug;
+      const userId = getUserIdFromEvent(event);
+
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      let body: CreateCommentBody;
+      try {
+        body = JSON.parse(event.body || '{}');
+      } catch {
+        return badRequest('Invalid JSON body');
+      }
+
+      const { slug, content, parent_id } = body;
 
       if (!slug) {
-        return badRequest('Restaurant slug is required');
+        return badRequest('slug is required');
+      }
+
+      if (!content || content.trim().length === 0) {
+        return badRequest('content is required');
       }
 
       // Get restaurant by slug
@@ -103,69 +245,286 @@ export const createHandler: Handler = {
         return notFound('Restaurant not found');
       }
 
-      let body: CreateCommentBody;
+      const restaurant_id = restaurant.id;
+
+      // Get user info
+      const user = await db
+        .selectFrom('users')
+        .select(['id', 'display_name', 'avatar'])
+        .where('id', '=', userId)
+        .executeTakeFirst();
+
+      if (!user) {
+        return badRequest('User not found');
+      }
+
+      // Verify parent comment exists if provided and get parent author name
+      let threadDepth = 0;
+      let reply_to_name: string | null = null;
+      if (parent_id) {
+        const parentComment = await db
+          .selectFrom('comments')
+          .innerJoin('users', 'users.id', 'comments.author_id')
+          .select(['comments.id', 'comments.thread_depth', 'users.display_name'])
+          .where('comments.id', '=', parent_id)
+          .where('comments.restaurant_id', '=', restaurant_id)
+          .executeTakeFirst();
+
+        if (!parentComment) {
+          return badRequest('Invalid parent_id: comment does not exist');
+        }
+        threadDepth = (parentComment.thread_depth ?? 0) + 1;
+        reply_to_name = parentComment.display_name;
+      }
+
+      const commentId = crypto.randomUUID();
+      const now = new Date();
+
+      // Create comment
+      await db
+        .insertInto('comments')
+        .values({
+          id: commentId,
+          restaurant_id,
+          author_id: userId,
+          text: content,
+          parent_comment_id: parent_id ?? null,
+          thread_depth: threadDepth,
+          like_count: 0,
+          status: 'published',
+        })
+        .execute();
+
+      return success({
+        id: commentId,
+        author_id: userId,
+        author_name: user.display_name,
+        author_avatar: user.avatar ?? null,
+        restaurant_id,
+        content,
+        like_count: 0,
+        created_at: now.toISOString(),
+        parent_id: parent_id ?? null,
+        reply_to_name,
+      }, 201);
+    } catch (err) {
+      console.error('[comments/create] Error:', err);
+      return error((err as Error).message);
+    }
+  },
+};
+
+// POST /comments/:commentId/like - Toggle like on comment
+export const likeHandler: Handler = {
+  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+    try {
+      const db = await getDb();
+      const userId = getUserIdFromEvent(event);
+      const commentId = event.pathParameters?.commentId;
+
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      if (!commentId) {
+        return badRequest('Comment ID is required');
+      }
+
+      // Verify comment exists
+      const comment = await db
+        .selectFrom('comments')
+        .select(['id', 'like_count'])
+        .where('id', '=', commentId)
+        .where('status', '=', 'published')
+        .executeTakeFirst();
+
+      if (!comment) {
+        return notFound('Comment not found');
+      }
+
+      // Check if user already liked this comment
+      const existingLike = await db
+        .selectFrom('comment_likes')
+        .select(['id'])
+        .where('comment_id', '=', commentId)
+        .where('user_id', '=', userId)
+        .executeTakeFirst();
+
+      let liked: boolean;
+      let newLikeCount: number;
+
+      if (existingLike) {
+        // Unlike - remove the like
+        await db
+          .deleteFrom('comment_likes')
+          .where('comment_id', '=', commentId)
+          .where('user_id', '=', userId)
+          .execute();
+
+        newLikeCount = Math.max((comment.like_count ?? 0) - 1, 0);
+        liked = false;
+      } else {
+        // Like - add the like
+        await db
+          .insertInto('comment_likes')
+          .values({
+            id: crypto.randomUUID(),
+            comment_id: commentId,
+            user_id: userId,
+          })
+          .execute();
+
+        newLikeCount = (comment.like_count ?? 0) + 1;
+        liked = true;
+      }
+
+      // Update like_count on comment
+      await db
+        .updateTable('comments')
+        .set({ like_count: newLikeCount })
+        .where('id', '=', commentId)
+        .execute();
+
+      return success({
+        liked,
+        like_count: newLikeCount,
+      });
+    } catch (err) {
+      console.error('[comments/like] Error:', err);
+      return error((err as Error).message);
+    }
+  },
+};
+
+// POST /comments/:commentId/report - Report a comment
+export const reportHandler: Handler = {
+  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+    try {
+      const db = await getDb();
+      const userId = getUserIdFromEvent(event);
+      const commentId = event.pathParameters?.commentId;
+
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      if (!commentId) {
+        return badRequest('Comment ID is required');
+      }
+
+      let body: ReportCommentBody;
       try {
         body = JSON.parse(event.body || '{}');
       } catch {
         return badRequest('Invalid JSON body');
       }
 
-      const { author_id, text, parent_comment_id } = body;
+      const { reason, details } = body;
 
-      if (!author_id) {
-        return badRequest('author_id is required');
+      const validReasons = ['spam', 'inappropriate', 'harassment', 'misinformation', 'other'];
+      if (!reason || !validReasons.includes(reason)) {
+        return badRequest('Valid reason is required: spam, inappropriate, harassment, misinformation, or other');
       }
 
-      if (!text || text.trim().length === 0) {
-        return badRequest('text is required');
-      }
-
-      // Verify author exists
-      const author = await db
-        .selectFrom('users')
-        .select('id')
-        .where('id', '=', author_id)
+      // Verify comment exists
+      const comment = await db
+        .selectFrom('comments')
+        .select(['id'])
+        .where('id', '=', commentId)
         .executeTakeFirst();
 
-      if (!author) {
-        return badRequest('Invalid author_id: user does not exist');
+      if (!comment) {
+        return notFound('Comment not found');
       }
 
-      // Verify parent comment exists if provided
-      let threadDepth = 0;
-      if (parent_comment_id) {
-        const parentComment = await db
-          .selectFrom('comments')
-          .select(['id', 'thread_depth'])
-          .where('id', '=', parent_comment_id)
-          .where('restaurant_id', '=', restaurant.id)
-          .executeTakeFirst();
+      // Check if user already reported this comment
+      const existingReport = await db
+        .selectFrom('comment_reports')
+        .select(['id'])
+        .where('comment_id', '=', commentId)
+        .where('reporter_id', '=', userId)
+        .executeTakeFirst();
 
-        if (!parentComment) {
-          return badRequest('Invalid parent_comment_id: comment does not exist');
-        }
-        threadDepth = (parentComment.thread_depth ?? 0) + 1;
+      if (existingReport) {
+        return badRequest('You have already reported this comment');
       }
 
-      // Create comment
-      const [result] = await db
-        .insertInto('comments')
+      // Create report
+      await db
+        .insertInto('comment_reports')
         .values({
           id: crypto.randomUUID(),
-          restaurant_id: restaurant.id,
-          author_id,
-          text,
-          parent_comment_id: parent_comment_id ?? null,
-          thread_depth: threadDepth,
-          like_count: 0,
-          status: 'published',
+          comment_id: commentId,
+          reporter_id: userId,
+          reason,
+          details: details ?? null,
+          status: 'pending',
         })
-        .returningAll()
         .execute();
 
-      return success({ comment: result }, 201);
+      return success({
+        success: true,
+        message: 'Báo cáo đã được ghi nhận',
+      });
     } catch (err) {
-      console.error('[restaurants/comments/create] Error:', err);
+      console.error('[comments/report] Error:', err);
+      return error((err as Error).message);
+    }
+  },
+};
+
+// DELETE /comments/:commentId - Delete a comment
+export const deleteHandler: Handler = {
+  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+    try {
+      const db = await getDb();
+      const userId = getUserIdFromEvent(event);
+      const commentId = event.pathParameters?.commentId;
+
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      if (!commentId) {
+        return badRequest('Comment ID is required');
+      }
+
+      // Verify comment exists and user is the author
+      const comment = await db
+        .selectFrom('comments')
+        .select(['id', 'author_id'])
+        .where('id', '=', commentId)
+        .where('status', '=', 'published')
+        .executeTakeFirst();
+
+      if (!comment) {
+        return notFound('Comment not found');
+      }
+
+      // Check if user is author (or could add admin check here)
+      if (comment.author_id !== userId) {
+        return unauthorized('You can only delete your own comments');
+      }
+
+      // Soft delete - update status
+      await db
+        .updateTable('comments')
+        .set({ status: 'deleted' })
+        .where('id', '=', commentId)
+        .execute();
+
+      // Also soft delete all replies
+      await db
+        .updateTable('comments')
+        .set({ status: 'deleted' })
+        .where('parent_comment_id', '=', commentId)
+        .execute();
+
+      return success({
+        success: true,
+      });
+    } catch (err) {
+      console.error('[comments/delete] Error:', err);
       return error((err as Error).message);
     }
   },

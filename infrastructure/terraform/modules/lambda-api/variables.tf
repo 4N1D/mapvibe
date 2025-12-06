@@ -37,3 +37,15 @@ variable "cloudfront_domain" {
   type        = string
   default     = ""
 }
+
+variable "sqs_embedding_queue_url" {
+  description = "SQS queue URL for embedding jobs"
+  type        = string
+  default     = ""
+}
+
+variable "sqs_embedding_queue_arn" {
+  description = "SQS queue ARN for embedding jobs"
+  type        = string
+  default     = ""
+}

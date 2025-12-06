@@ -1,4 +1,5 @@
 import { getDb } from '../services/db';
+import { sendEmbeddingJob } from '../services/sqs';
 
 /**
  * Recalculates and updates the average ratings for a restaurant
@@ -44,4 +45,10 @@ export async function recalculateRestaurantRatings(restaurantId: string): Promis
     .execute();
 
   console.log(`[rating] Recalculated ratings for restaurant ${restaurantId}: overall=${avgResult.avg_overall}`);
+
+  // Gửi message vào SQS để trigger Lambda Embedding khi rating thay đổi
+  // Không await để không block flow
+  sendEmbeddingJob(restaurantId).catch((err) => {
+    console.error(`[rating] Failed to send embedding job for restaurant ${restaurantId}:`, err);
+  });
 }

@@ -149,3 +149,28 @@ export interface HotReviewsResponse {
   count: number;
   reviews: HotReview[];
 }
+// ============================================
+// Comment Types
+// ============================================
+export interface Comment {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  restaurant_id: string;
+  content: string;
+  like_count: number;
+  created_at: string;
+  replies?: Comment[];
+  parent_id?: string;
+  reply_to_name?: string;
+}
+
+export interface CommentsResponse {
+  restaurant_id: string;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  comments: Comment[];
+}

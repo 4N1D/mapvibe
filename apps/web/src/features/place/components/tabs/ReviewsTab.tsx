@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RestaurantReview, RestaurantReviewsResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 import { formatRelativeTime } from "@/utils/date";
@@ -9,43 +10,40 @@ interface ReviewsTabProps {
   restaurantId: number;
 }
 
+const fetchReviews = async (restaurantId: number, page: number) => {
+  const response = await apiClient.get<RestaurantReviewsResponse>(
+    `/reviews/restaurant/${restaurantId}?page=${page}&limit=10`
+  );
+  return response.data;
+};
+
 export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
-  const [reviews, setReviews] = useState<RestaurantReview[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [localReviews, setLocalReviews] = useState<RestaurantReview[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get<RestaurantReviewsResponse>(
-          `/reviews/restaurant/${restaurantId}?page=1&limit=10`
-        );
-        setReviews(response.data.reviews);
-        setHasMore(response.data.page < response.data.total_pages);
-        setPage(1);
-      } catch (error) {
-        console.error("Failed to fetch reviews:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data } = useQuery({
+    queryKey: ["reviews", restaurantId],
+    queryFn: () => fetchReviews(restaurantId, 1),
+    placeholderData: (prev) => prev,
+  });
 
-    fetchReviews();
-  }, [restaurantId]);
+  const reviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+
+  if (data && localReviews.length === 0 && hasMore !== (data.page < data.total_pages)) {
+    setHasMore(data.page < data.total_pages);
+  }
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await apiClient.get<RestaurantReviewsResponse>(
-        `/reviews/restaurant/${restaurantId}?page=${nextPage}&limit=10`
-      );
-      setReviews((prev) => [...prev, ...response.data.reviews]);
-      setHasMore(response.data.page < response.data.total_pages);
+      const response = await fetchReviews(restaurantId, nextPage);
+      const currentReviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+      setLocalReviews([...currentReviews, ...response.reviews]);
+      setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
       console.error("Failed to load more reviews:", error);
@@ -54,7 +52,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
     }
   };
 
-  const handleSubmit = async (data: {
+  const handleSubmit = async (submitData: {
     content: string;
     ratings: Record<string, number>;
     photos: File[];
@@ -62,7 +60,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
     try {
       setSubmitting(true);
 
-      const ratingValues = Object.values(data.ratings).filter((r) => r > 0);
+      const ratingValues = Object.values(submitData.ratings).filter((r) => r > 0);
       const overallRating =
         ratingValues.length > 0
           ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
@@ -70,14 +68,14 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
 
       const payload = {
         restaurant_id: restaurantId,
-        content: data.content,
-        ratings: data.ratings,
+        content: submitData.content,
+        ratings: submitData.ratings,
         overall_rating: overallRating,
-        // TODO: Upload photos first, then include URLs
       };
 
       const response = await apiClient.post<RestaurantReview>("/reviews", payload);
-      setReviews((prev) => [response.data, ...prev]);
+      const currentReviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+      setLocalReviews([response.data, ...currentReviews]);
     } catch (error) {
       console.error("Failed to submit review:", error);
       alert("Không thể gửi nhận xét. Vui lòng thử lại.");
@@ -85,14 +83,6 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
       setSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

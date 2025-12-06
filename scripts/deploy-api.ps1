@@ -6,8 +6,23 @@ $ROOT_DIR = Split-Path -Parent $PSScriptRoot
 $API_DIR = "$ROOT_DIR\apps\api"
 $TERRAFORM_DIR = "$ROOT_DIR\infrastructure\terraform"
 $LAMBDA_DIR = "$TERRAFORM_DIR\modules\lambda-api"
-$BUN = "$env:USERPROFILE\.bun\bin\bun.exe"
-$TF = "C:\Users\Minh\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terraform_Microsoft.Winget.Source_8wekyb3d8bbwe\terraform.exe"
+
+# Find bun executable
+$BUN = (Get-Command bun -ErrorAction SilentlyContinue).Source
+if (-not $BUN) {
+    $BUN = "$env:USERPROFILE\.bun\bin\bun.exe"
+    if (-not (Test-Path $BUN)) {
+        Write-Host "[ERROR] bun not found. Install: https://bun.sh" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Find terraform executable
+$TF = (Get-Command terraform -ErrorAction SilentlyContinue).Source
+if (-not $TF) {
+    Write-Host "[ERROR] terraform not found in PATH. Install: https://terraform.io" -ForegroundColor Red
+    exit 1
+}
 
 function Exit-OnError {
     param($msg)

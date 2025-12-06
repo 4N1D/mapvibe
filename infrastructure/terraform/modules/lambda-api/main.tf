@@ -64,6 +64,13 @@ resource "aws_iam_role_policy" "lambda" {
         Effect   = "Allow"
         Action   = ["s3:PutObject"]
         Resource = "arn:aws:s3:::${var.photos_bucket_name}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = var.sqs_embedding_queue_arn != "" ? var.sqs_embedding_queue_arn : "*"
       }
     ]
   })
@@ -85,12 +92,13 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      DB_HOST           = var.db_host
-      DB_NAME           = var.db_name
-      DB_SECRET_ARN     = var.db_secret_arn
-      NODE_ENV          = var.environment
-      S3_PHOTOS_BUCKET  = var.photos_bucket_name
-      CLOUDFRONT_DOMAIN = var.cloudfront_domain
+      DB_HOST                 = var.db_host
+      DB_NAME                 = var.db_name
+      DB_SECRET_ARN           = var.db_secret_arn
+      NODE_ENV                = var.environment
+      S3_PHOTOS_BUCKET        = var.photos_bucket_name
+      CLOUDFRONT_DOMAIN       = var.cloudfront_domain
+      SQS_EMBEDDING_QUEUE_URL = var.sqs_embedding_queue_url
     }
   }
 

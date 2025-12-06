@@ -48,13 +48,20 @@ def get_db_url():
         logger.error(f"❌ Error getting DB Secret: {str(e)}")
         return None
 
-# Initialize DB engine
+# Initialize DB engine with proper pool settings for Lambda
+# Lambda processes batches of 5, so we need at least 5 connections
 db_url = get_db_url()
 engine = None
 if db_url:
     try:
-        engine = create_engine(db_url, pool_size=1, max_overflow=0)
-        logger.info("✅ Database Engine initialized.")
+        engine = create_engine(
+            db_url,
+            pool_size=5,           # Match batch size (5 messages per batch)
+            max_overflow=2,        # Allow 2 extra connections if needed
+            pool_timeout=30,       # Wait up to 30s for a connection
+            pool_recycle=3600,     # Recycle connections after 1 hour
+        )
+        logger.info("✅ Database Engine initialized with pool_size=5, max_overflow=2")
     except Exception as e:
         logger.error(f"❌ Engine Creation Failed: {str(e)}")
 else:
@@ -106,65 +113,84 @@ def get_embedding(text_input: str) -> Optional[List[float]]:
 def get_restaurant_data(restaurant_id: str) -> Optional[Dict[str, Any]]:
     """Lấy dữ liệu nhà hàng từ DB để tạo embedding"""
     if not engine:
+        logger.error("❌ Database engine not initialized")
         return None
     
-    try:
-        with engine.connect() as conn:
-            # Lấy thông tin cơ bản từ restaurants
-            restaurant_result = conn.execute(
-                text("""
-                    SELECT id, name_vi, slug, address, description, business_type,
-                           cuisine_types, price_min, price_max, opening_hours,features
-                    FROM restaurants
-                    WHERE id = :restaurant_id
-                """),
-                {"restaurant_id": restaurant_id}
-            ).fetchone()
-            
-            if not restaurant_result:
-                logger.warning(f"⚠️ Restaurant {restaurant_id} not found")
+    # Retry logic for connection issues
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                # Lấy thông tin cơ bản từ restaurants
+                restaurant_result = conn.execute(
+                    text("""
+                        SELECT id, name_vi, slug, address, description, business_type,
+                               cuisine_types, price_min, price_max, opening_hours,features
+                        FROM restaurants
+                        WHERE id = :restaurant_id
+                    """),
+                    {"restaurant_id": restaurant_id}
+                ).fetchone()
+                
+                if not restaurant_result:
+                    logger.warning(f"⚠️ Restaurant {restaurant_id} not found")
+                    return None
+                
+                restaurant_data = {
+                    'id': restaurant_result[0],
+                    'name_vi': restaurant_result[1],
+                    'slug': restaurant_result[2],
+                    'address': restaurant_result[3],
+                    'description': restaurant_result[4],
+                    'business_type': restaurant_result[5],
+                    'cuisine_types': restaurant_result[6],
+                    'price_min': restaurant_result[7],
+                    'price_max': restaurant_result[8],
+                    'opening_hours': restaurant_result[9],
+                    'features': restaurant_result[10]
+                }
+                
+                # Lấy menu từ photos (OCR đã xử lý)
+                menu_results = conn.execute(
+                    text("""
+                        SELECT ocr_structured
+                        FROM photos
+                        WHERE restaurant_id = :restaurant_id
+                          AND photo_type = 'menu'
+                          AND ocr_structured IS NOT NULL
+                        ORDER BY processed_at DESC
+                        LIMIT 1
+                    """),
+                    {"restaurant_id": restaurant_id}
+                ).fetchall()
+                
+                menu_items = []
+                if menu_results:
+                    ocr_data = menu_results[0][0]
+                    if isinstance(ocr_data, dict):
+                        menu_items = ocr_data.get('items', [])
+                
+                restaurant_data['menu_items'] = menu_items
+                return restaurant_data
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower() or "connection" in error_msg.lower() or "pool" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2  # Exponential backoff: 2s, 4s, 6s
+                    logger.warning(f"⚠️ Connection error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    logger.info(f"⏳ Retrying in {wait_time}s...")
+                    import time
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"❌ Error querying restaurant data after {max_retries} attempts: {error_msg}")
+                    return None
+            else:
+                logger.error(f"❌ Error querying restaurant data: {error_msg}")
                 return None
-            
-            restaurant_data = {
-                'id': restaurant_result[0],
-                'name_vi': restaurant_result[1],
-                'slug': restaurant_result[2],
-                'address': restaurant_result[3],
-                'description': restaurant_result[4],
-                'business_type': restaurant_result[5],
-                'cuisine_types': restaurant_result[6],
-                'price_min': restaurant_result[7],
-                'price_max': restaurant_result[8],
-                'opening_hours': restaurant_result[9],
-                'features': restaurant_result[10]
-            }
-            
-            # Lấy menu từ photos (OCR đã xử lý)
-            menu_results = conn.execute(
-                text("""
-                    SELECT ocr_structured
-                    FROM photos
-                    WHERE restaurant_id = :restaurant_id
-                      AND photo_type = 'menu'
-                      AND ocr_structured IS NOT NULL
-                    ORDER BY processed_at DESC
-                    LIMIT 1
-                """),
-                {"restaurant_id": restaurant_id}
-            ).fetchall()
-            
-            menu_items = []
-            if menu_results:
-                ocr_data = menu_results[0][0]
-                if isinstance(ocr_data, dict):
-                    menu_items = ocr_data.get('items', [])
-            
-            restaurant_data['menu_items'] = menu_items
-            return restaurant_data
-            
-    except Exception as e:
-        logger.error(f"❌ Error querying restaurant data: {str(e)}")
-        return None
+    
+    return None
 
 def build_embedding_text(restaurant_data: Dict[str, Any]) -> str:
     """
@@ -173,39 +199,51 @@ def build_embedding_text(restaurant_data: Dict[str, Any]) -> str:
     """
     parts = []
     
-    # Tên quán
+    # Tên nhà hàng
     if restaurant_data.get('name_vi'):
-        parts.append(f"Tên quán: {restaurant_data['name_vi']}")
+        parts.append(restaurant_data['name_vi'])
     
     # Địa chỉ
     if restaurant_data.get('address'):
-        parts.append(f"Địa chỉ: {restaurant_data['address']}")
-
-    if restaurant_data.get('features'):
-        parts.append(f"Dịch vụ: {restaurant_data['features']}")
+        parts.append(restaurant_data['address'])
     
     # Mô tả
     if restaurant_data.get('description'):
-        parts.append(f"Mô tả: {restaurant_data['description']}")
+        parts.append(restaurant_data['description'])
     
     # Loại hình kinh doanh
     if restaurant_data.get('business_type'):
         parts.append(f"Loại hình: {restaurant_data['business_type']}")
     
-    # Cuisine types
+    # Loại ẩm thực
     cuisine_types = restaurant_data.get('cuisine_types')
     if cuisine_types:
         if isinstance(cuisine_types, list):
-            parts.append(f"Phong cách ẩm thực: {', '.join(cuisine_types)}")
+            parts.append(f"Ẩm thực: {', '.join(cuisine_types)}")
         elif isinstance(cuisine_types, str):
-            parts.append(f"Phong cách ẩm thực: {cuisine_types}")
+            try:
+                parsed = json.loads(cuisine_types)
+                if isinstance(parsed, list):
+                    parts.append(f"Ẩm thực: {', '.join(parsed)}")
+                else:
+                    parts.append(f"Ẩm thực: {cuisine_types}")
+            except:
+                parts.append(f"Ẩm thực: {cuisine_types}")
     
-    # Menu items (từ OCR)
+    # Features
+    if restaurant_data.get('features'):
+        features = restaurant_data['features']
+        if isinstance(features, list):
+            parts.append(f"Tiện ích: {', '.join(features)}")
+        elif isinstance(features, str):
+            parts.append(f"Tiện ích: {features}")
+    
+    # Menu items
     menu_items = restaurant_data.get('menu_items', [])
     if menu_items:
         menu_text = "Menu: "
         item_names = []
-        for item in menu_items[:10]:  # Giới hạn 10 món đầu
+        for item in menu_items[:20]:  # Limit to 20 items
             name = item.get('name', '')
             price = item.get('price')
             if name:
@@ -243,64 +281,85 @@ def update_restaurant_embedding(restaurant_id: str, embedding: List[float]):
         logger.error("❌ Database engine not initialized")
         return False
     
-    try:
-        with engine.connect() as conn:
-            # Lấy lại restaurant data để tạo search_vector
-            restaurant_data = get_restaurant_data(restaurant_id)
-            if not restaurant_data:
-                return False
-            
-            # Tạo text cho search_vector (chỉ cần tên, mô tả, địa chỉ)
-            search_parts = []
-            if restaurant_data.get('name_vi'):
-                search_parts.append(restaurant_data['name_vi'])
-            if restaurant_data.get('address'):
-                search_parts.append(restaurant_data['address'])
-            if restaurant_data.get('description'):
-                search_parts.append(restaurant_data['description'])
-            if restaurant_data.get('features'):
-                search_parts.append(restaurant_data['features'])
-            if restaurant_data.get('business_type'):
-                search_parts.append(restaurant_data['business_type'])        
-            cuisine_types = restaurant_data.get('cuisine_types')
-            if cuisine_types:
-                if isinstance(cuisine_types, list):
-                    search_parts.append(', '.join(cuisine_types))
-                elif isinstance(cuisine_types, str):
-                    search_parts.append(cuisine_types)
-            menu_items = restaurant_data.get('menu_items', [])
-            if menu_items:
-                search_parts.append(', '.join([item.get('name', '') for item in menu_items[:10]]))
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                # Lấy lại restaurant data để tạo search_vector
+                restaurant_data = get_restaurant_data(restaurant_id)
+                if not restaurant_data:
+                    return False
+                
+                # Tạo text cho search_vector (chỉ cần tên, mô tả, địa chỉ)
+                search_parts = []
+                if restaurant_data.get('name_vi'):
+                    search_parts.append(restaurant_data['name_vi'])
+                if restaurant_data.get('address'):
+                    search_parts.append(restaurant_data['address'])
+                if restaurant_data.get('description'):
+                    search_parts.append(restaurant_data['description'])
+                if restaurant_data.get('features'):
+                    search_parts.append(restaurant_data['features'])
+                if restaurant_data.get('business_type'):
+                    search_parts.append(restaurant_data['business_type'])        
+                cuisine_types = restaurant_data.get('cuisine_types')
+                if cuisine_types:
+                    if isinstance(cuisine_types, list):
+                        search_parts.append(', '.join(cuisine_types))
+                    elif isinstance(cuisine_types, str):
+                        search_parts.append(cuisine_types)
+                menu_items = restaurant_data.get('menu_items', [])
+                if menu_items:
+                    search_parts.append(', '.join([item.get('name', '') for item in menu_items[:10]]))
 
-            search_text = " ".join(search_parts)
-            
-            # Convert embedding list thành PostgreSQL vector format
-            embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-            
-            # Update cả embedding và search_vector
-            conn.execute(
-                text("""
-                    UPDATE restaurants
-                    SET embedding = :embedding::vector,
-                        search_vector = to_tsvector('simple', unaccent(:search_text)),
-                        updated_at = NOW()
-                    WHERE id = :restaurant_id
-                """),
-                {
-                    "restaurant_id": restaurant_id,
-                    "embedding": embedding_str,
-                    "search_text": search_text
-                }
-            )
-            conn.commit()
-            logger.info(f"✅ Updated embedding for restaurant {restaurant_id}")
-            return True
-            
-    except Exception as e:
-        logger.error(f"❌ Error updating restaurant embedding: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
+                search_text = " ".join(search_parts)
+                
+                # Convert embedding list thành PostgreSQL vector format
+                embedding_str = "[" + ",".join(map(str, embedding)) + "]"
+                
+                # Update cả embedding và search_vector
+                # Note: pg8000 requires proper parameter binding for vector type
+                # Use bindparam to ensure proper type handling
+                from sqlalchemy import bindparam
+                
+                conn.execute(
+                    text("""
+                        UPDATE restaurants
+                        SET embedding = CAST(:embedding AS vector),
+                            search_vector = to_tsvector('simple', unaccent(:search_text)),
+                            updated_at = NOW()
+                        WHERE id = :restaurant_id
+                    """),
+                    {
+                        "restaurant_id": restaurant_id,
+                        "embedding": embedding_str,
+                        "search_text": search_text
+                    }
+                )
+                conn.commit()
+                logger.info(f"✅ Updated embedding for restaurant {restaurant_id}")
+                return True
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower() or "connection" in error_msg.lower() or "pool" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.warning(f"⚠️ Connection error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    logger.info(f"⏳ Retrying in {wait_time}s...")
+                    import time
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"❌ Error updating restaurant embedding after {max_retries} attempts: {error_msg}")
+                    return False
+            else:
+                logger.error(f"❌ Error updating restaurant embedding: {error_msg}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return False
+    
+    return False
 
 # ============================================
 # LAMBDA HANDLER
@@ -419,4 +478,3 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})
         }
-

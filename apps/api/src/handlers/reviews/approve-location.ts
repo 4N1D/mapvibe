@@ -3,6 +3,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
 import { getDb } from '../../services/db';
 import { success, badRequest, notFound, error } from '../../middlewares/response';
 import { sql } from 'kysely';
+import { sendEmbeddingJob } from '../../services/sqs';
 
 interface ApproveLocationBody {
   location_address_id: string;
@@ -120,6 +121,12 @@ export const handler: Handler = {
             updated_at = NOW()
           WHERE id = ${location_address_id}
         `.execute(trx);
+      });
+
+      // Gửi message vào SQS để trigger Lambda Embedding
+      // Không await để không block response
+      sendEmbeddingJob(restaurantId).catch((err) => {
+        console.error('[reviews/approve-location] Failed to send embedding job:', err);
       });
 
       return success({

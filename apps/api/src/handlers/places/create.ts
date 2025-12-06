@@ -2,6 +2,7 @@ import crypto from "crypto";
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, badRequest, error } from "../../middlewares/response";
+import { sendEmbeddingJob } from "../../services/sqs";
 
 interface CreatePlaceBody {
   name_vi: string;
@@ -79,6 +80,12 @@ export const handler: Handler = {
         })
         .returningAll()
         .execute();
+
+      // Gửi message vào SQS để trigger Lambda Embedding
+      // Không await để không block response
+      sendEmbeddingJob(created.id).catch((err) => {
+        console.error("[places/create] Failed to send embedding job:", err);
+      });
 
       return success(created, 201);
     } catch (err) {

@@ -4,11 +4,14 @@
 # ============================================
 # ZIP SOURCE CODE (main.py + libs)
 # ============================================
+# IMPORTANT: Zip file MUST be pre-built using scripts/build-lambda-rag.ps1
+# This ensures dependencies are Linux-compatible (built with Docker)
+# The zip file should be at: ${path.module}/lambda-rag.zip
+# 
+# To build: Run .\scripts\build-lambda-rag.ps1 before terraform apply
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/src"
-  output_path = "${path.module}/lambda-rag.zip"
+locals {
+  zip_file_path = "${path.module}/lambda-rag.zip"
 }
 
 # ============================================
@@ -66,14 +69,14 @@ resource "aws_iam_role_policy" "lambda_extra" {
 # ============================================
 
 resource "aws_lambda_function" "rag" {
-  filename         = data.archive_file.lambda_zip.output_path
+  filename         = local.zip_file_path
   function_name    = "${var.project_name}-rag-search-${var.environment}"
   role             = aws_iam_role.lambda.arn
   handler          = "main.handler"
   runtime          = "python3.12"
   timeout          = 30
   memory_size      = 512
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = filebase64sha256(local.zip_file_path)
 
   environment {
     variables = {

@@ -209,3 +209,35 @@ export interface RestaurantReviewsResponse {
   total_pages: number;
   reviews: RestaurantReview[];
 }
+
+// ============================================
+// Restaurant Photo Types (for PhotosTab)
+// ============================================
+export type PhotoCategory = "all" | "food" | "view" | "comment" | "menu";
+
+export interface RestaurantPhoto {
+  id: string;
+  url: string;
+  thumbnail_url?: string;
+  category: PhotoCategory;
+  caption?: string;
+  author_id?: string;
+  author_name?: string;
+  created_at: string;
+}
+
+export interface RestaurantPhotosResponse {
+  restaurant_id: number;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  category_counts: {
+    all: number;
+    food: number;
+    view: number;
+    comment: number;
+    menu: number;
+  };
+  photos: RestaurantPhoto[];
+}

@@ -1,7 +1,6 @@
 import os
 import json
 import boto3
-import uvicorn
 import time
 import random
 import pytz
@@ -183,10 +182,10 @@ class RAGService:
                                 1. Nếu user tìm 'cafe', 'nước', 'trà sữa' -> CHỈ lấy ['Cà phê', 'Trà sữa', 'Giải khát']. TUYỆT ĐỐI KHÔNG thêm 'Quán ăn', 'Nhà hàng'.
                                 2. Nếu user tìm 'ăn', 'cơm', 'phở' -> Lấy ['Nhà hàng', 'Quán ăn', 'Món Việt', ...].
                                 3. Nếu user tìm 'nhậu' -> Lấy ['Quán nhậu', 'Beer', 'Bar'].
-                                4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay') -> CHỈ lấy category đó. TUYỆT ĐỐI KHÔNG thêm 'Nhà hàng' hay 'Quán ăn'.
+                                4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay') -> CHỈ lấy business_type đó. TUYỆT ĐỐI KHÔNG thêm 'Nhà hàng' hay 'Quán ăn'.
                                 (VD: Tìm 'BBQ' -> ['Nướng', 'Buffet', 'Grill']. KHÔNG lấy 'Nhà hàng').
-                                Hãy chọn category sát nhất với từ khóa của user.
-                                5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo') -> CHỈ lấy category chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
+                                Hãy chọn business_type sát nhất với từ khóa của user.
+                                5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo') -> CHỈ lấy business_type chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
                                 -> TUYỆT ĐỐI KHÔNG thêm 'Cafe' hay 'Nhà hàng' chung chung vào list này.
                                 6. Nếu user tìm 'Bar', 'Pub', 'Club', 'Quẩy' -> 
                                 - Lấy ['Bar', 'Pub', 'Club', 'Nightlife', 'Lounge'].
@@ -292,7 +291,7 @@ class RAGService:
                 AND (
                     "opening_hours" ILIKE '%Cả ngày%' 
                     OR (
-                        "opening_hours" ~ '^\d{2}:\d{2} - \d{2}:\d{2}$'
+                        "opening_hours" ~ '^\\d{2}:\\d{2} - \\d{2}:\\d{2}$'
                         AND (
                             CASE 
                                 WHEN CAST(split_part("opening_hours", ' - ', 1) AS TIME) <= CAST(split_part("opening_hours", ' - ', 2) AS TIME) THEN
@@ -313,11 +312,11 @@ class RAGService:
             for i, keyword in enumerate(params["exclude_keywords"]):
                 # Tạo param name động: exclude_0, exclude_1...
                 arg_name = f"exclude_{i}"
-                # Logic: Tên quán HOẶC Category không được chứa từ khóa này
+                # Logic: Tên quán HOẶC business_type không được chứa từ khóa này
                 sql_base += f""" 
                     AND NOT (
-                        name ILIKE :{arg_name} 
-                        OR category ILIKE :{arg_name}
+                        name_vi ILIKE :{arg_name} 
+                        OR business_type ILIKE :{arg_name}
                         OR description ILIKE :{arg_name}
                     )
                 """
@@ -335,11 +334,11 @@ class RAGService:
                 
         or_conditions = []
         if params.get("target_categories"):
-        # Tạo danh sách điều kiện OR (VD: category LIKE cafe OR category LIKE trà sữa)
+        # Tạo danh sách điều kiện OR (VD: business_type LIKE cafe OR business_type LIKE trà sữa)
             or_conditions = []
             for i, cat in enumerate(params["target_categories"]):
                 arg_name = f"inc_cat_{i}"
-                or_conditions.append(f"(category ILIKE :{arg_name} OR name ILIKE :{arg_name})")
+                or_conditions.append(f"(business_type ILIKE :{arg_name} OR name_vi ILIKE :{arg_name})")
                 sql_params[arg_name] = f"%{cat}%"
         
         # Gộp lại bằng OR và đóng ngoặc

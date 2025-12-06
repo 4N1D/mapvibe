@@ -130,6 +130,21 @@ module "lambda_migration" {
 }
 
 # ============================================
+# LAMBDA EMBEDDINGS MODULE
+# ============================================
+
+module "lambda_embeddings" {
+  source = "./modules/lambda-embeddings"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  aws_region    = var.aws_region
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+}
+
+# ============================================
 # LAMBDA API MODULE
 # ============================================
 
@@ -138,13 +153,15 @@ module "lambda_migration" {
 module "lambda_api" {
   source = "./modules/lambda-api"
 
-  environment        = var.environment
-  project_name       = var.project_name
-  db_secret_arn      = aws_secretsmanager_secret.db_credentials.arn
-  db_host            = module.rds.address
-  db_name            = module.rds.database_name
-  photos_bucket_name = module.cdn.photos_bucket_name
-  cloudfront_domain  = module.cdn.cloudfront_domain_name
+  environment              = var.environment
+  project_name             = var.project_name
+  db_secret_arn            = aws_secretsmanager_secret.db_credentials.arn
+  db_host                  = module.rds.address
+  db_name                  = module.rds.database_name
+  photos_bucket_name       = module.cdn.photos_bucket_name
+  cloudfront_domain        = module.cdn.cloudfront_domain_name
+  sqs_embedding_queue_url  = module.lambda_embeddings.sqs_queue_url
+  sqs_embedding_queue_arn  = module.lambda_embeddings.sqs_queue_arn
 }
 
 # ============================================
@@ -206,21 +223,6 @@ module "lambda_rekognition" {
   db_host            = module.rds.address
   db_name            = module.rds.database_name
   photos_bucket_name = module.cdn.photos_bucket_name
-}
-
-# ============================================
-# LAMBDA EMBEDDINGS MODULE
-# ============================================
-
-module "lambda_embeddings" {
-  source = "./modules/lambda-embeddings"
-
-  project_name  = var.project_name
-  environment   = var.environment
-  aws_region    = var.aws_region
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
 }
 
 # ============================================

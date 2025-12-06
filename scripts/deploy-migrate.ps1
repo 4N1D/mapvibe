@@ -15,7 +15,7 @@ Push-Location "$PSScriptRoot/../infrastructure/terraform"
 try {
     # Deploy Lambda migration module
     Write-Host "Deploying Lambda migration..." -ForegroundColor Yellow
-    terraform apply -target=module.lambda_migration -auto-approve
+    terraform apply "-target=module.lambda_migration" -auto-approve
 
     if ($LASTEXITCODE -ne 0) {
         throw "Terraform apply failed"

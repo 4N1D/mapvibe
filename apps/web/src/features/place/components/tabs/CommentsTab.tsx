@@ -12,20 +12,22 @@ interface CommentsTabProps {
 export function CommentsTab({ restaurantId }: CommentsTabProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string; rootParentId: string } | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     const fetchComments = async () => {
       try {
         setLoading(true);
         const response = await apiClient.get<CommentsResponse>(
-          `/comments/${restaurantId}?page=${page}&limit=10`
+          `/comments/${restaurantId}?page=1&limit=10`
         );
         setComments(response.data.comments);
-        setTotalPages(response.data.total_pages);
+        setHasMore(response.data.page < response.data.total_pages);
+        setPage(1);
       } catch (error) {
         console.error("Failed to fetch comments:", error);
       } finally {
@@ -34,7 +36,24 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
     };
 
     fetchComments();
-  }, [restaurantId, page]);
+  }, [restaurantId]);
+
+  const loadMore = async () => {
+    try {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const response = await apiClient.get<CommentsResponse>(
+        `/comments/${restaurantId}?page=${nextPage}&limit=10`
+      );
+      setComments((prev) => [...prev, ...response.data.comments]);
+      setHasMore(response.data.page < response.data.total_pages);
+      setPage(nextPage);
+    } catch (error) {
+      console.error("Failed to load more comments:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleSubmit = async (content: string) => {
     try {
@@ -115,26 +134,14 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="mt-6 flex justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
-          >
-            Trước
-          </button>
-          <span className="flex items-center px-4 text-sm text-gray-600">
-            {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
-          >
-            Sau
-          </button>
-        </div>
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="mt-6 w-full py-3 text-center text-sm text-gray-500 hover:text-primary-500 disabled:opacity-50"
+        >
+          {loadingMore ? "Đang tải..." : "Nhấn để xem thêm bình luận..."}
+        </button>
       )}
     </div>
   );

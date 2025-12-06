@@ -92,6 +92,24 @@ const generateRestaurantReviews = (count: number) => {
 // Store restaurant reviews
 const reviewsStore = { data: generateRestaurantReviews(12) };
 
+// Generate mock restaurant photos
+const generateRestaurantPhotos = (count: number) => {
+  const categories: Array<"food" | "ambiance" | "review"> = ["food", "ambiance", "review"];
+  return Array.from({ length: count }, (_, i) => ({
+    id: `photo-${i + 1}`,
+    url: `https://images.unsplash.com/photo-${1546069901 + i * 500}-ba9599a7e63c?w=800`,
+    thumbnail_url: `https://images.unsplash.com/photo-${1546069901 + i * 500}-ba9599a7e63c?w=300`,
+    category: categories[i % 3],
+    caption: faker.lorem.sentence(),
+    author_id: `user-${(i % 5) + 1}`,
+    author_name: faker.person.fullName(),
+    created_at: faker.date.recent({ days: 60 }).toISOString(),
+  }));
+};
+
+// Store restaurant photos
+const photosStore = { data: generateRestaurantPhotos(42) };
+
 // Generate mock hot reviews
 const generateHotReviews = (count: number) => {
   const tags: Array<"hot" | "new" | "normal" | "trending"> = ["hot", "trending", "new", "normal"];
@@ -235,6 +253,42 @@ export const handlers = [
 
     reviewsStore.data.unshift(newReview);
     return HttpResponse.json(newReview);
+  }),
+
+  // Restaurant Photos API - GET
+  http.get("*/photos/restaurant/:restaurantId", ({ request }) => {
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "15");
+    const category = url.searchParams.get("category") || "all";
+
+    // Filter by category
+    const filteredPhotos =
+      category === "all"
+        ? photosStore.data
+        : photosStore.data.filter((p) => p.category === category);
+
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const paginatedPhotos = filteredPhotos.slice(start, end);
+
+    // Calculate category counts
+    const categoryCounts = {
+      all: photosStore.data.length,
+      food: photosStore.data.filter((p) => p.category === "food").length,
+      ambiance: photosStore.data.filter((p) => p.category === "ambiance").length,
+      review: photosStore.data.filter((p) => p.category === "review").length,
+    };
+
+    return HttpResponse.json({
+      restaurant_id: 1,
+      total: filteredPhotos.length,
+      page,
+      limit,
+      total_pages: Math.ceil(filteredPhotos.length / limit),
+      category_counts: categoryCounts,
+      photos: paginatedPhotos,
+    });
   }),
 
   // Comments API - GET

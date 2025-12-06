@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Comment, CommentsResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
+import { formatRelativeTime } from "@/utils/date";
 import { CommentForm } from "../CommentForm";
 import { CommentItem } from "../CommentItem";
 
@@ -34,19 +35,6 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
 
     fetchComments();
   }, [restaurantId, page]);
-
-  const formatTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffHours < 1) return "Vừa xong";
-    if (diffHours < 24) return `${diffHours} giờ trước`;
-    if (diffDays < 30) return `${diffDays} ngày trước`;
-    return date.toLocaleDateString("vi-VN");
-  };
 
   const handleSubmit = async (content: string) => {
     try {
@@ -112,7 +100,7 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
               key={comment.id}
               comment={comment}
               onReply={handleReply}
-              formatTime={formatTime}
+              formatTime={formatRelativeTime}
             />
           ))
         )}

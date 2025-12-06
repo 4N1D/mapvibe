@@ -2,20 +2,8 @@ import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { HotReview, HotReviewsResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
+import { formatRelativeTime } from "@/utils/date";
 import { ReviewCard } from "./ReviewCard";
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffHours < 1) return "Vừa xong";
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-  if (diffDays < 7) return `${diffDays} ngày trước`;
-  return date.toLocaleDateString("vi-VN");
-}
 
 function getReviewTags(score: string, upvoteCount: number): string[] {
   const tags: string[] = [];

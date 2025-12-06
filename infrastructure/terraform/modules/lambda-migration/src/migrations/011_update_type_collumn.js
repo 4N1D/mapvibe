@@ -1,13 +1,13 @@
 const { sql } = require("kysely");
 
 async function up(db) {
-  console.log("Updating columns and removing ai_aggregated_info in 'restaurant' table...");
+  console.log("Updating columns and removing ai_aggregated_info in 'restaurants' table...");
 
   await sql`
-    ALTER TABLE restaurant 
-    ALTER COLUMN features TYPE TEXT[], -- Chuyển từ VARCHAR(50)[] sang TEXT[] (bỏ giới hạn 50 ký tự)
-    ALTER COLUMN business_type TYPE TEXT, -- Chuyển từ VARCHAR(50) sang TEXT
-    DROP COLUMN IF EXISTS ai_aggregated_info; -- Xóa cột JSON
+    ALTER TABLE restaurants 
+    ALTER COLUMN features TYPE TEXT[],
+    ALTER COLUMN business_type TYPE TEXT,
+    DROP COLUMN IF EXISTS ai_aggregated_info;
   `.execute(db);
 
   console.log("  ✓ Updated 'features' to TEXT[]");
@@ -18,12 +18,12 @@ async function up(db) {
 }
 
 async function down(db) {
-  console.log("Reverting changes to 'restaurant' table...");
+  console.log("Reverting changes to 'restaurants' table...");
 
   // Lưu ý: Việc chuyển từ TEXT về VARCHAR(50) có thể gây lỗi nếu dữ liệu hiện tại dài hơn 50 ký tự.
   // PostgreSQL sẽ báo lỗi nếu có dữ liệu bị cắt bớt mà không có ép kiểu rõ ràng.
   await sql`
-    ALTER TABLE restaurant 
+    ALTER TABLE restaurants 
     ADD COLUMN IF NOT EXISTS ai_aggregated_info JSON,
     ALTER COLUMN business_type TYPE VARCHAR(50),
     ALTER COLUMN features TYPE VARCHAR(50)[];

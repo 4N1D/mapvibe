@@ -226,6 +226,21 @@ module "lambda_rekognition" {
 }
 
 # ============================================
+# LAMBDA EMBEDDINGS MODULE
+# ============================================
+
+module "lambda_embeddings" {
+  source = "./modules/lambda-embeddings"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  aws_region    = var.aws_region
+  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
+  db_host       = module.rds.address
+  db_name       = module.rds.database_name
+}
+
+# ============================================
 # WAF MODULE (for CloudFront)
 # ============================================
 

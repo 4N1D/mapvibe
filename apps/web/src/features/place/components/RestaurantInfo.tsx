@@ -97,7 +97,7 @@ export function RestaurantInfo({
 
           {/* Details */}
           <div className="space-y-2.5 text-sm">
-            <div className="hover:text-primary flex items-start gap-3 text-gray-700 transition-colors">
+            <div className="hover:text-primary-500 flex items-start gap-3 text-gray-700 transition-colors">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
               <span className="line-clamp-2">{address}</span>
             </div>
@@ -143,23 +143,23 @@ export function RestaurantInfo({
       <div className="mt-6 flex gap-3 border-t border-gray-100 pt-4">
         <button
           title={phone}
-          className="hover:text-primary flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
+          className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
         >
           <PhoneCall className="h-4 w-4" />
           Gọi điện thoại
         </button>
-        <button className="hover:text-primary flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
+        <button className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
           <Bookmark className="h-4 w-4" />
           Lưu vào Bộ sưu tập
         </button>
         <button
           onClick={onCommentClick}
-          className="hover:text-primary flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
+          className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
         >
           <MessageSquare className="h-4 w-4" />
           Bình luận
         </button>
-        <button className="hover:text-primary flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
+        <button className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
           <Share2 className="h-4 w-4" />
           Chia sẻ
         </button>

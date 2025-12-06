@@ -28,7 +28,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
           Vui lòng{" "}
           <a
             href="/login"
-            className="text-primary font-medium hover:underline"
+            className="text-primary-500 font-medium hover:underline"
           >
             đăng nhập
           </a>{" "}
@@ -53,7 +53,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
         {replyingTo && (
           <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
             <span>
-              Đang trả lời <span className="text-primary font-semibold">@{replyingTo.name}</span>
+              Đang trả lời <span className="text-primary-500 font-semibold">@{replyingTo.name}</span>
             </span>
             <button
               type="button"
@@ -73,7 +73,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
             placeholder={
               replyingTo ? `Trả lời @${replyingTo.name}...` : "Viết nhận xét của bạn tại đây..."
             }
-            className="focus:border-primary focus:ring-primary flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-1"
+            className="focus:border-primary-500 focus:ring-primary-500 flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-1"
             disabled={loading}
           />
           <button

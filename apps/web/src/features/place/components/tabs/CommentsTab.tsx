@@ -13,7 +13,7 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string; rootParentId: string } | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -48,10 +48,15 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
       const response = await apiClient.post<Comment>("/comments", payload);
 
       if (replyingTo) {
+        const newReply = {
+          ...response.data,
+          reply_to_name: replyingTo.name,
+          parent_id: replyingTo.rootParentId,
+        };
         setComments((prev) =>
           prev.map((comment) =>
-            comment.id === replyingTo.id
-              ? { ...comment, replies: [...(comment.replies || []), response.data] }
+            comment.id === replyingTo.rootParentId
+              ? { ...comment, replies: [...(comment.replies || []), newReply] }
               : comment
           )
         );
@@ -66,28 +71,28 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
     }
   };
 
-  const handleReply = (parentId: string, authorName: string) => {
-    setReplyingTo({ id: parentId, name: authorName });
+  const handleReply = (commentId: string, authorName: string, rootParentId: string) => {
+    setReplyingTo({ id: commentId, name: authorName, rootParentId });
   };
 
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+        <div className="border-primary-500 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
       </div>
     );
   }
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
-      <div className="mb-6">
-        <CommentForm
-          onSubmit={handleSubmit}
-          replyingTo={replyingTo}
-          onCancelReply={() => setReplyingTo(null)}
-          loading={submitting}
-        />
-      </div>
+      {!replyingTo && (
+        <div className="mb-6">
+          <CommentForm
+            onSubmit={handleSubmit}
+            loading={submitting}
+          />
+        </div>
+      )}
 
       <div className="divide-y divide-gray-100">
         {comments.length === 0 ? (
@@ -100,6 +105,10 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
               key={comment.id}
               comment={comment}
               onReply={handleReply}
+              onSubmitReply={handleSubmit}
+              onCancelReply={() => setReplyingTo(null)}
+              replyingToId={replyingTo?.id}
+              submitting={submitting}
               formatTime={formatRelativeTime}
             />
           ))

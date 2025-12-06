@@ -41,6 +41,12 @@ interface DuplicateCandidate {
 const DUPLICATE_THRESHOLD = 0.7;
 const PROXIMITY_METERS = 100;
 
+// Extract house number from street address (e.g., "123 Nguyen Hue" -> "123", "12A/3 Le Loi" -> "12A/3")
+const extractHouseNumber = (address: string): string | null => {
+  const match = address.trim().match(/^[\d]+[A-Za-z]?(\/[\d]+[A-Za-z]?)*/);
+  return match ? match[0] : null;
+};
+
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -104,10 +110,16 @@ export const handler: Handler = {
         return badRequest('Invalid author_id: user does not exist');
       }
 
+      // Normalize address for exact match comparison
+      const normalizedStreetAddress = street_address.toLowerCase().replace(/\s+/g, ' ').trim();
+      const normalizedDistrict = district.toLowerCase().replace(/\s+/g, ' ').trim();
+
       // Phase 1: Duplicate Check using fuzzy name matching (pg_trgm) and geospatial proximity (ST_DWithin)
       const duplicates: DuplicateCandidate[] = [];
 
       // Check location_addresses table
+      // Check for exact address match OR fuzzy match
+      const inputHouseNumber = extractHouseNumber(street_address);
       const locationDuplicates = await sql<DuplicateCandidate>`
         SELECT 
           id,
@@ -129,13 +141,27 @@ export const handler: Handler = {
         FROM location_addresses
         WHERE status IN ('pending', 'approved')
           AND (
-            similarity(COALESCE(restaurant_name, ''), ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
-            OR (
-              location IS NOT NULL 
-              AND ST_DWithin(
-                location::geography,
-                ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
-                ${PROXIMITY_METERS}
+            -- Exact address match (normalized)
+            (LOWER(REGEXP_REPLACE(street_address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
+             AND LOWER(REGEXP_REPLACE(district, '\s+', ' ', 'g')) = ${normalizedDistrict})
+            OR
+            -- Fuzzy match conditions
+            (
+              (
+                ${inputHouseNumber}::text IS NULL 
+                OR (regexp_match(street_address, '^[0-9]+[A-Za-z]?(/[0-9]+[A-Za-z]?)*'))[1] = ${inputHouseNumber}
+              )
+              AND (
+                similarity(COALESCE(restaurant_name, ''), ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
+                OR similarity(street_address, ${street_address}) > ${DUPLICATE_THRESHOLD}
+                OR (
+                  location IS NOT NULL 
+                  AND ST_DWithin(
+                    location::geography,
+                    ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
+                    ${PROXIMITY_METERS}
+                  )
+                )
               )
             )
           )
@@ -146,6 +172,7 @@ export const handler: Handler = {
       duplicates.push(...(locationDuplicates.rows as DuplicateCandidate[]));
 
       // Check restaurants table
+      // Check for exact address match OR fuzzy match
       const restaurantDuplicates = await sql<DuplicateCandidate>`
         SELECT 
           id,
@@ -167,13 +194,27 @@ export const handler: Handler = {
         FROM restaurants
         WHERE status = 'approved'
           AND (
-            similarity(name_vi, ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
-            OR (
-              location IS NOT NULL 
-              AND ST_DWithin(
-                location::geography,
-                ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
-                ${PROXIMITY_METERS}
+            -- Exact address match (normalized)
+            (LOWER(REGEXP_REPLACE(address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
+             AND LOWER(REGEXP_REPLACE(district, '\s+', ' ', 'g')) = ${normalizedDistrict})
+            OR
+            -- Fuzzy match conditions
+            (
+              (
+                ${inputHouseNumber}::text IS NULL 
+                OR (regexp_match(address, '^[0-9]+[A-Za-z]?(/[0-9]+[A-Za-z]?)*'))[1] = ${inputHouseNumber}
+              )
+              AND (
+                similarity(name_vi, ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
+                OR similarity(address, ${street_address}) > ${DUPLICATE_THRESHOLD}
+                OR (
+                  location IS NOT NULL 
+                  AND ST_DWithin(
+                    location::geography,
+                    ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
+                    ${PROXIMITY_METERS}
+                  )
+                )
               )
             )
           )
@@ -183,13 +224,9 @@ export const handler: Handler = {
 
       duplicates.push(...(restaurantDuplicates.rows as DuplicateCandidate[]));
 
-      // If duplicates found with score > 0.7, return error with potential duplicates
-      const highScoreDuplicates = duplicates.filter(d => 
-        d.similarity_score > DUPLICATE_THRESHOLD || 
-        (d.distance_meters != null && d.distance_meters < PROXIMITY_METERS)
-      );
-
-      if (highScoreDuplicates.length > 0) {
+      // If any duplicates found (exact match, high similarity, or proximity), return error
+      // The SQL query already filters for matching records, so all results are potential duplicates
+      if (duplicates.length > 0) {
         return {
           statusCode: 400,
           headers: {
@@ -202,7 +239,7 @@ export const handler: Handler = {
             error: 'Potential duplicate location found',
             code: 'DUPLICATE_LOCATION',
             message: 'This location may already exist. Please select an existing place or confirm creation of a new entry.',
-            potential_duplicates: highScoreDuplicates.map(d => ({
+            potential_duplicates: duplicates.map(d => ({
               id: d.id,
               name: d.restaurant_name,
               address: d.street_address,

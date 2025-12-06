@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
@@ -15,51 +16,44 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   comment: "Bình luận",
 };
 
+const fetchPhotos = async (restaurantId: number, category: string, page: number) => {
+  const response = await apiClient.get<RestaurantPhotosResponse>(
+    `/photos/restaurant/${restaurantId}?page=${page}&limit=15&category=${category}`
+  );
+  return response.data;
+};
+
 export function PhotosTab({ restaurantId }: PhotosTabProps) {
-  const [photos, setPhotos] = useState<RestaurantPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [category, setCategory] = useState<DisplayCategory>("all");
+  const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [category, setCategory] = useState<DisplayCategory>("all");
-  const [categoryCounts, setCategoryCounts] = useState<Record<DisplayCategory, number>>({
-    all: 0,
-    food: 0,
-    view: 0,
-    comment: 0,
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["photos", restaurantId, category],
+    queryFn: () => fetchPhotos(restaurantId, category, 1),
+    placeholderData: (prev) => prev,
+    select: (data) => {
+      const { menu: _, ...counts } = data.category_counts;
+      return { ...data, category_counts: counts };
+    },
   });
 
-  useEffect(() => {
-    const fetchPhotos = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get<RestaurantPhotosResponse>(
-          `/photos/restaurant/${restaurantId}?page=1&limit=15&category=${category}`
-        );
-        setPhotos(response.data.photos);
-        const { menu: _, ...counts } = response.data.category_counts;
-        setCategoryCounts(counts);
-        setHasMore(response.data.page < response.data.total_pages);
-        setPage(1);
-      } catch (error) {
-        console.error("Failed to fetch photos:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const photos = page === 1 ? (data?.photos || []) : allPhotos;
+  const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, comment: 0 };
 
-    fetchPhotos();
-  }, [restaurantId, category]);
+  if (data && page === 1 && hasMore !== (data.page < data.total_pages)) {
+    setHasMore(data.page < data.total_pages);
+  }
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await apiClient.get<RestaurantPhotosResponse>(
-        `/photos/restaurant/${restaurantId}?page=${nextPage}&limit=15&category=${category}`
-      );
-      setPhotos((prev) => [...prev, ...response.data.photos]);
-      setHasMore(response.data.page < response.data.total_pages);
+      const response = await fetchPhotos(restaurantId, category, nextPage);
+      setAllPhotos(page === 1 ? [...(data?.photos || []), ...response.photos] : [...allPhotos, ...response.photos]);
+      setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
       console.error("Failed to load more photos:", error);
@@ -71,17 +65,10 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
   const handleCategoryChange = (newCategory: DisplayCategory) => {
     if (newCategory !== category) {
       setCategory(newCategory);
-      setPhotos([]);
+      setPage(1);
+      setAllPhotos([]);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -90,18 +77,19 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
           <button
             key={cat}
             onClick={() => handleCategoryChange(cat)}
+            disabled={isFetching}
             className={`rounded-full border px-4 py-1.5 text-sm transition ${
               category === cat
                 ? "border-primary-500 bg-primary-50 text-primary-600"
                 : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-            }`}
+            } disabled:opacity-50`}
           >
             {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
           </button>
         ))}
       </div>
 
-      <div className="rounded-lg bg-white p-4 shadow-sm">
+      <div className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}>
         {photos.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Chưa có ảnh nào trong danh mục này.</p>
         ) : (

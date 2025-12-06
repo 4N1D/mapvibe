@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Comment, CommentsResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 import { formatRelativeTime } from "@/utils/date";
@@ -9,44 +10,41 @@ interface CommentsTabProps {
   restaurantId: number;
 }
 
+const fetchComments = async (restaurantId: number, page: number) => {
+  const response = await apiClient.get<CommentsResponse>(
+    `/comments/${restaurantId}?page=${page}&limit=10`
+  );
+  return response.data;
+};
+
 export function CommentsTab({ restaurantId }: CommentsTabProps) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string; rootParentId: string } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    const fetchComments = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get<CommentsResponse>(
-          `/comments/${restaurantId}?page=1&limit=10`
-        );
-        setComments(response.data.comments);
-        setHasMore(response.data.page < response.data.total_pages);
-        setPage(1);
-      } catch (error) {
-        console.error("Failed to fetch comments:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data } = useQuery({
+    queryKey: ["comments", restaurantId],
+    queryFn: () => fetchComments(restaurantId, 1),
+    placeholderData: (prev) => prev,
+  });
 
-    fetchComments();
-  }, [restaurantId]);
+  const comments = localComments.length > 0 ? localComments : (data?.comments || []);
+
+  if (data && localComments.length === 0 && hasMore !== (data.page < data.total_pages)) {
+    setHasMore(data.page < data.total_pages);
+  }
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await apiClient.get<CommentsResponse>(
-        `/comments/${restaurantId}?page=${nextPage}&limit=10`
-      );
-      setComments((prev) => [...prev, ...response.data.comments]);
-      setHasMore(response.data.page < response.data.total_pages);
+      const response = await fetchComments(restaurantId, nextPage);
+      const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
+      setLocalComments([...currentComments, ...response.comments]);
+      setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
       console.error("Failed to load more comments:", error);
@@ -66,14 +64,16 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
 
       const response = await apiClient.post<Comment>("/comments", payload);
 
+      const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
+      
       if (replyingTo) {
         const newReply = {
           ...response.data,
           reply_to_name: replyingTo.name,
           parent_id: replyingTo.rootParentId,
         };
-        setComments((prev) =>
-          prev.map((comment) =>
+        setLocalComments(
+          currentComments.map((comment: Comment) =>
             comment.id === replyingTo.rootParentId
               ? { ...comment, replies: [...(comment.replies || []), newReply] }
               : comment
@@ -81,7 +81,7 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
         );
         setReplyingTo(null);
       } else {
-        setComments((prev) => [response.data, ...prev]);
+        setLocalComments([response.data, ...currentComments]);
       }
     } catch (error) {
       console.error("Failed to post comment:", error);
@@ -93,14 +93,6 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
   const handleReply = (commentId: string, authorName: string, rootParentId: string) => {
     setReplyingTo({ id: commentId, name: authorName, rootParentId });
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="border-primary-500 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">

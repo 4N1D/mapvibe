@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RestaurantPhoto, RestaurantPhotosResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
@@ -6,42 +7,39 @@ interface MenuTabProps {
   restaurantId: number;
 }
 
+const fetchMenuPhotos = async (restaurantId: number, page: number) => {
+  const response = await apiClient.get<RestaurantPhotosResponse>(
+    `/photos/restaurant/${restaurantId}?page=${page}&limit=12&category=menu`
+  );
+  return response.data;
+};
+
 export function MenuTab({ restaurantId }: MenuTabProps) {
-  const [photos, setPhotos] = useState<RestaurantPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [localPhotos, setLocalPhotos] = useState<RestaurantPhoto[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    const fetchMenuPhotos = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get<RestaurantPhotosResponse>(
-          `/photos/restaurant/${restaurantId}?page=1&limit=12&category=menu`
-        );
-        setPhotos(response.data.photos);
-        setHasMore(response.data.page < response.data.total_pages);
-        setPage(1);
-      } catch (error) {
-        console.error("Failed to fetch menu photos:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data } = useQuery({
+    queryKey: ["menu-photos", restaurantId],
+    queryFn: () => fetchMenuPhotos(restaurantId, 1),
+    placeholderData: (prev) => prev,
+  });
 
-    fetchMenuPhotos();
-  }, [restaurantId]);
+  const photos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+
+  if (data && localPhotos.length === 0 && hasMore !== (data.page < data.total_pages)) {
+    setHasMore(data.page < data.total_pages);
+  }
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await apiClient.get<RestaurantPhotosResponse>(
-        `/photos/restaurant/${restaurantId}?page=${nextPage}&limit=12&category=menu`
-      );
-      setPhotos((prev) => [...prev, ...response.data.photos]);
-      setHasMore(response.data.page < response.data.total_pages);
+      const response = await fetchMenuPhotos(restaurantId, nextPage);
+      const currentPhotos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+      setLocalPhotos([...currentPhotos, ...response.photos]);
+      setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
       console.error("Failed to load more menu photos:", error);
@@ -49,14 +47,6 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
       setLoadingMore(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">

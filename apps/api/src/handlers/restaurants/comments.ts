@@ -344,9 +344,10 @@ export const likeHandler: Handler = {
 
       // Check if user already liked this comment
       const existingLike = await db
-        .selectFrom('comment_likes')
+        .selectFrom('likes')
         .select(['id'])
-        .where('comment_id', '=', commentId)
+        .where('target_type', '=', 'comment')
+        .where('target_id', '=', commentId)
         .where('user_id', '=', userId)
         .executeTakeFirst();
 
@@ -356,8 +357,9 @@ export const likeHandler: Handler = {
       if (existingLike) {
         // Unlike - remove the like
         await db
-          .deleteFrom('comment_likes')
-          .where('comment_id', '=', commentId)
+          .deleteFrom('likes')
+          .where('target_type', '=', 'comment')
+          .where('target_id', '=', commentId)
           .where('user_id', '=', userId)
           .execute();
 
@@ -366,11 +368,11 @@ export const likeHandler: Handler = {
       } else {
         // Like - add the like
         await db
-          .insertInto('comment_likes')
+          .insertInto('likes')
           .values({
-            id: crypto.randomUUID(),
-            comment_id: commentId,
             user_id: userId,
+            target_type: 'comment',
+            target_id: commentId,
           })
           .execute();
 
@@ -439,9 +441,10 @@ export const reportHandler: Handler = {
 
       // Check if user already reported this comment
       const existingReport = await db
-        .selectFrom('comment_reports')
+        .selectFrom('reports')
         .select(['id'])
-        .where('comment_id', '=', commentId)
+        .where('target_type', '=', 'comment')
+        .where('target_id', '=', commentId)
         .where('reporter_id', '=', userId)
         .executeTakeFirst();
 
@@ -451,11 +454,11 @@ export const reportHandler: Handler = {
 
       // Create report
       await db
-        .insertInto('comment_reports')
+        .insertInto('reports')
         .values({
-          id: crypto.randomUUID(),
-          comment_id: commentId,
           reporter_id: userId,
+          target_type: 'comment',
+          target_id: commentId,
           reason,
           details: details ?? null,
           status: 'pending',

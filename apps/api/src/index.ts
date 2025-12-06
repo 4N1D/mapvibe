@@ -23,7 +23,17 @@ import {
 } from './handlers/reviews';
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
-import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
+import {
+  getMeHandler,
+  updateMeHandler,
+  getUserByIdHandler,
+  getMyPhotosHandler,
+  getMyReviewsHandler,
+  getMySavedHandler,
+  getMyStatsHandler,
+  getAvatarUploadUrlHandler,
+  updateAvatarHandler,
+} from "./handlers/users";
 import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
@@ -36,6 +46,7 @@ import {
   reviewsCreateHandler as restaurantReviewsCreateHandler,
   photosListHandler as restaurantPhotosListHandler,
   menuHandler as restaurantMenuHandler,
+  saveHandler as restaurantSaveHandler,
 } from "./handlers/restaurants";
 
 
@@ -157,6 +168,42 @@ const routes: RouteDefinition[] = [
   },
   {
     method: "GET",
+    pattern: /^\/users\/me\/photos$/,
+    paramNames: [],
+    handler: getMyPhotosHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/reviews$/,
+    paramNames: [],
+    handler: getMyReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/saved$/,
+    paramNames: [],
+    handler: getMySavedHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/stats$/,
+    paramNames: [],
+    handler: getMyStatsHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/avatar$/,
+    paramNames: [],
+    handler: getAvatarUploadUrlHandler,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/users\/me\/avatar$/,
+    paramNames: [],
+    handler: updateAvatarHandler,
+  },
+  {
+    method: "GET",
     pattern: /^\/users\/([^/]+)$/,
     paramNames: ["id"],
     handler: getUserByIdHandler,
@@ -231,6 +278,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/restaurants\/([^/]+)\/menu$/,
     paramNames: ["slug"],
     handler: restaurantMenuHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/([^/]+)\/save$/,
+    paramNames: ["id"],
+    handler: restaurantSaveHandler,
   },
 ];
 

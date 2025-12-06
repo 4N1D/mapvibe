@@ -1,11 +1,22 @@
 # GitLab CI/CD Pipeline for MapVibe Monorepo
-# This pipeline runs on every push to any branch
+
+# Prevents duplicate pipelines (branch + MR)
+workflow:
+  rules:
+    - when: never
+    # # Run MR pipeline when MR is created/updated
+    # - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # # Skip branch pipeline if MR already exists for this branch
+    # - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+    #   when: never
+    # # Run branch pipeline for dev/prod (direct pushes)
+    # - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "prod"
 
 # Define pipeline stages
 stages:
   - install
   - build
-  - test
+  - deploy
 
 # Cache dependencies for faster builds
 cache:
@@ -21,6 +32,7 @@ cache:
 # Default configuration for all jobs
 default:
   image: oven/bun:latest
+  interruptible: true
   before_script:
     - bun --version
 
@@ -38,62 +50,113 @@ install:
       - apps/*/node_modules/
       - packages/*/node_modules/
     expire_in: 1 hour
-  only:
-    - branches
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[ci-only\]/
+      when: never
+    - when: on_success
 
 # ===========================
 # STAGE 2: BUILD
 # ===========================
 
-# Build database package (skip - runs TypeScript directly)
-build:database:
-  stage: build
-  needs: [install]
-  script:
-    - echo "🗄️ Database package uses TypeScript directly - no build needed"
-    - echo "✅ Skipping build for database package"
-  only:
-    - branches
-
-# Build ui-components package
-build:ui-components:
-  stage: build
-  needs: [install]
-  script:
-    - echo "🎨 Building UI components..."
-    - cd packages/ui-components
-    - bun run build
-  artifacts:
-    paths:
-      - packages/ui-components/dist/
-    expire_in: 1 day
-  only:
-    - branches
-
 # Build web app
 build:web:
   stage: build
-  needs: [install, build:ui-components]
+  needs: [install]
   script:
     - echo "🌐 Building web application..."
     - cd apps/web
+    - |
+      cat > .env << EOF
+      VITE_API_URL=$VITE_API_URL
+      VITE_USE_MOCK_SEARCH=$VITE_USE_MOCK_SEARCH
+      VITE_AWS_REGION=$VITE_AWS_REGION
+      VITE_COGNITO_USER_POOL_ID=$VITE_COGNITO_USER_POOL_ID
+      VITE_COGNITO_APP_CLIENT_ID=$VITE_COGNITO_APP_CLIENT_ID
+      VITE_COGNITO_DOMAIN=$VITE_COGNITO_DOMAIN
+      EOF
+    - cat .env
     - bun run build
   artifacts:
     paths:
       - apps/web/dist/
     expire_in: 1 week
-  only:
-    - branches
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[ci-only\]/
+      when: never
+    - when: on_success
+
 # ===========================
-# STAGE 3: TEST (Optional)
+# STAGE 3: DEPLOY
 # ===========================
 
-# Uncomment when you have tests
-# test:unit:
-#   stage: test
-#   needs: [build:ui-components]
-#   script:
-#     - echo "🧪 Running unit tests..."
-#     - bun test
-#   only:
-#     - branches
+# Deploy Frontend to S3 + CloudFront
+deploy:frontend:
+  stage: deploy
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  needs: [build:web]
+  before_script: []
+  script:
+    - echo "🚀 Deploying frontend to S3..."
+    - aws s3 sync apps/web/dist s3://$S3_BUCKET_NAME --delete
+    - echo "🔄 Invalidating CloudFront cache..."
+    - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DIST_ID --paths "/*"
+    - echo "✅ Frontend deployed successfully"
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(dev|prod)$/ || $CI_COMMIT_BRANCH =~ /^(dev|prod)$/
+      changes:
+        - apps/web/**/*
+        - packages/ui-components/**/*
+  allow_failure: false
+
+# Deploy Infrastructure + Lambda API + Migrations (Terraform)
+deploy:infrastructure:
+  stage: deploy
+  image:
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+  needs:
+    - job: deploy:frontend
+      optional: true
+  before_script:
+    - apk add --no-cache aws-cli curl bash
+    - curl -fsSL https://bun.sh/install | bash
+    - export BUN_INSTALL="$HOME/.bun"
+    - export PATH="$BUN_INSTALL/bin:$PATH"
+    - bun --version
+  script:
+    - export PATH="$HOME/.bun/bin:$PATH"
+    - echo "🔨 Building Lambda API..."
+    - cd apps/api
+    - bun install
+    - bun run build
+    - mkdir -p ../../infrastructure/terraform/modules/lambda-api/dist
+    - cp dist/index.js ../../infrastructure/terraform/modules/lambda-api/dist/
+    - echo ""
+    - echo "📦 Installing Lambda Migration dependencies..."
+    - cd ../../infrastructure/terraform/modules/lambda-migration/src
+    - bun install
+    - cd ../../..
+    - echo ""
+    - echo "🏗️ Deploying infrastructure..."
+    - terraform init
+    - terraform apply -auto-approve
+    - echo "✅ Infrastructure deployed"
+    - echo ""
+    - echo "🗄️ Running database migrations..."
+    - aws lambda invoke --function-name mapvibe-db-migration-mvp --payload '{}' --cli-binary-format raw-in-base64-out response.json
+    - cat response.json
+    - |
+      if grep -q '"FunctionError"' response.json; then
+        echo "❌ Lambda migration failed!"
+        exit 1
+      fi
+    - echo "✅ All done!"
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(dev|prod)$/ || $CI_COMMIT_BRANCH =~ /^(dev|prod)$/
+      changes:
+        - apps/api/**/*
+        - infrastructure/terraform/**/*
+  allow_failure: false

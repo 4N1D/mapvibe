@@ -1,0 +1,5 @@
+fastapi
+mangum
+sqlalchemy
+pg8000
+pytz

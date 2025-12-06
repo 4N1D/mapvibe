@@ -1,15 +1,20 @@
 {
   "name": "mapvibe",
   "version": "0.1.0",
+  "type": "module",
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
     "eslint": "^9.39.1",
+    "globals": "^16.5.0",
     "kysely-codegen": "^0.19.0",
     "kysely-migration-cli": "^0.4.2",
     "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.1"
   },
   "engines": {
     "node": ">=24.11.1",
@@ -24,12 +29,20 @@
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "deploy:infra": "turbo run deploy --filter=infrastructure",
+    "plan:infra": "turbo run plan --filter=infrastructure",
     "deploy:web": "turbo run deploy --filter=web",
-    "deploy:lambda": "turbo run deploy --filter=api-functions"
+    "deploy:api": "pwsh ./scripts/deploy-api.ps1",
+    "deploy:migrate": "pwsh ./scripts/deploy-migrate.ps1",
+    "deploy:migrate:rollback": "pwsh ./scripts/deploy-migrate.ps1 -rollback",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "workspaces": [
     "apps/*",
     "packages/*",
-    "infrastructure/*"
-  ]
+    "infrastructure"
+  ],
+  "dependencies": {
+    "lucide-react": "^0.554.0"
+  }
 }

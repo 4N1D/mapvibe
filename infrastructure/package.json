@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "echo 'Deploy infrastructure'",
+    "deploy": "cd terraform && terraform apply -auto-approve",
+    "plan": "cd terraform && terraform plan",
     "clean": "rm -rf cdk.out .terraform"
   }
 }

@@ -27,27 +27,27 @@ export interface PaginatedResponse<T> {
 // ============================================
 // Common Types
 // ============================================
-export type UserRole = 'user' | 'admin';
-export type AccountStatus = 'active' | 'suspended' | 'banned';
-export type LocationStatus = 'pending' | 'approved' | 'rejected' | 'merged';
-export type RestaurantStatus = 'approved' | 'closed' | 'removed';
-export type ReviewStatus = 'published' | 'hidden' | 'deleted';
-export type PhotoType = 'general' | 'space' | 'food' | 'menu' | 'video';
-export type VoteType = 'upvote' | 'downvote';
+export type UserRole = "user" | "admin";
+export type AccountStatus = "active" | "suspended" | "banned";
+export type LocationStatus = "pending" | "approved" | "rejected" | "merged";
+export type RestaurantStatus = "approved" | "closed" | "removed";
+export type ReviewStatus = "published" | "hidden" | "deleted";
+export type PhotoType = "general" | "space" | "food" | "menu" | "video";
+export type VoteType = "upvote" | "downvote";
 
 // ============================================
 // Rating Types (1-10 scale for approved restaurants)
 // ============================================
 export interface RestaurantRatings {
-  service: number;      // 1-10
-  location: number;     // 1-10
-  price: number;        // 1-10
-  quality: number;      // 1-10
-  ambiance: number;     // 1-10
-  overall?: number;     // Auto-calculated average
+  service: number; // 1-10
+  location: number; // 1-10
+  price: number; // 1-10
+  quality: number; // 1-10
+  ambiance: number; // 1-10
+  overall?: number; // Auto-calculated average
 }
 
-export type RatingAspect = keyof Omit<RestaurantRatings, 'overall'>;
+export type RatingAspect = keyof Omit<RestaurantRatings, "overall">;
 
 // ============================================
 // Location & Address Types
@@ -63,4 +63,181 @@ export interface Address {
   district: string;
   city: string;
   fullAddress?: string;
+}
+
+// ============================================
+// Restaurant Types
+// ============================================
+export interface Restaurant {
+  id: number;
+  slug: string;
+  name: string;
+  address: string;
+  priceRange: string;
+  hours: string;
+  rating: number;
+  phone: string;
+  description: string;
+  image?: string;
+  images?: string[];
+  reviews?: Review[];
+  matchReason?: string;
+}
+
+export interface RestaurantSearchResult {
+  id: number;
+  slug: string;
+  name: string;
+  address: string;
+  priceRange: string;
+  hours: string;
+  rating: number;
+  image: string;
+  matchReason: string;
+}
+
+// ============================================
+// Review Types
+// ============================================
+export interface Review {
+  id: number;
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+}
+
+// ============================================
+// Search API Types
+// ============================================
+export interface SearchRequest {
+  query: string;
+  session_id: string;
+  is_new_topic?: boolean;
+}
+
+export interface SearchResponse {
+  message: string;
+  current_context: string;
+  restaurants: RestaurantSearchResult[];
+}
+
+export interface ReviewPhoto {
+  url: string;
+  caption?: string;
+}
+
+export interface HotReview {
+  id: string;
+  author_id: string;
+  author_name: string;
+  restaurant_id: string | null;
+  text: string;
+  photos: ReviewPhoto[];
+  upvote_count: number;
+  downvote_count: number;
+  comment_count: number;
+  share_count: number;
+  view_count: number;
+  created_at: string;
+  score: string;
+  tag: "hot" | "new" | "normal" | "trending";
+}
+
+export interface HotReviewsResponse {
+  restaurant_id: string | null;
+  count: number;
+  reviews: HotReview[];
+}
+// ============================================
+// Comment Types
+// ============================================
+export interface Comment {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  restaurant_id: string;
+  content: string;
+  like_count: number;
+  created_at: string;
+  replies?: Comment[];
+  parent_id?: string;
+  reply_to_name?: string;
+}
+
+export interface CommentsResponse {
+  restaurant_id: string;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  comments: Comment[];
+}
+
+// ============================================
+// Restaurant Review Types (for ReviewsTab)
+// ============================================
+export interface ReviewRatings {
+  quality: number;    // Chất lượng (1-10)
+  service: number;    // Dịch vụ (1-10)
+  location: number;   // Vị trí (1-10)
+  price: number;      // Giá cả (1-10)
+  ambiance: number;   // Không gian (1-10)
+}
+
+export interface RestaurantReview {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  restaurant_id: number;
+  content: string;
+  ratings: ReviewRatings;
+  overall_rating: number;  // Average of all ratings
+  photos: ReviewPhoto[];
+  like_count: number;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface RestaurantReviewsResponse {
+  restaurant_id: number;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  reviews: RestaurantReview[];
+}
+
+// ============================================
+// Restaurant Photo Types (for PhotosTab)
+// ============================================
+export type PhotoCategory = "all" | "food" | "view" | "comment" | "menu";
+
+export interface RestaurantPhoto {
+  id: string;
+  url: string;
+  thumbnail_url?: string;
+  category: PhotoCategory;
+  caption?: string;
+  author_id?: string;
+  author_name?: string;
+  created_at: string;
+}
+
+export interface RestaurantPhotosResponse {
+  restaurant_id: number;
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  category_counts: {
+    all: number;
+    food: number;
+    view: number;
+    comment: number;
+    menu: number;
+  };
+  photos: RestaurantPhoto[];
 }

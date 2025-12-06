@@ -10,10 +10,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={cn(
-          "rounded-lg border border-gray-200 bg-white shadow-sm",
-          className
-        )}
+        className={cn("rounded-lg border border-gray-200 bg-white shadow-sm", className)}
         {...props}
       >
         {children}
@@ -44,8 +41,7 @@ export const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(
 
 CardHeader.displayName = "CardHeader";
 
-export interface CardTitleProps
-  extends React.HTMLAttributes<HTMLHeadingElement> {
+export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
   children: React.ReactNode;
 }
 
@@ -54,10 +50,7 @@ export const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
     return (
       <h3
         ref={ref}
-        className={cn(
-          "text-2xl font-semibold leading-none tracking-tight",
-          className
-        )}
+        className={cn("text-2xl leading-none font-semibold tracking-tight", className)}
         {...props}
       >
         {children}
@@ -75,7 +68,11 @@ export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {
 export const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div ref={ref} className={cn("p-6 pt-0", className)} {...props}>
+      <div
+        ref={ref}
+        className={cn("p-6 pt-0", className)}
+        {...props}
+      >
         {children}
       </div>
     );

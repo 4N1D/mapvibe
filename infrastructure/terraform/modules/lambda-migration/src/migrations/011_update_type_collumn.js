@@ -5,12 +5,12 @@ async function up(db) {
 
   await sql`
     ALTER TABLE restaurants 
-    ALTER COLUMN features TYPE TEXT[],
+    ALTER COLUMN features TYPE TEXT,
     ALTER COLUMN business_type TYPE TEXT,
     DROP COLUMN IF EXISTS ai_aggregated_info;
   `.execute(db);
 
-  console.log("  ✓ Updated 'features' to TEXT[]");
+  console.log("  ✓ Updated 'features' to TEXT");
   console.log("  ✓ Updated 'business_type' to TEXT");
   console.log("  ✓ Dropped 'ai_aggregated_info'");
 

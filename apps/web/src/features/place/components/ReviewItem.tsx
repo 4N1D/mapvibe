@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Flag, Star } from "lucide-react";
+import { Heart, Flag, Star } from "lucide-react";
 import { RestaurantReview } from "@mapvibe/types";
 import { ReportModal } from "./ReportModal";
 
@@ -85,11 +85,6 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
         >
           <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
           <span>{likeCount}</span>
-        </button>
-
-        <button className="flex items-center gap-1 transition hover:text-primary-500">
-          <MessageCircle className="h-4 w-4" />
-          <span>{review.comment_count}</span>
         </button>
 
         <button

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-
 const { sql } = require("kysely");
 
 async function up(db) {

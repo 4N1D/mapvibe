@@ -393,14 +393,18 @@ resource "aws_lambda_permission" "cognito_trigger" {
 
 data "aws_caller_identity" "current" {}
 
-# Cấu hình Lambda Trigger bằng null_resource + AWS CLI
+# Cấu hình Lambda Triggers bằng null_resource + AWS CLI
+# Triggers:
+# - PostConfirmation: Tạo user record khi đăng ký email
+# - PostAuthentication: Update last_login mỗi lần đăng nhập
+# - PreTokenGeneration: Thêm custom:roles claim vào token
 resource "null_resource" "cognito_lambda_trigger" {
   triggers = {
     lambda_arn = module.lambda_api.function_arn
   }
 
   provisioner "local-exec" {
-    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${module.cognito.user_pool_id} --lambda-config PreTokenGeneration=${module.lambda_api.function_arn}"
+    command = "aws cognito-idp update-user-pool --region ${var.aws_region} --user-pool-id ${module.cognito.user_pool_id} --lambda-config PostConfirmation=${module.lambda_api.function_arn},PostAuthentication=${module.lambda_api.function_arn},PreTokenGeneration=${module.lambda_api.function_arn}"
   }
 
   depends_on = [aws_lambda_permission.cognito_trigger]

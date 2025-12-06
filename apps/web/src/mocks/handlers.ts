@@ -26,6 +26,40 @@ const generateRestaurants = (count: number) => {
 
 const allRestaurants = generateRestaurants(6);
 
+// Generate mock comments
+const generateComments = (count: number, withReplies = true) => {
+  return Array.from({ length: count }, (_, i) => {
+    const hasReplies = withReplies && Math.random() > 0.5;
+    return {
+      id: `comment-${i + 1}`,
+      author_id: `user-${i + 1}`,
+      author_name: faker.person.fullName(),
+      author_avatar: null,
+      restaurant_id: "1",
+      content: faker.lorem.sentences({ min: 1, max: 3 }),
+      like_count: faker.number.int({ min: 0, max: 50 }),
+      created_at: faker.date.recent({ days: 14 }).toISOString(),
+      replies: hasReplies
+        ? Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, (_, j) => ({
+            id: `comment-${i + 1}-reply-${j + 1}`,
+            author_id: `user-reply-${j + 1}`,
+            author_name: faker.person.fullName(),
+            author_avatar: null,
+            restaurant_id: "1",
+            content: faker.lorem.sentences({ min: 1, max: 2 }),
+            like_count: faker.number.int({ min: 0, max: 20 }),
+            created_at: faker.date.recent({ days: 7 }).toISOString(),
+            parent_id: `comment-${i + 1}`,
+            reply_to_name: faker.person.firstName(),
+          }))
+        : [],
+    };
+  });
+};
+
+// Store comments in memory for POST simulation
+const commentsStore = { data: generateComments(8) };
+
 // Generate mock hot reviews
 const generateHotReviews = (count: number) => {
   const tags: Array<"hot" | "new" | "normal" | "trending"> = ["hot", "trending", "new", "normal"];
@@ -121,5 +155,71 @@ export const handlers = [
       count: reviews.length,
       reviews,
     });
+  }),
+
+  // Comments API - GET
+  http.get("*/comments/:restaurantId", ({ request }) => {
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "10");
+
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const paginatedComments = commentsStore.data.slice(start, end);
+
+    return HttpResponse.json({
+      restaurant_id: "1",
+      total: commentsStore.data.length,
+      page,
+      limit,
+      total_pages: Math.ceil(commentsStore.data.length / limit),
+      comments: paginatedComments,
+    });
+  }),
+
+  // Comments API - POST
+  http.post("*/comments", async ({ request }) => {
+    const body = (await request.json()) as {
+      restaurant_id: string;
+      content: string;
+      parent_id?: string | null;
+    };
+
+    const newComment = {
+      id: `comment-${Date.now()}`,
+      author_id: "current-user",
+      author_name: "Bạn",
+      author_avatar: null,
+      restaurant_id: body.restaurant_id,
+      content: body.content,
+      like_count: 0,
+      created_at: new Date().toISOString(),
+      replies: [],
+      parent_id: body.parent_id || undefined,
+    };
+
+    if (body.parent_id) {
+      // Add as reply
+      const parentComment = commentsStore.data.find((c) => c.id === body.parent_id);
+      if (parentComment) {
+        parentComment.replies.push({
+          id: newComment.id,
+          author_id: newComment.author_id,
+          author_name: newComment.author_name,
+          author_avatar: null,
+          restaurant_id: newComment.restaurant_id,
+          content: newComment.content,
+          like_count: 0,
+          created_at: newComment.created_at,
+          parent_id: body.parent_id,
+          reply_to_name: parentComment.author_name,
+        });
+      }
+    } else {
+      // Add as new comment
+      commentsStore.data.unshift(newComment);
+    }
+
+    return HttpResponse.json(newComment);
   }),
 ];

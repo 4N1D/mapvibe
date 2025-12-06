@@ -6,7 +6,9 @@ interface PhotosTabProps {
   restaurantId: number;
 }
 
-const CATEGORY_LABELS: Record<Exclude<PhotoCategory, "menu">, string> = {
+type DisplayCategory = Exclude<PhotoCategory, "menu">;
+
+const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   all: "Tất cả",
   food: "Thức ăn",
   view: "Không gian",
@@ -19,12 +21,12 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [category, setCategory] = useState<PhotoCategory>("all");
-  const [categoryCounts, setCategoryCounts] = useState<Record<PhotoCategory, number>>({
+  const [category, setCategory] = useState<DisplayCategory>("all");
+  const [categoryCounts, setCategoryCounts] = useState<Record<DisplayCategory, number>>({
     all: 0,
     food: 0,
-    ambiance: 0,
-    review: 0,
+    view: 0,
+    comment: 0,
   });
 
   useEffect(() => {
@@ -35,7 +37,8 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
           `/photos/restaurant/${restaurantId}?page=1&limit=15&category=${category}`
         );
         setPhotos(response.data.photos);
-        setCategoryCounts(response.data.category_counts);
+        const { menu: _, ...counts } = response.data.category_counts;
+        setCategoryCounts(counts);
         setHasMore(response.data.page < response.data.total_pages);
         setPage(1);
       } catch (error) {
@@ -65,7 +68,7 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
     }
   };
 
-  const handleCategoryChange = (newCategory: PhotoCategory) => {
+  const handleCategoryChange = (newCategory: DisplayCategory) => {
     if (newCategory !== category) {
       setCategory(newCategory);
       setPhotos([]);

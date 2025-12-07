@@ -23,5 +23,19 @@ variable "db_name" {
   description = "Database name"
 }
 
+variable "cognito_user_pool_id" {
+  type        = string
+  description = "Cognito User Pool ID for JWT verification"
+}
 
+variable "cognito_client_id" {
+  type        = string
+  description = "Cognito App Client ID for JWT verification"
+}
+
+variable "aws_region" {
+  type        = string
+  description = "AWS region"
+  default     = "us-east-1"
+}
 

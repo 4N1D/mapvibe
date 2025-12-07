@@ -18,6 +18,7 @@ from sqlalchemy import create_engine, text
 
 from botocore.exceptions import ClientError
 
+import hashlib
 
 # --- 1. CẤU HÌNH & LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,6 +33,14 @@ DB_NAME = os.environ.get("DB_NAME", "food_recommendation")
 # Client AWS
 secrets_client = boto3.client('secretsmanager', region_name=AWS_REGION)
 bedrock_client = boto3.client(service_name='bedrock-runtime', region_name=AWS_REGION)
+
+# Cache embeddings trong Lambda container
+EMBEDDING_CACHE = {}
+MAX_CACHE_SIZE = 100
+
+def get_cache_key(text: str) -> str:
+    """Tạo cache key từ text input"""
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
 
 # --- HÀM LẤY DB URL TỪ SECRET ---
 def get_db_url():
@@ -55,14 +64,214 @@ def get_db_url():
 try:
     db_url = get_db_url()
     if db_url:
-        engine = create_engine(db_url, pool_size=1, max_overflow=0)
-        logger.info("✅ Database Engine initialized.")
+        # pg8000 doesn't support connect_timeout parameter
+        # Timeout is handled by SQLAlchemy pool settings instead
+        engine = create_engine(
+            db_url,
+            pool_size=2,
+            max_overflow=1,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            connect_args={}
+        )
+        logger.info("✅ Database Engine initialized with optimized pool settings.")
     else:
         logger.error("❌ Could not initialize DB Engine (Missing URL)")
 except Exception as e:
     logger.error(f"❌ Engine Creation Failed: {str(e)}")
     # Vẫn để app chạy để trả về lỗi cho user biết
 
+
+# --- MAPPING QUẬN CŨ -> PHƯỜNG MỚI (Theo Nghị quyết 1685/NQ-UBTVQH15, tháng 7/2025) ---
+# Nguồn: https://tphcm.chinhphu.vn/danh-sach-chinh-thuc-168-phuong-xa-cua-tphcm-sau-sap-xep-101250617000144317.htm
+DISTRICT_TO_WARDS = {
+    "Quận 1": [
+        "Phường Tân Định",
+        "Phường Bến Thành",
+        "Phường Sài Gòn",
+        "Phường Cầu Ông Lãnh"
+    ],
+     "Quận 3": [
+        "Phường Bàn Cờ",  # Từ P.1 + P.2 + P.3 + P.5 + một phần P.4
+        "Phường Xuân Hòa",  # Từ P. Võ Thị Sáu + phần còn lại P.4
+        "Phường Nhiêu Lộc"  # Từ P.9 + P.10 + P.11 + P.12 + P.13 + P.14
+    ],
+    "Quận 4": [
+        "Phường Vĩnh Hội",  # Từ P.1 + P.3 + một phần P.2 + một phần P.4
+        "Phường Khánh Hội",  # Từ P.8 + P.9 + P.10 + P.6 + một phần P.2 + một phần P.4 + một phần P.15
+        "Phường Xóm Chiếu"  # Từ P.13 + P.14 + P.16 + P.18 + phần còn lại P.15
+    ],
+    "Quận 5": [
+        "Phường Chợ Quán",  # Từ P.1 + P.2 + P.3 + P.4
+        "Phường An Đông",  # Từ P.5 + P.6 + P.7 + P.8 + P.9
+        "Phường Chợ Lớn"  # Từ P.10 + P.11 + P.12 + P.13 + P.14
+    ],
+    "Quận 6": [
+        "Phường Bình Tiên",
+        "Phường Bình Tây",
+        "Phường Bình Phú",
+        "Phường Phú Lâm"
+    ],
+    "Quận 7": [
+        "Phường Tân Mỹ",
+        "Phường Tân Hưng",
+        "Phường Tân Thuận",
+        "Phường Phú Thuận"
+    ],
+    "Quận 8": [
+        "Phường Chánh Hưng",
+        "Phường Bình Đông",
+        "Phường Phú Định"
+    ],
+    "Quận 10": [
+        "Phường Vườn Lài",  # Từ P.1 + P.2 + P.4 + P.9 + P.10 + P.11
+        "Phường Diên Hồng",  # Từ P.5 + P.6 + P.7 + P.8 + P.14
+        "Phường Hòa Hưng"  # Từ P.12 + P.13 + P.15
+    ],
+    "Quận 11": [
+        "Phường Bình Thới",
+        "Phường Phú Thọ",
+        "Phường Hòa Bình",
+        "Phường Minh Phụng"
+    ],
+    "Quận 12": [
+        "Phường Đông Hưng Thuận",
+        "Phường Trung Mỹ Tây",
+        "Phường Tân Thới Hiệp",
+        "Phường Thới An",
+        "Phường An Phú Đông"
+    ],
+    "Quận Bình Thạnh": [
+        "Phường Gia Định",
+        "Phường Bình Thạnh",
+        "Phường Bình Lợi Trung",
+        "Phường Thạnh Mỹ Tây",
+        "Phường Bình Quới"
+    ],
+    "Quận Tân Bình": [
+        "Phường Tân Sơn Hòa",
+        "Phường Tân Sơn Nhất",
+        "Phường Tân Hòa",
+        "Phường Bảy Hiền",
+        "Phường Tân Bình",
+        "Phường Tân Sơn"
+    ],
+    "Quận Tân Phú": [
+        "Phường Tây Thạnh",
+        "Phường Tân Sơn Nhì",
+        "Phường Phú Thọ Hòa",
+        "Phường Phú Thạnh",
+        "Phường Tân Phú"
+    ],
+    "Quận Phú Nhuận": [
+        "Phường Đức Nhuận",
+        "Phường Cầu Kiệu",
+        "Phường Phú Nhuận"
+    ],
+    "Quận Gò Vấp": [
+        "Phường Hạnh Thông",
+        "Phường An Nhơn",
+        "Phường Gò Vấp",
+        "Phường Thông Tây Hội",
+        "Phường An Hội Tây",
+        "Phường An Hội Đông"
+    ],
+    "Quận Thủ Đức": [
+        "Phường Hiệp Bình",
+        "Phường Tam Bình",
+        "Phường Thủ Đức",
+        "Phường Linh Xuân",
+        "Phường Long Bình",
+        "Phường Tăng Nhơn Phú",
+        "Phường Phước Long",
+        "Phường Long Phước",
+        "Phường An Khánh",
+        "Phường Bình Trưng",
+        "Phường Cát Lái",
+        "Phường Trường Thọ"
+    ],
+    "Huyện Bình Chánh": [
+        "Xã Vĩnh Lộc",
+        "Xã Tân Vĩnh Lộc",
+        "Xã Bình Lợi",
+        "Xã Tân Nhựt",
+        "Xã Bình Chánh",
+        "Xã Hưng Long",
+        "Xã Bình Hưng"
+    ],
+    "Huyện Cần Giờ": [
+        "Xã Bình Khánh",
+        "Xã Cần Giờ",
+        "Xã An Thới Đông",
+        "Xã Thạnh An"
+    ],
+    "Huyện Củ Chi": [
+        "Xã An Nhơn Tây",
+        "Xã Thái Mỹ",
+        "Xã Nhuận Đức",
+        "Xã Tân An Hội",
+        "Xã Củ Chi",
+        "Xã Phú Hòa Đông",
+        "Xã Bình Mỹ"
+    ],
+    "Huyện Hóc Môn": [
+        "Xã Hóc Môn",
+        "Xã Bà Điểm",
+        "Xã Xuân Thới Sơn",
+        "Xã Đông Thạnh"
+    ],
+    "Huyện Nhà Bè": [
+        "Xã Nhà Bè",
+        "Xã Hiệp Phước"
+    ],
+    "Quận Bình Tân": [
+        "Phường Bình Tân",
+        "Phường Bình Hưng Hòa",
+        "Phường Bình Trị Đông",
+        "Phường An Lạc",
+        "Phường Tân Tạo"
+    ]
+}
+
+def get_wards_from_district(district_name: str) -> List[str]:
+    """
+    Chuyển đổi tên quận cũ sang danh sách phường mới theo Nghị quyết 1685/NQ-UBTVQH15
+    
+    Args:
+        district_name: Tên quận cũ (VD: "Quận 1", "Q1", "Q.3", "Tân Bình", "Bình Thạnh")
+    
+    Returns:
+        List[str]: Danh sách tên phường mới
+    """
+    # Chuẩn hóa tên quận
+    district_normalized = district_name.strip()
+    
+    # Xử lý các biến thể viết tắt
+    if district_normalized.upper().startswith("Q"):
+        # "Q1" -> "Quận 1", "Q.3" -> "Quận 3", "Q 5" -> "Quận 5"
+        num = district_normalized.replace("Q", "").replace(".", "").replace(" ", "").strip()
+        if num.isdigit():
+            district_normalized = f"Quận {num}"
+    
+    # Xử lý tên quận bằng chữ (không có số)
+    district_mapping = {
+        "Tân Bình": "Quận Tân Bình",
+        "Tân Phú": "Quận Tân Phú",
+        "Bình Thạnh": "Quận Bình Thạnh",
+        "Phú Nhuận": "Quận Phú Nhuận",
+        "Gò Vấp": "Quận Gò Vấp",
+        "Thủ Đức": "Quận Thủ Đức",
+        "Bình Tân": "Quận Bình Tân",
+        "Bình Chánh": "Huyện Bình Chánh",
+        "Cần Giờ": "Huyện Cần Giờ",
+        "Củ Chi": "Huyện Củ Chi",
+        "Hóc Môn": "Huyện Hóc Môn",
+        "Nhà Bè": "Huyện Nhà Bè",
+    }
+    
+    district_normalized = district_mapping.get(district_normalized, district_normalized)
+    
+    return DISTRICT_TO_WARDS.get(district_normalized, [])
 
 # MODEL CONFIG
 MODEL_EMBED = "amazon.titan-embed-text-v2:0"
@@ -139,11 +348,30 @@ class RAGService:
         raise Exception("AWS Bedrock quá tải, vui lòng thử lại sau!")
 
     def get_embedding(self, text_input: str):
-        if not text_input: return None
+        if not text_input: 
+            return None
+        
+        # Check cache trước
+        cache_key = get_cache_key(text_input)
+        if cache_key in EMBEDDING_CACHE:
+            logger.info(f"[CACHE HIT] Embedding cached for: {text_input[:50]}...")
+            return EMBEDDING_CACHE[cache_key]
+        
+        # Nếu không có trong cache, gọi Bedrock
+        logger.info(f"[CACHE MISS] Calling Bedrock for: {text_input[:50]}...")
         body = json.dumps({"inputText": text_input, "dimensions": 1024, "normalize": True})
         try:
             response = self.bedrock.invoke_model(modelId=MODEL_EMBED, body=body)
-            return json.loads(response["body"].read())["embedding"]
+            embedding = json.loads(response["body"].read())["embedding"]
+            
+            # Lưu vào cache (nếu chưa đầy)
+            if len(EMBEDDING_CACHE) < MAX_CACHE_SIZE:
+                EMBEDDING_CACHE[cache_key] = embedding
+                logger.info(f"[CACHE] Stored embedding. Cache size: {len(EMBEDDING_CACHE)}/{MAX_CACHE_SIZE}")
+            else:
+                logger.warning(f"[CACHE] Cache full ({MAX_CACHE_SIZE} items), skipping cache")
+            
+            return embedding
         except Exception as e:
             logger.error(f"Embedding Error: {e}")
             return None
@@ -273,8 +501,26 @@ class RAGService:
         sql_params = {"query_ts": clean_query, "emb_literal": emb_literal}
 
         if params.get("district"):
-            sql_base += " AND address ILIKE :district"
-            sql_params["district"] = f"%{params['district']}%"
+            wards = get_wards_from_district(params["district"])
+            if wards:
+                # Tạo điều kiện OR cho tất cả các phường
+                # Tìm trong cả trường address và ward (nếu có)
+                ward_conditions = []
+                for i, ward in enumerate(wards):
+                    param_name = f"ward_{i}"
+                    # Tìm trong address hoặc ward field
+                    ward_conditions.append(f"(address ILIKE :{param_name} OR ward ILIKE :{param_name})")
+                    sql_params[param_name] = f"%{ward}%"
+                
+                if ward_conditions:
+                    sql_base += f" AND ({' OR '.join(ward_conditions)})"
+                    logger.info(f"[DISTRICT MAPPING] Quận '{params['district']}' -> {len(wards)} phường: {', '.join(wards[:3])}{'...' if len(wards) > 3 else ''}")
+            else:
+                # Fallback: nếu không tìm thấy mapping, tìm trực tiếp trong address
+                # (có thể là quận cũ hoặc tên không chuẩn)
+                sql_base += " AND address ILIKE :district"
+                sql_params["district"] = f"%{params['district']}%"
+                logger.warning(f"[DISTRICT FALLBACK] Không tìm thấy mapping cho '{params['district']}', tìm trực tiếp trong address")
 
         if params.get("max_price"):
             sql_base += " AND price_min <= :max_p"

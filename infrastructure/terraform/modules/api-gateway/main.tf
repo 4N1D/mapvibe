@@ -339,9 +339,11 @@ resource "aws_apigatewayv2_route" "rag_health" {
 }
 
 resource "aws_apigatewayv2_route" "review_aggregate" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "POST /reviews/aggregate-pending"
-  target    = "integrations/${aws_apigatewayv2_integration.review_aggregate.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /reviews/aggregate-pending"
+  target             = "integrations/${aws_apigatewayv2_integration.review_aggregate.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 # ============================================

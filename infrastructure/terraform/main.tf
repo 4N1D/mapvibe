@@ -189,11 +189,13 @@ module "lambda_rag" {
 module "lambda_review_aggregate" {
   source = "./modules/lambda-review-aggregate"
 
-  project_name  = var.project_name
-  environment   = var.environment
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
+  project_name         = var.project_name
+  environment          = var.environment
+  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
+  db_host              = module.rds.address
+  db_name              = module.rds.database_name
+  cognito_user_pool_id = module.cognito.user_pool_id
+  cognito_client_id    = module.cognito.client_id
 }
 
 # ============================================

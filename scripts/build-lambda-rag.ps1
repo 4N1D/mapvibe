@@ -58,16 +58,26 @@ $DOCKERFILE | Out-File -FilePath $DOCKERFILE_PATH -Encoding utf8 -NoNewline
 
 # Build Docker image
 Push-Location $BUILD_DIR
-docker build -t lambda-rag-builder:latest . 2>&1 | ForEach-Object {
-    if ($_ -match "ERROR|error|Error") {
+$ErrorActionPreference = "Continue"
+$buildOutput = & docker build --progress=plain -t lambda-rag-builder:latest . 2>&1
+$buildSuccess = $LASTEXITCODE -eq 0
+$ErrorActionPreference = "Stop"
+
+# Show all output (filter out PowerShell exception messages)
+$buildOutput | ForEach-Object {
+    if ($_ -match "System\.Management\.Automation\.RemoteException") {
+        # Skip PowerShell exception messages from Docker output
+        return
+    }
+    if ($_ -match "ERROR|error|Error|failed|Failed|FAILED") {
         Write-Host $_ -ForegroundColor Red
     } else {
         Write-Host $_ -ForegroundColor Gray
     }
 }
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "`n❌ Docker build failed!" -ForegroundColor Red
+if (-not $buildSuccess) {
+    Write-Host "`n❌ Docker build failed with exit code $LASTEXITCODE" -ForegroundColor Red
     Pop-Location
     exit 1
 }
@@ -110,24 +120,28 @@ if (Test-Path $ZIP_FILE) {
 
 # Zip tất cả files trong build directory
 Write-Host "   Creating zip file..." -ForegroundColor Gray
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-# Tạo zip với files ở root level
-$zip = $null
 try {
-    $zip = [System.IO.Compression.ZipFile]::Open($ZIP_FILE, [System.IO.Compression.ZipArchiveMode]::Create)
-    
-    Get-ChildItem -Path $BUILD_DIR -Recurse -File | ForEach-Object {
-        $relativePath = $_.FullName.Substring($BUILD_DIR.Length + 1).Replace('\', '/')
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $relativePath) | Out-Null
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    $zip = $null
+    try {
+        $createMode = [System.IO.Compression.ZipArchiveMode]::Create
+        $zip = [System.IO.Compression.ZipFile]::Open($ZIP_FILE, $createMode)
+        Get-ChildItem -Path $BUILD_DIR -Recurse -File | ForEach-Object {
+            $relativePath = $_.FullName.Substring($BUILD_DIR.Length + 1).Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $relativePath) | Out-Null
+        }
+    } finally {
+        if ($zip) {
+            $zip.Dispose()
+            Start-Sleep -Milliseconds 100
+        }
     }
-} finally {
-    if ($zip) {
-        $zip.Dispose()
-        $zip = $null
-        # Đợi một chút để đảm bảo file handles được đóng
-        Start-Sleep -Milliseconds 100
-    }
+} catch {
+    # Fallback to Compress-Archive
+    Write-Host "   Using Compress-Archive fallback..." -ForegroundColor Yellow
+    Push-Location $BUILD_DIR
+    Compress-Archive -Path * -DestinationPath $ZIP_FILE -Force
+    Pop-Location
 }
 
 # Clean up build directory (với retry logic)

@@ -1,5 +1,6 @@
+import React from "react";
 import { Card, CardContent } from "@mapvibe/ui-components";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Share2 } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
 
@@ -42,6 +43,34 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
   }
 
   if (!data) return null;
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/review/${data.id}`;
+    const shareText = `${data.text.substring(0, 100)}...`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Review từ ${data.author_name || data.author_id}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // User cancelled or error occurred
+        console.log("Share cancelled or failed:", err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Đã sao chép link vào clipboard!");
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        alert("Không thể chia sẻ. Vui lòng thử lại.");
+      }
+    }
+  };
 
   return (
     <Card className="h-full flex flex-col cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
@@ -119,6 +148,14 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
               <MessageCircle className="h-3 w-3" />
               {data.comment_count}
             </span>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"
+              title="Chia sẻ"
+            >
+              <Share2 className="h-3 w-3" />
+              {data.share_count || 0}
+            </button>
           </div>
         </div>
       </CardContent>

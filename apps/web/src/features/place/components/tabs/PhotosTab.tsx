@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/axios";
 
 interface PhotosTabProps {
   restaurantId: number;
+  showFilters?: boolean; // Default true, set to false to hide filter buttons
 }
 
 type DisplayCategory = Exclude<PhotoCategory, "menu">;
@@ -23,7 +24,7 @@ const fetchPhotos = async (restaurantId: number, category: string, page: number)
   return response.data;
 };
 
-export function PhotosTab({ restaurantId }: PhotosTabProps) {
+export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) {
   const [category, setCategory] = useState<DisplayCategory>("all");
   const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
@@ -35,8 +36,11 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
     queryFn: () => fetchPhotos(restaurantId, category, 1),
     placeholderData: (prev) => prev,
     select: (data) => {
-      const { menu: _, ...counts } = data.category_counts;
-      return { ...data, category_counts: counts };
+      if (showFilters) {
+        const { menu: _, ...counts } = data.category_counts;
+        return { ...data, category_counts: counts };
+      }
+      return data;
     },
   });
 
@@ -72,22 +76,24 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
-            disabled={isFetching}
-            className={`rounded-full border px-4 py-1.5 text-sm transition ${
-              category === cat
-                ? "border-primary-500 bg-primary-50 text-primary-600"
-                : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-            } disabled:opacity-50`}
-          >
-            {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
-          </button>
-        ))}
-      </div>
+      {showFilters && (
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              disabled={isFetching}
+              className={`rounded-full border px-4 py-1.5 text-sm transition ${
+                category === cat
+                  ? "border-primary-500 bg-primary-50 text-primary-600"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+              } disabled:opacity-50`}
+            >
+              {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}>
         {photos.length === 0 ? (

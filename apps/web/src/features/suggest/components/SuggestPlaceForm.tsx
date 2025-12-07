@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Input, Button } from "@mapvibe/ui-components";
 import { X, Upload, Loader2 } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 import {
   FEATURES,
   PHOTO_TYPES,
@@ -11,6 +12,8 @@ import {
 import { useVietnamAddress } from "../hooks/useVietnamAddress";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/axios";
+
+const MIN_REVIEW_LENGTH = 50;
 
 const initialFormData: SuggestPlaceFormData = {
   name: "",
@@ -31,7 +34,6 @@ export function SuggestPlaceForm() {
   const { user } = useAuth();
   const [formData, setFormData] = useState<SuggestPlaceFormData>(initialFormData);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const fileInputRefs = useRef<Record<PhotoType, HTMLInputElement | null>>({
     food: null,
@@ -112,14 +114,20 @@ export function SuggestPlaceForm() {
     return formData.photos.filter((p) => p.type === type);
   };
 
-  const uploadPhotoToS3 = async (photo: PhotoUploadItem): Promise<{ url: string; caption: string }> => {
-    const uploadResponse = await apiClient.post<{ upload_url: string; cdn_url: string }>("/photos/upload-url", {
-      photo_type: photo.type,  // food | view | menu | other
+  const uploadPhotoToS3 = async (
+    photo: PhotoUploadItem
+  ): Promise<{ photo_id: string; url: string; caption: string }> => {
+    const uploadResponse = await apiClient.post<{
+      photo_id: string;
+      upload_url: string;
+      cdn_url: string;
+    }>("/photos/upload-url", {
+      photo_type: photo.type,
       content_type: photo.file.type,
       file_size: photo.file.size,
     });
 
-    const { upload_url, cdn_url } = uploadResponse.data;
+    const { photo_id, upload_url, cdn_url } = uploadResponse.data;
 
     await fetch(upload_url, {
       method: "PUT",
@@ -127,25 +135,51 @@ export function SuggestPlaceForm() {
       headers: { "Content-Type": photo.file.type },
     });
 
-    return { url: cdn_url, caption: "" };
+    return { photo_id, url: cdn_url, caption: "" };
+  };
+
+  const deleteUploadedPhotos = async (photoIds: string[]) => {
+    await Promise.allSettled(
+      photoIds.map((id) => apiClient.delete(`/photos/${id}`))
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Validation
     if (!user) {
-      setSubmitError("Vui lòng đăng nhập để gửi địa điểm");
+      toast.error("Vui lòng đăng nhập để gửi địa điểm");
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast.error("Vui lòng nhập tên địa điểm");
+      return;
+    }
+
+    if (!formData.streetAddress.trim()) {
+      toast.error("Vui lòng nhập địa chỉ");
+      return;
+    }
+
+    if (formData.review.length < MIN_REVIEW_LENGTH) {
+      toast.error(`Đánh giá phải có ít nhất ${MIN_REVIEW_LENGTH} ký tự`);
       return;
     }
 
     setSubmitting(true);
-    setSubmitError(null);
+    const uploadedPhotoIds: string[] = [];
 
     try {
-      // Upload all photos to S3
-      const uploadedPhotos = await Promise.all(
-        formData.photos.map((photo) => uploadPhotoToS3(photo))
-      );
+      // Upload all photos to S3 and track photo_ids
+      const uploadedPhotos: { url: string; caption: string }[] = [];
+
+      for (const photo of formData.photos) {
+        const result = await uploadPhotoToS3(photo);
+        uploadedPhotoIds.push(result.photo_id);
+        uploadedPhotos.push({ url: result.url, caption: result.caption });
+      }
 
       // Call API
       await apiClient.post("/reviews/submit-new-place", {
@@ -159,15 +193,25 @@ export function SuggestPlaceForm() {
         photos: uploadedPhotos,
       });
 
-      setSubmitSuccess(true);
-      setFormData(initialFormData);
-      
       // Cleanup photo previews
       formData.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+
+      setSubmitSuccess(true);
+      setFormData(initialFormData);
+      toast.success("Gửi địa điểm thành công! Chúng tôi sẽ xem xét và phê duyệt sớm nhất.");
     } catch (error) {
       console.error("Submit failed:", error);
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      setSubmitError(err.response?.data?.message || err.message || "Có lỗi xảy ra, vui lòng thử lại");
+
+      // Cleanup uploaded photos on error
+      if (uploadedPhotoIds.length > 0) {
+        toast.loading("Đang dọn dẹp ảnh đã tải lên...", { id: "cleanup" });
+        await deleteUploadedPhotos(uploadedPhotoIds);
+        toast.dismiss("cleanup");
+      }
+
+      const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string };
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || "Có lỗi xảy ra, vui lòng thử lại";
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -175,35 +219,34 @@ export function SuggestPlaceForm() {
 
   if (submitSuccess) {
     return (
-      <div className="mx-auto max-w-4xl p-6 text-center">
-        <div className="rounded-lg bg-green-50 p-8">
-          <h2 className="text-xl font-bold text-green-800">Gửi địa điểm thành công!</h2>
-          <p className="mt-2 text-green-600">Cảm ơn bạn đã chia sẻ địa điểm. Chúng tôi sẽ xem xét và phê duyệt sớm nhất.</p>
-          <Button
-            type="button"
-            onClick={() => setSubmitSuccess(false)}
-            className="mt-4 rounded-full bg-primary-500 px-8 py-2 text-white hover:bg-primary-600"
-          >
-            Gửi địa điểm khác
-          </Button>
+      <>
+        <Toaster position="top-center" />
+        <div className="mx-auto max-w-4xl p-6 text-center">
+          <div className="rounded-lg bg-green-50 p-8">
+            <h2 className="text-xl font-bold text-green-800">Gửi địa điểm thành công!</h2>
+            <p className="mt-2 text-green-600">Cảm ơn bạn đã chia sẻ địa điểm. Chúng tôi sẽ xem xét và phê duyệt sớm nhất.</p>
+            <Button
+              type="button"
+              onClick={() => setSubmitSuccess(false)}
+              className="mt-4 rounded-full bg-primary-500 px-8 py-2 text-white hover:bg-primary-600"
+            >
+              Gửi địa điểm khác
+            </Button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-6 p-6">
-      <h1 className="text-center text-2xl font-bold uppercase tracking-wide">
-        Hãy chia sẻ địa điểm yêu thích của bạn cùng với chúng tôi
-      </h1>
+    <>
+      <Toaster position="top-center" />
+      <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-6 p-6">
+        <h1 className="text-center text-2xl font-bold uppercase tracking-wide">
+          Hãy chia sẻ địa điểm yêu thích của bạn cùng với chúng tôi
+        </h1>
 
-      {submitError && (
-        <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
-          {submitError}
-        </div>
-      )}
-
-      <Input
+        <Input
         label="Tên địa điểm"
         placeholder="Nhập tên quán ăn/uống tại đây ..."
         value={formData.name}
@@ -364,32 +407,42 @@ export function SuggestPlaceForm() {
         </div>
       </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">Đánh giá</label>
-        <textarea
-          className="min-h-32 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-          placeholder="Hãy chia sẻ đánh giá của bạn tại đây ..."
-          value={formData.review}
-          onChange={(e) => handleInputChange("review", e.target.value)}
-        />
-      </div>
-
-      <div className="flex justify-center">
-        <Button
-          type="submit"
-          disabled={submitting}
-          className="rounded-full bg-primary-500 px-12 py-3 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {submitting ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Đang gửi...
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">Đánh giá</label>
+            <span className={`text-xs ${formData.review.length < MIN_REVIEW_LENGTH ? "text-red-500" : "text-gray-500"}`}>
+              {formData.review.length}/{MIN_REVIEW_LENGTH} ký tự tối thiểu
             </span>
-          ) : (
-            "Đăng"
-          )}
-        </Button>
-      </div>
-    </form>
+          </div>
+          <textarea
+            className={`min-h-32 w-full rounded-lg border bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 ${
+              formData.review.length > 0 && formData.review.length < MIN_REVIEW_LENGTH
+                ? "border-red-300 focus:border-red-500"
+                : "border-gray-300 focus:border-primary-500"
+            }`}
+            placeholder="Hãy chia sẻ đánh giá của bạn tại đây (tối thiểu 50 ký tự)..."
+            value={formData.review}
+            onChange={(e) => handleInputChange("review", e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-center">
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="rounded-full bg-primary-500 px-12 py-3 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Đang gửi...
+              </span>
+            ) : (
+              "Đăng"
+            )}
+          </Button>
+        </div>
+      </form>
+    </>
   );
 }

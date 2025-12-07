@@ -34,7 +34,7 @@ import {
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
 } from "./handlers/users";
-import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
+import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
   commentsListHandler as restaurantCommentsListHandler,
@@ -215,6 +215,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/photos\/upload-url$/,
     paramNames: [],
     handler: photoGetUploadUrlHandler,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/photos\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: deletePhotoHandler,
   },
 
   // Restaurants routes

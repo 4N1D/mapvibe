@@ -24,6 +24,7 @@ export const getMeHandler: Handler = {
           'phone',
           'display_name',
           'avatar',
+          'background',
           'bio',
           'gender',
           'reputation',

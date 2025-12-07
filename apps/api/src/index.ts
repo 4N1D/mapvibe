@@ -33,6 +33,8 @@ import {
   getMyStatsHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
+  getBackgroundUploadUrlHandler,
+  updateBackgroundHandler,
 } from "./handlers/users";
 import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
@@ -201,6 +203,18 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/avatar$/,
     paramNames: [],
     handler: updateAvatarHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/background$/,
+    paramNames: [],
+    handler: getBackgroundUploadUrlHandler,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/users\/me\/background$/,
+    paramNames: [],
+    handler: updateBackgroundHandler,
   },
   {
     method: "GET",

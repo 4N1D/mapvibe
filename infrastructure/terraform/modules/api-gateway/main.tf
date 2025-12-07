@@ -187,6 +187,22 @@ resource "aws_apigatewayv2_route" "users_me_avatar_put" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "users_me_background_post" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /users/me/background"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_background_put" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PUT /users/me/background"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_route" "restaurants_save" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "POST /restaurants/{id}/save"

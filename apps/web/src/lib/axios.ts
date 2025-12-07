@@ -14,17 +14,6 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
-      
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch {
-      // User not authenticated, continue without token
-    }
-    
     console.log(`[${config.method?.toUpperCase()}] ${config.url}`);
     
     // Add Authorization header with JWT token

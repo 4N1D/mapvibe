@@ -76,6 +76,16 @@ export const getUploadUrlHandler: Handler = {
       // Get presigned URL (5 minutes expiry)
       const presignedResult = await getPresignedUploadUrl(s3Key, content_type, 300);
 
+      // Pre-save CDN URL to user table so it's available after S3 upload
+      await db
+        .updateTable('users')
+        .set({
+          avatar: presignedResult.cdnUrl,
+          updated_at: new Date(),
+        })
+        .where('id', '=', userId)
+        .execute();
+
       return success({
         upload_url: presignedResult.uploadUrl,
         cdn_url: presignedResult.cdnUrl,

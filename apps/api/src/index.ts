@@ -33,6 +33,7 @@ import {
   getMyReviewsHandler,
   getMySavedHandler,
   getMyStatsHandler,
+  getMyVotesHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
@@ -221,6 +222,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/stats$/,
     paramNames: [],
     handler: getMyStatsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/votes$/,
+    paramNames: [],
+    handler: getMyVotesHandler,
   },
   {
     method: "POST",

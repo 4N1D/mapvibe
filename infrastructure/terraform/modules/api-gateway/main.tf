@@ -171,6 +171,14 @@ resource "aws_apigatewayv2_route" "users_me_stats" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "users_me_votes" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/votes"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_route" "users_me_avatar_post" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "POST /users/me/avatar"

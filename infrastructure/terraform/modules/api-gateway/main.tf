@@ -217,6 +217,12 @@ resource "aws_apigatewayv2_route" "restaurants_info" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "restaurants_similar" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/similar"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
 resource "aws_apigatewayv2_route" "restaurants_comments_list" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /restaurants/{slug}/comments"
@@ -338,6 +344,18 @@ resource "aws_apigatewayv2_route" "reviews_approve_location" {
 resource "aws_apigatewayv2_route" "reviews_cleanup_expired" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/cleanup-expired"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_comments" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /reviews/{reviewId}/comments"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "reviews_detail" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /reviews/{reviewId}"
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 

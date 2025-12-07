@@ -53,11 +53,15 @@ export const handler: Handler = {
         .where('id', '=', review_post_id)
         .executeTakeFirst();
 
+      const baseUrl = process.env.FRONTEND_URL || 'https://mapvibe.site';
+      const shareUrl = `${baseUrl}/reviews/${review_post_id}`;
+
       return success({
         review_post_id,
         share_count: updated?.share_count ?? reviewPost.share_count + 1,
         platform,
         shared_by: userId || 'anonymous',
+        url: shareUrl,
       });
     } catch (err) {
       console.error('[reviews/share] Error:', err);

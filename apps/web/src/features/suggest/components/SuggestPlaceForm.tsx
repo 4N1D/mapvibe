@@ -13,7 +13,20 @@ import { useVietnamAddress } from "../hooks/useVietnamAddress";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/axios";
 
-const MIN_REVIEW_LENGTH = 50;
+const MIN_REVIEW_LENGTH = 300;
+
+// Format number with dots as thousand separator (VN style: 100.000)
+const formatPrice = (value: number | string): string => {
+  const num = typeof value === "string" ? parseInt(value.replace(/\./g, ""), 10) : value;
+  if (isNaN(num) || num === 0) return "";
+  return num.toLocaleString("vi-VN");
+};
+
+// Parse formatted price string back to number
+const parsePrice = (value: string): number => {
+  const num = parseInt(value.replace(/\./g, ""), 10);
+  return isNaN(num) ? 0 : num;
+};
 
 const initialFormData: SuggestPlaceFormData = {
   name: "",
@@ -168,6 +181,17 @@ export function SuggestPlaceForm() {
       return;
     }
 
+    // Price validation
+    if (formData.priceMin < 0 || formData.priceMax < 0) {
+      toast.error("Giá không được là số âm");
+      return;
+    }
+
+    if (formData.priceMin > 0 && formData.priceMax > 0 && formData.priceMin > formData.priceMax) {
+      toast.error("Giá tối thiểu không được lớn hơn giá tối đa");
+      return;
+    }
+
     setSubmitting(true);
     const uploadedPhotoIds: string[] = [];
 
@@ -253,44 +277,59 @@ export function SuggestPlaceForm() {
         onChange={(e) => handleInputChange("name", e.target.value)}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Input
-          label="Số điện thoại"
-          placeholder="Nhập số điện thoại..."
-          value={formData.phone}
-          onChange={(e) => handleInputChange("phone", e.target.value)}
-        />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+        <div className="md:col-span-1">
+          <Input
+            label="Số điện thoại"
+            placeholder="Nhập SĐT..."
+            value={formData.phone}
+            onChange={(e) => handleInputChange("phone", e.target.value)}
+          />
+        </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">Khoảng giá</label>
+        <div className="md:col-span-3">
+          <label className="mb-2 block text-sm font-medium text-gray-700">Khoảng giá (VNĐ)</label>
           <div className="flex items-center gap-2">
             <Input
               placeholder="100.000"
-              type="number"
-              value={formData.priceMin || ""}
-              onChange={(e) => handleInputChange("priceMin", Number(e.target.value))}
+              type="text"
+              inputMode="numeric"
+              value={formatPrice(formData.priceMin)}
+              onChange={(e) => {
+                const value = parsePrice(e.target.value);
+                if (value >= 0) handleInputChange("priceMin", value);
+              }}
             />
             <span>-</span>
             <Input
               placeholder="300.000"
-              type="number"
-              value={formData.priceMax || ""}
-              onChange={(e) => handleInputChange("priceMax", Number(e.target.value))}
+              type="text"
+              inputMode="numeric"
+              value={formatPrice(formData.priceMax)}
+              onChange={(e) => {
+                const value = parsePrice(e.target.value);
+                if (value >= 0) handleInputChange("priceMax", value);
+              }}
             />
           </div>
+          {formData.priceMin > 0 && formData.priceMax > 0 && formData.priceMin > formData.priceMax && (
+            <p className="mt-1 text-xs text-red-500">Giá tối thiểu không được lớn hơn giá tối đa</p>
+          )}
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="mb-2 block text-sm font-medium text-gray-700">Giờ mở cửa</label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
               type="time"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 [&::-webkit-calendar-picker-indicator]:ml-auto"
               value={formData.openTime}
               onChange={(e) => handleInputChange("openTime", e.target.value)}
             />
             <span>-</span>
-            <Input
+            <input
               type="time"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 [&::-webkit-calendar-picker-indicator]:ml-auto"
               value={formData.closeTime}
               onChange={(e) => handleInputChange("closeTime", e.target.value)}
             />

@@ -25,8 +25,7 @@ Amplify.configure({
             "https://mapvibe.site/auth/callback",
           ],
           redirectSignOut: [
-            "http://localhost:5173/",
-            "https://d1oasw0quh6m55.cloudfront.net/",
+            "http://localhost:5173",
             "https://mapvibe.site",
           ],
           responseType: "code",
@@ -74,7 +73,7 @@ export const signIn = async (email: string, password: string): Promise<void> => 
 };
 
 export const signOut = async (): Promise<void> => {
-  await amplifySignOut();
+  await amplifySignOut({ global: true });
 };
 
 export const getCurrentUser = async (): Promise<any> => {

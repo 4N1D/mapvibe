@@ -123,14 +123,6 @@ export function Header() {
                         <User className="h-4 w-4" />
                         Hồ sơ của tôi
                       </Link>
-                      <Link
-                        to="/settings"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Settings className="h-4 w-4" />
-                        Cài đặt tài khoản
-                      </Link>
 
                       <button
                         onClick={handleLogout}

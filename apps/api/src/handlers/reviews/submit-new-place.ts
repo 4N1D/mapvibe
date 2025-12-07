@@ -81,8 +81,8 @@ export const handler: Handler = {
       if (!text) {
         return badRequest('text is required');
       }
-      if (text.length < 50) {
-        return badRequest('Review text must be at least 50 characters');
+      if (text.length < 300) {
+        return badRequest('Review text must be at least 300 characters');
       }
 
       // Verify author exists

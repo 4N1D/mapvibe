@@ -4,12 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/axios";
 import {
   User,
-  Mail,
   Image as ImageIcon,
   FileText,
   Bookmark,
   Camera,
-  Upload,
 } from "lucide-react";
 import { SavedCard } from "@/features/review/components/SavedCard";
 import { Button, Input } from "@mapvibe/ui-components";
@@ -55,7 +53,9 @@ interface PostItem {
   created_at: string;
   comments?: number;
   likes?: number;
+  dislikes?: number;
   bookmarked?: boolean;
+  author_name?: string;
 }
 
 // Mock data for development
@@ -115,7 +115,7 @@ export function ProfilePage() {
   // Helper to check mock mode
   const isMockModeEnabled = (): boolean => {
     return (
-      import.meta.env.VITE_USE_MOCK_AUTH === "true" ||
+      import.meta.env.VITE_USE_MOCK_SEARCH === "true" ||
       localStorage.getItem("mock_auth_enabled") === "true"
     );
   };
@@ -152,7 +152,6 @@ export function ProfilePage() {
       fetchPosts();
       fetchSavedPosts();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   const fetchProfile = async () => {
@@ -171,7 +170,7 @@ export function ProfilePage() {
       // Real API call
       const response = await apiClient.get<{ user: UserProfile }>("/users/me");
       setProfile(response.data.user);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to fetch profile:", err);
 
       // In mock mode, fallback to mock data if API fails
@@ -179,10 +178,10 @@ export function ProfilePage() {
         setProfile(MOCK_PROFILE);
         return;
       }
-
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
-        err.response?.data?.message ||
-          err.message ||
+        error.response?.data?.message ||
+          error.message ||
           "Không thể tải thông tin profile"
       );
     } finally {
@@ -198,7 +197,7 @@ export function ProfilePage() {
         month: "long",
         year: "numeric",
       });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   };
@@ -264,11 +263,12 @@ export function ProfilePage() {
       const response = await apiClient.get<{ photos: PhotoItem[] }>("/photos/me");
       const items = response.data?.photos || [];
       setPhotos(buildPhotoGroups(items));
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to fetch photos:", err);
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
       setPhotosError(
-        err?.response?.data?.message ||
-          err?.message ||
+        error?.response?.data?.message ||
+          error?.message ||
           "Không thể tải danh sách ảnh"
       );
     } finally {
@@ -346,10 +346,11 @@ export function ProfilePage() {
       const response = await apiClient.get<{ posts: PostItem[] }>("/posts/me");
       const items = response.data?.posts || [];
       setPosts(items);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to fetch posts:", err);
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
       setPostsError(
-        err?.response?.data?.message || err?.message || "Không thể tải danh sách bài viết"
+        error?.response?.data?.message || error?.message || "Không thể tải danh sách bài viết"
       );
     } finally {
       setPostsLoading(false);
@@ -423,10 +424,11 @@ export function ProfilePage() {
           bookmarked: p.bookmarked ?? true,
         }))
       );
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to fetch saved posts:", err);
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
       setSavedPostsError(
-        err?.response?.data?.message || err?.message || "Không thể tải bài viết đã lưu"
+        error?.response?.data?.message || error?.message || "Không thể tải bài viết đã lưu"
       );
     } finally {
       setSavedPostsLoading(false);
@@ -439,7 +441,6 @@ export function ProfilePage() {
     description: post.description,
     cover_url: post.cover_url,
     created_at: post.created_at,
-    author_name: profile?.display_name || profile?.email || "User",
     // Nếu mock có author riêng thì ưu tiên, fallback profile
     author_name: post.author_name || profile?.display_name || profile?.email || "User",
     comments: post.comments,
@@ -453,7 +454,7 @@ export function ProfilePage() {
       console.log("Saving profile:", formData);
       // await apiClient.put("/users/me", formData);
       alert("Đã lưu thay đổi thành công!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to save:", err);
       alert("Lỗi khi lưu thay đổi");
     }
@@ -519,7 +520,7 @@ export function ProfilePage() {
       }
 
       alert("Đã cập nhật ảnh đại diện thành công!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to upload avatar:", err);
       alert("Lỗi khi tải lên ảnh đại diện");
       setAvatarPreview(null);
@@ -601,9 +602,10 @@ export function ProfilePage() {
       setBackgroundPreview(cdn_url);
 
       alert("Đã cập nhật ảnh nền thành công!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Profile] Failed to upload background:", err);
-      alert("Lỗi khi tải lên ảnh nền: " + (err.message || "Vui lòng thử lại"));
+      const error = err as { message?: string };
+      alert("Lỗi khi tải lên ảnh nền: " + (error.message || "Vui lòng thử lại"));
       // Don't clear preview on error, let user see what they selected
     } finally {
       setIsUploadingBackground(false);

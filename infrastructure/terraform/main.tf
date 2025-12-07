@@ -83,8 +83,8 @@ module "cognito" {
 
   project_name  = var.project_name
   environment   = var.environment
-  callback_urls = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback"]
-  logout_urls   = ["http://localhost:5173/", "https://mapvibe.site/"]
+  callback_urls = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback", "http://localhost:5174/auth/callback", "https://admin.mapvibe.site/auth/callback"]
+  logout_urls   = ["http://localhost:5173/", "https://mapvibe.site/", "http://localhost:5174/", "https://admin.mapvibe.site/"]
 
   # Google OAuth (optional - leave empty to disable)
   google_client_id     = var.google_client_id
@@ -189,11 +189,13 @@ module "lambda_rag" {
 module "lambda_review_aggregate" {
   source = "./modules/lambda-review-aggregate"
 
-  project_name  = var.project_name
-  environment   = var.environment
-  db_secret_arn = aws_secretsmanager_secret.db_credentials.arn
-  db_host       = module.rds.address
-  db_name       = module.rds.database_name
+  project_name         = var.project_name
+  environment          = var.environment
+  db_secret_arn        = aws_secretsmanager_secret.db_credentials.arn
+  db_host              = module.rds.address
+  db_name              = module.rds.database_name
+  cognito_user_pool_id = module.cognito.user_pool_id
+  cognito_client_id    = module.cognito.client_id
 }
 
 # ============================================
@@ -336,6 +338,36 @@ module "dns" {
   project_name           = var.project_name
   domain_name            = "mapvibe.site"
   cloudfront_domain_name = module.cdn.cloudfront_domain_name
+}
+
+# ============================================
+# ADMIN DASHBOARD CDN MODULE
+# ============================================
+
+module "admin_cdn" {
+  source = "./modules/s3-cloudfront-admin"
+
+  environment         = var.environment
+  project_name        = var.project_name
+  bucket_name         = "mapvibe-admin-static"
+  domain_alias        = "admin.mapvibe.site"
+  acm_certificate_arn = module.dns.certificate_arn
+  web_acl_arn         = module.waf.web_acl_arn
+
+  depends_on = [module.dns]
+}
+
+# Route53 record for admin.mapvibe.site
+resource "aws_route53_record" "admin" {
+  zone_id = module.dns.zone_id
+  name    = "admin.mapvibe.site"
+  type    = "A"
+
+  alias {
+    name                   = module.admin_cdn.cloudfront_domain_name
+    zone_id                = "Z2FDTNDATAQYW2"  # CloudFront global hosted zone ID
+    evaluate_target_health = false
+  }
 }
 
 # ============================================
@@ -535,4 +567,25 @@ output "cognito_hosted_ui_url" {
 output "waf_web_acl_arn" {
   description = "WAF Web ACL ARN"
   value       = module.waf.web_acl_arn
+}
+
+# Admin Dashboard Outputs
+output "admin_cloudfront_url" {
+  description = "Admin Dashboard CloudFront URL"
+  value       = module.admin_cdn.cloudfront_url
+}
+
+output "admin_cloudfront_distribution_id" {
+  description = "Admin CloudFront Distribution ID"
+  value       = module.admin_cdn.cloudfront_distribution_id
+}
+
+output "admin_s3_bucket" {
+  description = "Admin S3 bucket name"
+  value       = module.admin_cdn.bucket_name
+}
+
+output "admin_domain" {
+  description = "Admin Dashboard URL"
+  value       = "https://admin.mapvibe.site"
 }

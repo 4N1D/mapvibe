@@ -17,41 +17,77 @@ export const handler: Handler = {
       if (restaurantId) {
         query = sql`
           SELECT
-            id,
-            author_id,
-            restaurant_id,
-            text,
-            features,
-            photos,
-            upvote_count,
-            downvote_count,
-            comment_count,
-            share_count,
-            view_count,
-            created_at
-          FROM review_posts
-          WHERE restaurant_id = ${restaurantId}
-          ORDER BY created_at DESC
+            rp.id,
+            rp.author_id,
+            u.display_name as author_name,
+            u.avatar as author_avatar,
+            rp.location_address_id,
+            rp.text,
+            rp.features,
+            rp.photos,
+            rp.upvote_count,
+            rp.downvote_count,
+            rp.comment_count,
+            rp.share_count,
+            rp.view_count,
+            rp.created_at,
+            la.restaurant_name as location_name,
+            la.street_address as location_street_address,
+            la.ward as location_ward,
+            la.city as location_city,
+            la.full_address as location_full_address,
+            la.geo_lat as location_geo_lat,
+            la.geo_lng as location_geo_lng,
+            la.cuisine_types as location_cuisine_types,
+            la.price_min as location_price_min,
+            la.price_max as location_price_max,
+            la.restaurant_id as location_restaurant_id,
+            la.review_count as location_review_count,
+            la.avg_upvote_rate as location_avg_upvote_rate,
+            la.status as location_status
+          FROM review_posts rp
+          LEFT JOIN users u ON u.id = rp.author_id
+          LEFT JOIN location_addresses la ON la.id = rp.location_address_id
+          WHERE rp.restaurant_id = ${restaurantId}
+          ORDER BY rp.created_at DESC
           LIMIT ${limit}
           OFFSET ${offset}
         `;
       } else {
         query = sql`
           SELECT
-            id,
-            author_id,
-            restaurant_id,
-            text,
-            features,
-            photos,
-            upvote_count,
-            downvote_count,
-            comment_count,
-            share_count,
-            view_count,
-            created_at
-          FROM review_posts
-          ORDER BY created_at DESC
+            rp.id,
+            rp.author_id,
+            u.display_name as author_name,
+            u.avatar as author_avatar,
+            rp.location_address_id,
+            rp.text,
+            rp.features,
+            rp.photos,
+            rp.upvote_count,
+            rp.downvote_count,
+            rp.comment_count,
+            rp.share_count,
+            rp.view_count,
+            rp.created_at,
+            la.restaurant_name as location_name,
+            la.street_address as location_street_address,
+            la.ward as location_ward,
+            la.city as location_city,
+            la.full_address as location_full_address,
+            la.geo_lat as location_geo_lat,
+            la.geo_lng as location_geo_lng,
+            la.cuisine_types as location_cuisine_types,
+            la.price_min as location_price_min,
+            la.price_max as location_price_max,
+            la.restaurant_id as location_restaurant_id,
+            la.review_count as location_review_count,
+            la.avg_upvote_rate as location_avg_upvote_rate,
+            la.status as location_status
+          FROM review_posts rp
+          LEFT JOIN users u ON u.id = rp.author_id
+          LEFT JOIN location_addresses la ON la.id = rp.location_address_id
+          ORDER BY rp.created_at DESC
           LIMIT ${limit}
           OFFSET ${offset}
         `;
@@ -60,7 +96,6 @@ export const handler: Handler = {
       const result = await query.execute(db);
 
       return success({
-        restaurant_id: restaurantId || null,
         count: result.rows.length,
         limit,
         offset,

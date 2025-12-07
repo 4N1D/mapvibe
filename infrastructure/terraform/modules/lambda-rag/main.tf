@@ -75,7 +75,7 @@ resource "aws_lambda_function" "rag" {
   handler          = "main.handler"
   runtime          = "python3.12"
   timeout          = 30
-  memory_size      = 512
+  memory_size      = 2048
   source_code_hash = filebase64sha256(local.zip_file_path)
 
   environment {

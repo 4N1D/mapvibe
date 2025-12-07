@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 let s3Client: S3Client | null = null;
@@ -15,7 +15,7 @@ export function getS3Client(): S3Client {
   return s3Client;
 }
 
-export const S3_PHOTOS_BUCKET = process.env.S3_PHOTOS_BUCKET || "mapvibe-photos";
+export const S3_PHOTOS_BUCKET = process.env.S3_PHOTOS_BUCKET || "mapvibe-photos-mvp";
 export const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN || "";
 
 export interface PresignedUrlResult {
@@ -65,4 +65,15 @@ export function generatePhotoKey(
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return `${photoType}/${userId}/${timestamp}-${random}.${extension}`;
+}
+
+export async function deleteFromS3(key: string): Promise<void> {
+  const client = getS3Client();
+
+  const command = new DeleteObjectCommand({
+    Bucket: S3_PHOTOS_BUCKET,
+    Key: key,
+  });
+
+  await client.send(command);
 }

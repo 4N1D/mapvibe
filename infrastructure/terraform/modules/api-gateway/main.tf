@@ -139,6 +139,148 @@ resource "aws_apigatewayv2_route" "users_get" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "users_me_photos" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/photos"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_reviews" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/reviews"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_saved" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/saved"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_stats" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/stats"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_avatar_post" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /users/me/avatar"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_avatar_put" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PUT /users/me/avatar"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_background_post" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /users/me/background"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_background_put" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PUT /users/me/background"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_save" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /restaurants/{id}/save"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_info" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/info"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "restaurants_comments_list" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/comments"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "restaurants_comments_create" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /restaurants/comments"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_comments_like" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /restaurants/comments/{commentId}/like"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_comments_report" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /restaurants/comments/{commentId}/report"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_comments_delete" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "DELETE /restaurants/comments/{commentId}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_reviews_list" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/reviews"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "restaurants_reviews_create" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /restaurants/{slug}/reviews"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "restaurants_photos_list" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/photos"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "restaurants_menu" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /restaurants/{slug}/menu"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
 resource "aws_apigatewayv2_route" "reviews_list" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /reviews"
@@ -213,9 +355,127 @@ resource "aws_apigatewayv2_route" "rag_health" {
 }
 
 resource "aws_apigatewayv2_route" "review_aggregate" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "POST /reviews/aggregate-pending"
-  target    = "integrations/${aws_apigatewayv2_integration.review_aggregate.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /reviews/aggregate-pending"
+  target             = "integrations/${aws_apigatewayv2_integration.review_aggregate.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# ============================================
+# ADMIN ROUTES
+# ============================================
+
+resource "aws_apigatewayv2_route" "admin_stats" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/stats"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/places"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_delete" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "DELETE /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reviews"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reviews/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/reviews/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_locations_pending" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/locations/pending"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_locations_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/locations/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/users"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/users/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/users/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "photos_delete" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "DELETE /photos/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 # ============================================

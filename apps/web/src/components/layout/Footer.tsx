@@ -20,7 +20,7 @@ export function Footer() {
             <ul className="space-y-2">
               <li>
                 <a
-                  href="/explore"
+                  href="/nearby"
                   className="transition-colors hover:text-primary-400"
                 >
                   Khám phá địa điểm ăn uống
@@ -36,7 +36,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="/write-review"
+                  href="/suggest"
                   className="transition-colors hover:text-primary-400"
                 >
                   Viết bài đánh giá

@@ -8,6 +8,8 @@ import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import create_engine, text
 
+from jwt_utils import require_auth
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -209,6 +211,50 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
     return [serialize_review(r) for r in reviews], [serialize_comment(c) for c in comments]
 
 
+def normalize_cuisine_types(cuisine_types: Any) -> List[Dict[str, str]]:
+    """
+    Normalize cuisine_types thành array of objects với format:
+    [{"name": "...", "description": "..."}, ...]
+    """
+    normalized = []
+    
+    if cuisine_types is None:
+        return []
+    
+    # Nếu là string, thử parse JSON
+    if isinstance(cuisine_types, str):
+        try:
+            parsed = json.loads(cuisine_types)
+            if isinstance(parsed, list):
+                cuisine_types = parsed
+            else:
+                return []
+        except:
+            return []
+    
+    # Xử lý list
+    if isinstance(cuisine_types, list):
+        for item in cuisine_types:
+            if isinstance(item, dict):
+                # Object format: {"name": "...", "description": "..."}
+                name = item.get("name", "").strip() if item.get("name") else ""
+                description = item.get("description", "").strip() if item.get("description") else ""
+                
+                if name:  # Chỉ thêm nếu có name
+                    normalized.append({
+                        "name": name,
+                        "description": description  # Có thể rỗng
+                    })
+            elif isinstance(item, str) and item.strip():
+                # String format - convert thành object
+                normalized.append({
+                    "name": item.strip(),
+                    "description": ""
+                })
+    
+    return normalized
+
+
 def build_prompt(
     reviews: List[Dict[str, Any]], comments: List[Dict[str, Any]], source_type: str
 ) -> List[Dict[str, Any]]:
@@ -229,13 +275,32 @@ def build_prompt(
         "Bạn là hệ thống tổng hợp dữ liệu nhà hàng. "
         "Dùng thông tin dưới đây để suy luận các trường. "
         "Chỉ trả về JSON với các thuộc tính: "
-        "name_vi, slug, address, district, ward, phone, website, geo_lat, geo_lng, "
+        "name_vi, slug, address, ward, phone, website, geo_lat, geo_lng, "
         "business_type, cuisine_types, price_min, price_max, opening_hours, "
         "description, features. "
         "Nếu thiếu thông tin, trả về null cho field đó (features và cuisine_types: mảng, có thể rỗng). "
         "price_min/price_max là integer. opening_hours phải ở format 'HH:MM - HH:MM' hoặc null. "
         "Không tự bịa địa chỉ hay toạ độ nếu không có căn cứ. "
-        "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments."
+        "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments.\n\n"
+        "QUAN TRỌNG về cuisine_types (mảng JSON array của objects):\n"
+        "- cuisine_types phải là mảng các objects, mỗi object có 2 trường bắt buộc: 'name' và 'description'\n"
+        "- Format ví dụ CHÍNH XÁC:\n"
+        "  [\n"
+        "    {\"name\": \"BUFFET LẨU BĂNG CHUYỀN\", \"description\": \"Bao gồm các loại hải sản, thịt, rau củ và nấm.\"},\n"
+        "    {\"name\": \"LẨU ĐA DẠNG NƯỚC DÙNG\", \"description\": \"Các lựa chọn nước lẩu như lẩu thảo mộc, lẩu kim chi, lẩu miso và nhiều loại khác.\"},\n"
+        "    {\"name\": \"CHẾ BIẾN THEO YÊU CẦU\", \"description\": \"Thực khách có thể tự tay chế biến món ăn theo sở thích cá nhân.\"},\n"
+        "    {\"name\": \"ẨM THỰC NHẬT BẢN\", \"description\": \"Không chỉ có lẩu, nhà hàng còn phục vụ nhiều món ăn theo phong cách Nhật Bản.\"},\n"
+        "    {\"name\": \"NƯỚC CHẤM ĐA DẠNG\", \"description\": \"Nhiều loại nước chấm phong phú để khách tự pha chế.\"}\n"
+        "  ]\n"
+        "- Hãy trích xuất từ reviews/comments:\n"
+        "  + name: Tên loại hình ẩm thực (3-6 từ, viết HOA, VD: \"BUFFET LẨU BĂNG CHUYỀN\")\n"
+        "  + description: Mô tả chi tiết về loại hình đó (1-2 câu, giải thích rõ ràng từ thông tin trong reviews)\n"
+        "- Mỗi object PHẢI có cả 'name' và 'description', không được thiếu.\n"
+        "- name viết HOA, ngắn gọn (3-6 từ).\n"
+        "- description là 1-2 câu mô tả chi tiết, trích xuất từ reviews/comments.\n"
+        "- Nếu không tìm thấy thông tin cụ thể, trả về mảng rỗng [].\n"
+        "- Không lặp lại thông tin đã có trong business_type.\n"
+        "- Ưu tiên các thông tin được nhắc đến nhiều lần trong reviews/comments."
     )
 
     status_text = "pending" if source_type == "pending" else "approved"
@@ -288,9 +353,20 @@ def aggregate(location_address_id: str):
 
     try:
         payload = json.loads(output_text)
+        
+        # Validate và normalize cuisine_types thành array of objects
+        if "cuisine_types" in payload:
+            payload["cuisine_types"] = normalize_cuisine_types(payload["cuisine_types"])
+            logger.info(f"✅ Normalized cuisine_types: {len(payload['cuisine_types'])} items")
+            if payload["cuisine_types"]:
+                logger.info(f"   Sample: {payload['cuisine_types'][0]}")
+        else:
+            payload["cuisine_types"] = []
+            logger.info("⚠️ cuisine_types not found in payload, setting to empty array")
+            
     except json.JSONDecodeError:
         logger.warning("LLM output is not valid JSON, wrapping as string")
-        payload = {"raw": output_text}
+        payload = {"raw": output_text, "cuisine_types": []}
 
     return {
         "location_address_id": location_address_id,
@@ -304,6 +380,13 @@ def aggregate(location_address_id: str):
 
 def lambda_handler(event, context):
     try:
+        # JWT Authentication check
+        is_authenticated, user_id, error_response = require_auth(event)
+        if not is_authenticated:
+            return error_response
+        
+        logger.info(f"✅ Authenticated user: {user_id}")
+        
         if event.get("body"):
             body = json.loads(event["body"])
         else:
@@ -331,4 +414,3 @@ def lambda_handler(event, context):
             "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
             "body": json.dumps({"error": str(e)}),
         }
-

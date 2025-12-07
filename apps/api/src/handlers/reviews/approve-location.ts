@@ -62,7 +62,6 @@ export const handler: Handler = {
             name_vi,
             slug,
             address,
-            district,
             ward,
             geo_lat,
             geo_lng,
@@ -88,7 +87,6 @@ export const handler: Handler = {
             ${location.restaurant_name},
             ${slug},
             ${location.street_address},
-            ${location.district},
             ${location.ward || null},
             ${location.geo_lat},
             ${location.geo_lng},
@@ -136,7 +134,6 @@ export const handler: Handler = {
           name: location.restaurant_name,
           slug,
           address: location.street_address,
-          district: location.district,
           ratings: {
             rating_service: 10,
             rating_location: 10,

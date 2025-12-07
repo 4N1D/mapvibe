@@ -37,13 +37,16 @@ resource "aws_sqs_queue_redrive_policy" "embedding_jobs" {
 }
 
 # ============================================
-# ZIP SOURCE CODE
+# ZIP SOURCE CODE (main.py + libs)
 # ============================================
+# IMPORTANT: Zip file MUST be pre-built using scripts/build-lambda-embeddings.ps1
+# This ensures dependencies are Linux-compatible (built with Docker)
+# The zip file should be at: ${path.module}/lambda-embeddings.zip
+# 
+# To build: Run .\scripts\build-lambda-embeddings.ps1 before terraform apply
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/src"
-  output_path = "${path.module}/lambda-embeddings.zip"
+locals {
+  zip_file_path = "${path.module}/lambda-embeddings.zip"
 }
 
 # ============================================
@@ -113,14 +116,14 @@ resource "aws_iam_role_policy" "lambda_extra" {
 # ============================================
 
 resource "aws_lambda_function" "embeddings" {
-  filename         = data.archive_file.lambda_zip.output_path
+  filename         = local.zip_file_path
   function_name    = "${var.project_name}-embeddings-${var.environment}"
   role             = aws_iam_role.lambda.arn
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   timeout          = 300
   memory_size      = 512
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = filebase64sha256(local.zip_file_path)
 
   environment {
     variables = {

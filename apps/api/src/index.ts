@@ -23,8 +23,20 @@ import {
 } from './handlers/reviews';
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
-import { getMeHandler, updateMeHandler, getUserByIdHandler } from "./handlers/users";
-import { getUploadUrlHandler as photoGetUploadUrlHandler } from "./handlers/photos";
+import {
+  getMeHandler,
+  updateMeHandler,
+  getUserByIdHandler,
+  getMyPhotosHandler,
+  getMyReviewsHandler,
+  getMySavedHandler,
+  getMyStatsHandler,
+  getAvatarUploadUrlHandler,
+  updateAvatarHandler,
+  getBackgroundUploadUrlHandler,
+  updateBackgroundHandler,
+} from "./handlers/users";
+import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
   commentsListHandler as restaurantCommentsListHandler,
@@ -36,7 +48,23 @@ import {
   reviewsCreateHandler as restaurantReviewsCreateHandler,
   photosListHandler as restaurantPhotosListHandler,
   menuHandler as restaurantMenuHandler,
+  saveHandler as restaurantSaveHandler,
 } from "./handlers/restaurants";
+import {
+  statsHandler as adminStatsHandler,
+  adminListPlacesHandler,
+  adminGetPlaceHandler,
+  adminUpdatePlaceHandler,
+  adminDeletePlaceHandler,
+  adminListReviewsHandler,
+  adminGetReviewHandler,
+  adminUpdateReviewHandler,
+  adminListPendingLocationsHandler,
+  adminUpdateLocationHandler,
+  adminListUsersHandler,
+  adminGetUserHandler,
+  adminUpdateUserHandler,
+} from "./handlers/admin";
 
 
 // Route definitions
@@ -157,6 +185,54 @@ const routes: RouteDefinition[] = [
   },
   {
     method: "GET",
+    pattern: /^\/users\/me\/photos$/,
+    paramNames: [],
+    handler: getMyPhotosHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/reviews$/,
+    paramNames: [],
+    handler: getMyReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/saved$/,
+    paramNames: [],
+    handler: getMySavedHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/stats$/,
+    paramNames: [],
+    handler: getMyStatsHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/avatar$/,
+    paramNames: [],
+    handler: getAvatarUploadUrlHandler,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/users\/me\/avatar$/,
+    paramNames: [],
+    handler: updateAvatarHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/background$/,
+    paramNames: [],
+    handler: getBackgroundUploadUrlHandler,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/users\/me\/background$/,
+    paramNames: [],
+    handler: updateBackgroundHandler,
+  },
+  {
+    method: "GET",
     pattern: /^\/users\/([^/]+)$/,
     paramNames: ["id"],
     handler: getUserByIdHandler,
@@ -168,6 +244,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/photos\/upload-url$/,
     paramNames: [],
     handler: photoGetUploadUrlHandler,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/photos\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: deletePhotoHandler,
   },
 
   // Restaurants routes
@@ -231,6 +313,92 @@ const routes: RouteDefinition[] = [
     pattern: /^\/restaurants\/([^/]+)\/menu$/,
     paramNames: ["slug"],
     handler: restaurantMenuHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/restaurants\/([^/]+)\/save$/,
+    paramNames: ["id"],
+    handler: restaurantSaveHandler,
+  },
+
+  // Admin routes
+  {
+    method: "GET",
+    pattern: /^\/admin\/stats$/,
+    paramNames: [],
+    handler: adminStatsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/places$/,
+    paramNames: [],
+    handler: adminListPlacesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/places\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetPlaceHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/places\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdatePlaceHandler,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/admin\/places\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminDeletePlaceHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/reviews$/,
+    paramNames: [],
+    handler: adminListReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/reviews\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetReviewHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/reviews\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdateReviewHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/pending$/,
+    paramNames: [],
+    handler: adminListPendingLocationsHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/locations\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdateLocationHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/users$/,
+    paramNames: [],
+    handler: adminListUsersHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/users\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetUserHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/users\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdateUserHandler,
   },
 ];
 

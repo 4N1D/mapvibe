@@ -28,7 +28,6 @@ export const handler: Handler = {
         name: restaurant.name_vi,
         slug: restaurant.slug,
         address: restaurant.address,
-        district: restaurant.district,
         ward: restaurant.ward,
         phone: restaurant.phone,
         opening_hours: restaurant.opening_hours,

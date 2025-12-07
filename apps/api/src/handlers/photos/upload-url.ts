@@ -5,7 +5,7 @@ import { getPresignedUploadUrl, generatePhotoKey } from "../../services/s3";
 import { success, badRequest, unauthorized, error } from "../../middlewares/response";
 import { getUserIdFromEvent } from "@/utils/auth";
 
-type PhotoType = "food" | "interior" | "exterior" | "menu" | "other";
+type PhotoType = "food" | "view" | "menu" | "other" | "user_avatar" | "user_background";
 
 interface GetUploadUrlBody {
   photo_type: PhotoType;

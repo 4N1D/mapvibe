@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/axios";
+import { motion, AnimatePresence } from "motion/react";
 import {
   User,
   Mail,
@@ -10,6 +11,8 @@ import {
   Bookmark,
   Camera,
   Upload,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { SavedCard } from "@/features/review/components/SavedCard";
 import { Button, Input } from "@mapvibe/ui-components";
@@ -91,6 +94,8 @@ export function ProfilePage() {
   const [savedPosts, setSavedPosts] = useState<PostItem[]>([]);
   const [savedPostsLoading, setSavedPostsLoading] = useState(false);
   const [savedPostsError, setSavedPostsError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [avatarSuccessAnimation, setAvatarSuccessAnimation] = useState(false);
 
   // Helper to check mock mode
   const isMockModeEnabled = (): boolean => {
@@ -461,11 +466,15 @@ export function ProfilePage() {
     try {
       setIsUploadingAvatar(true);
       
-      // Get upload URL
-      const uploadResponse = await apiClient.post("/photos/upload-url", {
-        photo_type: "user_avatar",
+      // Get upload URL from avatar endpoint
+      const uploadResponse = await apiClient.post<{
+        upload_url: string;
+        cdn_url: string;
+        s3_key: string;
+        expires_in: number;
+        content_type: string;
+      }>("/users/me/avatar", {
         content_type: file.type,
-        file_size: file.size,
       });
 
       const { upload_url, cdn_url } = uploadResponse.data;
@@ -479,20 +488,24 @@ export function ProfilePage() {
         },
       });
 
-      // Update user profile with new avatar URL
-      await apiClient.put("/users/me", {
-        avatar: cdn_url,
-      });
-
-      // Update local profile
+      // Update local profile with new avatar URL
       if (profile) {
         setProfile({ ...profile, avatar: cdn_url });
       }
 
-      alert("Đã cập nhật ảnh đại diện thành công!");
+      // Clear preview and use the new avatar URL
+      setAvatarPreview(null);
+
+      // Show success animation and toast
+      setAvatarSuccessAnimation(true);
+      setTimeout(() => setAvatarSuccessAnimation(false), 2000);
+      setToast({ message: "Đã cập nhật ảnh đại diện thành công!", type: "success" });
+      setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       console.error("[Profile] Failed to upload avatar:", err);
-      alert("Lỗi khi tải lên ảnh đại diện");
+      const errorMessage = err.response?.data?.message || err.message || "Vui lòng thử lại";
+      setToast({ message: `Lỗi khi tải lên ảnh đại diện: ${errorMessage}`, type: "error" });
+      setTimeout(() => setToast(null), 4000);
       setAvatarPreview(null);
     } finally {
       setIsUploadingAvatar(false);
@@ -938,16 +951,32 @@ export function ProfilePage() {
                   >
                     {/* Avatar Image or Placeholder */}
                     {avatarPreview || profile.avatar ? (
-                      <img
+                      <motion.img
                         src={avatarPreview || profile.avatar}
                         alt={profile.display_name || profile.email}
                         className="h-24 w-24 rounded-full bg-gray-300 object-cover ring-4 ring-white"
+                        animate={avatarSuccessAnimation ? { scale: [1, 1.1, 1] } : {}}
+                        transition={{ duration: 0.5 }}
                       />
                     ) : (
                       <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 text-2xl font-bold text-gray-600 ring-4 ring-white">
                         {getInitials(profile.display_name, profile.email)}
                       </div>
                     )}
+
+                    {/* Success Animation Overlay */}
+                    <AnimatePresence>
+                      {avatarSuccessAnimation && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="absolute inset-0 flex items-center justify-center rounded-full bg-green-500/80 backdrop-blur-sm"
+                        >
+                          <CheckCircle2 className="h-10 w-10 text-white" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 transition-opacity duration-200 group-hover/avatar:opacity-100">
@@ -1098,6 +1127,34 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className="fixed left-1/2 top-4 z-50 flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg"
+            style={{
+              backgroundColor: toast.type === "success" ? "#10b981" : "#ef4444",
+            }}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="h-5 w-5 text-white" />
+            ) : (
+              <X className="h-5 w-5 text-white" />
+            )}
+            <span className="text-sm font-medium text-white">{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-2 rounded p-1 hover:bg-white/20"
+            >
+              <X className="h-4 w-4 text-white" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

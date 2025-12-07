@@ -32,7 +32,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(),
       };
 
-      // Determine if this is a new topic (first message in conversation)
+      // Determine if this is a new topic:
+      // - true: first message in conversation or after reset (to start new context)
+      // - false: continuing conversation (to preserve context)
       const isNewTopic = messages.length === 0;
 
       setMessages((prev) => [...prev, userMessage]);
@@ -46,6 +48,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       cancelTokenRef.current = { cancel };
 
       try {
+        // Call real API endpoint (no mock search)
         const { data } = await retryRequest(
           () =>
             apiClient.post(
@@ -81,7 +84,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         const aiMessage: Message = {
           id: `ai-${Date.now()}`,
           role: "assistant",
-          content: "Xin lỗi, không thể tìm thấy quán theo yêu cầu của bạn. Vui lòng thử lại sau.",
+          content: "Xin lỗi, hiện tại tôi không tìm thấy địa điểm mà bạn yêu cầu.",
           restaurants: [],
           timestamp: new Date(),
         };
@@ -98,8 +101,10 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       cancelTokenRef.current.cancel();
     }
 
+    // Reset messages and generate new session ID
+    // Next message will have is_new_topic = true (new conversation)
     setMessages([]);
-    sessionIdRef.current = generateSessionId(); // New session on reset
+    sessionIdRef.current = generateSessionId();
   }, []);
 
   return (

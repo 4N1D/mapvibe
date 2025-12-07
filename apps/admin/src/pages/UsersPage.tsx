@@ -59,8 +59,17 @@ export default function UsersPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.map((user: Record<string, unknown>) => {
-                  const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles || ['user'];
-                  const isAdmin = roles.includes('admin');
+                  let roles: string[] = ['user'];
+                  try {
+                    if (typeof user.roles === 'string') {
+                      roles = JSON.parse(user.roles);
+                    } else if (Array.isArray(user.roles)) {
+                      roles = user.roles;
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse roles:', e);
+                  }
+                  const isAdmin = Array.isArray(roles) && roles.includes('admin');
 
                   return (
                     <tr key={user.id as string} className="hover:bg-gray-50">

@@ -39,6 +39,7 @@ import {
 import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
+  similarHandler as restaurantSimilarHandler,
   commentsListHandler as restaurantCommentsListHandler,
   commentsCreateHandler as restaurantCommentsCreateHandler,
   commentsLikeHandler as restaurantCommentsLikeHandler,
@@ -258,6 +259,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/restaurants\/([^/]+)\/info$/,
     paramNames: ["slug"],
     handler: restaurantInfoHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/similar$/,
+    paramNames: ["slug"],
+    handler: restaurantSimilarHandler,
   },
   // Comments routes
   {

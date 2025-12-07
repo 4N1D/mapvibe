@@ -595,7 +595,7 @@ class RAGService:
 
         with engine.connect() as conn:
             rows = conn.execute(text(sql_base), sql_params).fetchall()
-            results = [row for row in rows if row.final_score >= min_score]
+            results = [row for row in rows if row.final_score is not None and row.final_score >= min_score]
             
             # --- LOGGING PHẦN SQL ---
             duration = (datetime.now() - start_time).total_seconds()

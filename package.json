@@ -31,6 +31,7 @@
     "deploy:infra": "turbo run deploy --filter=infrastructure",
     "plan:infra": "turbo run plan --filter=infrastructure",
     "deploy:web": "turbo run deploy --filter=web",
+    "deploy:admin": "pwsh ./scripts/deploy-admin.ps1",
     "deploy:api": "pwsh ./scripts/deploy-api.ps1",
     "deploy:migrate": "pwsh ./scripts/deploy-migrate.ps1",
     "deploy:migrate:rollback": "pwsh ./scripts/deploy-migrate.ps1 -rollback",

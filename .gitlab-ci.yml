@@ -86,6 +86,30 @@ build:web:
       when: never
     - when: on_success
 
+# Build admin app
+build:admin:
+  stage: build
+  needs: [install]
+  script:
+    - echo "🔧 Building admin dashboard..."
+    - cd apps/admin
+    - |
+      cat > .env << EOF
+      VITE_API_URL=$VITE_API_URL
+      VITE_COGNITO_USER_POOL_ID=$VITE_COGNITO_USER_POOL_ID
+      VITE_COGNITO_CLIENT_ID=$VITE_COGNITO_APP_CLIENT_ID
+      VITE_COGNITO_DOMAIN=$VITE_COGNITO_DOMAIN
+      EOF
+    - bun run build
+  artifacts:
+    paths:
+      - apps/admin/dist/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[ci-only\]/
+      when: never
+    - when: on_success
+
 # ===========================
 # STAGE 3: DEPLOY
 # ===========================
@@ -109,6 +133,26 @@ deploy:frontend:
       changes:
         - apps/web/**/*
         - packages/ui-components/**/*
+  allow_failure: false
+
+# Deploy Admin Dashboard to S3 + CloudFront
+deploy:admin:
+  stage: deploy
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  needs: [build:admin]
+  before_script: []
+  script:
+    - echo "🚀 Deploying admin dashboard to S3..."
+    - aws s3 sync apps/admin/dist s3://mapvibe-admin-static --delete
+    - echo "🔄 Invalidating CloudFront cache..."
+    - aws cloudfront create-invalidation --distribution-id $ADMIN_CLOUDFRONT_DIST_ID --paths "/*"
+    - echo "✅ Admin dashboard deployed successfully"
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(dev|prod)$/ || $CI_COMMIT_BRANCH =~ /^(dev|prod)$/
+      changes:
+        - apps/admin/**/*
   allow_failure: false
 
 # Deploy Infrastructure + Lambda API + Migrations (Terraform)

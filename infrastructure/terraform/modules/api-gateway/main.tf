@@ -363,6 +363,122 @@ resource "aws_apigatewayv2_route" "review_aggregate" {
 }
 
 # ============================================
+# ADMIN ROUTES
+# ============================================
+
+resource "aws_apigatewayv2_route" "admin_stats" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/stats"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/places"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_places_delete" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "DELETE /admin/places/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reviews"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reviews/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reviews_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/reviews/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_locations_pending" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/locations/pending"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_locations_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/locations/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/users"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/users/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_users_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/users/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "photos_delete" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "DELETE /photos/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# ============================================
 # STAGE (Auto-deploy)
 # ============================================
 

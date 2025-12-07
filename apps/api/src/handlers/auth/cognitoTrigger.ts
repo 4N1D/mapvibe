@@ -116,7 +116,19 @@ async function handlePreTokenGeneration(
     .where('id', '=', userId)
     .executeTakeFirst();
 
-  const roles = dbUser?.roles ? JSON.parse(dbUser.roles as string) : ['user'];
+  // Handle roles: could be string, array, null, or undefined
+  let roles: string[] = ['user'];
+  if (dbUser?.roles) {
+    if (typeof dbUser.roles === 'string') {
+      try {
+        roles = JSON.parse(dbUser.roles);
+      } catch {
+        roles = ['user'];
+      }
+    } else if (Array.isArray(dbUser.roles)) {
+      roles = dbUser.roles;
+    }
+  }
 
   // 3. Thêm custom claims vào token
   event.response = {

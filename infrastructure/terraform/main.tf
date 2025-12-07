@@ -83,8 +83,8 @@ module "cognito" {
 
   project_name  = var.project_name
   environment   = var.environment
-  callback_urls = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback"]
-  logout_urls   = ["http://localhost:5173/", "https://mapvibe.site/"]
+  callback_urls = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback", "http://localhost:5174/auth/callback", "https://admin.mapvibe.site/auth/callback"]
+  logout_urls   = ["http://localhost:5173/", "https://mapvibe.site/", "http://localhost:5174/", "https://admin.mapvibe.site/"]
 
   # Google OAuth (optional - leave empty to disable)
   google_client_id     = var.google_client_id

@@ -438,6 +438,22 @@ resource "aws_apigatewayv2_route" "admin_locations_pending" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "admin_locations_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/locations/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_locations_reviews" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/locations/{id}/reviews"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_route" "admin_locations_update" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "PATCH /admin/locations/{id}"

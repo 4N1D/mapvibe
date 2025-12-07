@@ -2,12 +2,15 @@ import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mapvibe.site';
+const isLocalhost = API_URL.includes('localhost');
 
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
+    ...(isLocalhost ? {} : { 'ngrok-skip-browser-warning': 'true' }),
   },
+  timeout: 10000,
 });
 
 // Add auth token to requests
@@ -17,9 +20,12 @@ apiClient.interceptors.request.use(async (config) => {
     const token = session.tokens?.idToken?.toString();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API] Token added:', token.substring(0, 20) + '...');
+    } else {
+      console.warn('[API] No token available - user may not be logged in');
     }
-  } catch {
-    // No session
+  } catch (err) {
+    console.error('[API] Failed to get session:', err);
   }
   return config;
 });

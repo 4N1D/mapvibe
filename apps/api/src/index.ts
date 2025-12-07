@@ -61,6 +61,8 @@ import {
   adminGetReviewHandler,
   adminUpdateReviewHandler,
   adminListPendingLocationsHandler,
+  adminGetLocationHandler,
+  adminGetLocationReviewsHandler,
   adminUpdateLocationHandler,
   adminListUsersHandler,
   adminGetUserHandler,
@@ -382,6 +384,18 @@ const routes: RouteDefinition[] = [
     pattern: /^\/admin\/locations\/pending$/,
     paramNames: [],
     handler: adminListPendingLocationsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)\/reviews$/,
+    paramNames: ["id"],
+    handler: adminGetLocationReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetLocationHandler,
   },
   {
     method: "PATCH",

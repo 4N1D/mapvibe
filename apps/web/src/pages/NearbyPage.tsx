@@ -19,6 +19,7 @@ interface PostItem {
   id: string;
   slug: string;
   author: string;
+  authorAvatar?: string;
   userRank: "Hạng đồng" | "Hạng bạc" | "Hạng vàng" | "Hạng kim cương" | "Hạng bạch kim";
   timeAgo: string;
   approved: boolean;
@@ -169,9 +170,17 @@ function PostCard({ post }: { post: PostItem }) {
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
-            {post.author.charAt(0).toUpperCase()}
-          </div>
+          {post.authorAvatar ? (
+            <img
+              src={post.authorAvatar}
+              alt={post.author}
+              className="h-9 w-9 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
+              {post.author.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <div className="text-sm font-semibold text-gray-900">{post.author}</div>

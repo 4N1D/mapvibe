@@ -1,8 +1,30 @@
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
 import { getDb } from '../../services/db';
-import { getPresignedUploadUrl } from '../../services/s3';
+import { getPresignedUploadUrl, deleteFromS3, CLOUDFRONT_DOMAIN, S3_PHOTOS_BUCKET } from '../../services/s3';
 import { success, badRequest, unauthorized, notFound, error } from '../../middlewares/response';
 import { getUserIdFromEvent } from '@/utils/auth';
+
+function extractS3KeyFromUrl(url: string): string | null {
+  if (!url) return null;
+  
+  try {
+    // Handle CloudFront URL: https://d123.cloudfront.net/backgrounds/userId/timestamp.jpg
+    if (CLOUDFRONT_DOMAIN && url.includes(CLOUDFRONT_DOMAIN)) {
+      const urlObj = new URL(url);
+      return urlObj.pathname.slice(1); // Remove leading slash
+    }
+    
+    // Handle S3 URL: https://bucket.s3.region.amazonaws.com/backgrounds/userId/timestamp.jpg
+    if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
+      const urlObj = new URL(url);
+      return urlObj.pathname.slice(1);
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const ALLOWED_CONTENT_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -66,6 +88,20 @@ export const getBackgroundUploadUrlHandler: Handler = {
 
       if (!user) {
         return notFound('User not found');
+      }
+
+      // Delete old background from S3 if exists
+      if (user.background) {
+        const oldS3Key = extractS3KeyFromUrl(user.background);
+        if (oldS3Key) {
+          try {
+            await deleteFromS3(oldS3Key);
+            console.log(`[users/me/background] Deleted old background: ${oldS3Key}`);
+          } catch (deleteErr) {
+            // Log but don't fail - old file cleanup is not critical
+            console.warn(`[users/me/background] Failed to delete old background: ${oldS3Key}`, deleteErr);
+          }
+        }
       }
 
       const extension = ALLOWED_CONTENT_TYPES[content_type];

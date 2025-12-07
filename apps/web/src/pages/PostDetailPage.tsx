@@ -246,9 +246,17 @@ export function PostDetailPage() {
       {/* Author Header */}
       <div className="mb-6 flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
-            {post.author.charAt(0).toUpperCase()}
-          </div>
+          {post.authorAvatar ? (
+            <img
+              src={post.authorAvatar}
+              alt={post.author}
+              className="h-12 w-12 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
+              {post.author.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900">{post.author}</span>

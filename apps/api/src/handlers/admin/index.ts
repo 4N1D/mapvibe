@@ -11,6 +11,8 @@ export {
   getReviewHandler as adminGetReviewHandler,
   updateReviewHandler as adminUpdateReviewHandler,
   listPendingLocationsHandler as adminListPendingLocationsHandler,
+  getLocationHandler as adminGetLocationHandler,
+  getLocationReviewsHandler as adminGetLocationReviewsHandler,
   updateLocationHandler as adminUpdateLocationHandler,
 } from './reviews';
 export {

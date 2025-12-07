@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import axios from "axios";
+import { apiClient } from "@/lib/axios";
 import { Restaurant } from "@mapvibe/types";
 import { ArrowLeft } from "lucide-react";
 import { CommentsTab, ImageGalleryPreview, IntroductionTab, MenuTab, PhotosTab, RestaurantInfo, ReviewsTab } from "@/features/place";
@@ -16,7 +16,7 @@ export function PlaceDetailPage() {
     const fetchRestaurant = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/place/${slug}`);
+        const response = await apiClient.get<Restaurant>(`/places/${slug}`);
         setRestaurant(response.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");

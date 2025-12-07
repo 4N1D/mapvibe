@@ -131,6 +131,7 @@ export interface HotReview {
   id: string;
   author_id: string;
   author_name: string;
+  author_avatar?: string;
   restaurant_id: string | null;
   text: string;
   photos: ReviewPhoto[];

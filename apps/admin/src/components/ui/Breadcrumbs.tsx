@@ -11,12 +11,15 @@ interface BreadcrumbsProps {
 }
 
 const routeLabels: Record<string, string> = {
-  '': 'Dashboard',
-  'locations': 'Locations',
-  'pending': 'Pending',
-  'places': 'Places',
-  'reviews': 'Reviews',
-  'users': 'Users',
+  '': 'Tổng quan',
+  'locations': 'Địa điểm',
+  'pending': 'Chờ duyệt',
+  'places': 'Nhà hàng',
+  'reviews': 'Đánh giá',
+  'users': 'Người dùng',
+  'reports': 'Báo cáo',
+  'analytics': 'Phân tích',
+  'profile': 'Hồ sơ',
 };
 
 export default function Breadcrumbs({ items }: BreadcrumbsProps) {
@@ -59,12 +62,12 @@ export default function Breadcrumbs({ items }: BreadcrumbsProps) {
 
 function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const paths = pathname.split('/').filter(Boolean);
-  const breadcrumbs: BreadcrumbItem[] = [{ label: 'Dashboard', href: '/' }];
+  const breadcrumbs: BreadcrumbItem[] = [{ label: 'Tổng quan', href: '/' }];
 
   let currentPath = '';
   for (const path of paths) {
     currentPath += `/${path}`;
-    const label = routeLabels[path] || (path.length === 36 ? 'Detail' : path);
+    const label = routeLabels[path] || (path.length === 36 ? 'Chi tiết' : path);
     breadcrumbs.push({ label, href: currentPath });
   }
 

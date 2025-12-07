@@ -19,8 +19,8 @@ export default function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = 'Xác nhận',
+  cancelText = 'Hủy',
   variant = 'danger',
   loading = false,
 }: ConfirmModalProps) {

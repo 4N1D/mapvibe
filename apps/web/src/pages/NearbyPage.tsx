@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
+import toast, { Toaster } from "react-hot-toast";
 import {
   Clock,
   MapPin,
@@ -15,6 +16,13 @@ import {
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
+
+// Strip HTML tags for plain text display
+const stripHtml = (html: string): string => {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+};
 
 interface GalleryItem {
   url: string;
@@ -192,7 +200,7 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
     id: review.id,
     slug,
     author: review.author_name,
-    authorAvatar: review.author_avatar,
+    authorAvatar: review.author_avatar || undefined,
     userRank: "Hạng đồng", // Not used anymore but kept for compatibility
     timeAgo: formatTimeAgo(review.created_at),
     approved: review.location_status === "approved",
@@ -355,7 +363,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
   const { user, isAuthenticated } = useAuth();
   const [localUpvotes, setLocalUpvotes] = useState(post.stats.upvotes);
   const [localDownvotes, setLocalDownvotes] = useState(post.stats.downvotes);
-  const [isVoting, setIsVoting] = useState(false);
+  const [_isVoting, setIsVoting] = useState(false);
   const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(null);
   const [voteAnimation, setVoteAnimation] = useState<"upvote" | "downvote" | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -379,7 +387,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
 
   const handleVote = async (voteType: "upvote" | "downvote") => {
     if (!isAuthenticated || !user) {
-      alert("Vui lòng đăng nhập để vote");
+      toast.error("Vui lòng đăng nhập để vote");
       return;
     }
 
@@ -392,7 +400,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
         setUserId(currentUserId);
       } catch (err) {
         console.error("[PostCard] Failed to get user profile:", err);
-        alert("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
+        toast.error("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
         return;
       }
     }
@@ -496,7 +504,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
       setVoteStatus(previousStatus);
       
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      alert(error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại.");
+      toast.error(error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại.");
       
       // Notify parent to rollback
       if (onVoteUpdate) {
@@ -510,7 +518,8 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const shareUrl = `${window.location.origin}/post/${post.slug}`;
-    const shareText = `${post.title} - ${post.description.substring(0, 100)}...`;
+    const plainDescription = stripHtml(post.description);
+    const shareText = `${post.title} - ${plainDescription.substring(0, 100)}...`;
 
     if (navigator.share) {
       try {
@@ -527,10 +536,10 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
       // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl);
-        alert("Đã sao chép link vào clipboard!");
+        toast.success("Đã sao chép link vào clipboard!");
       } catch (err) {
         console.error("Failed to copy:", err);
-        alert("Không thể chia sẻ. Vui lòng thử lại.");
+        toast.error("Không thể chia sẻ. Vui lòng thử lại.");
       }
     }
   };
@@ -595,7 +604,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
           <Gallery items={post.images} />
         </div>
 
-        <p className="mt-3 text-sm text-gray-700">{post.description}</p>
+        <p className="mt-3 line-clamp-3 text-sm text-gray-700">{stripHtml(post.description)}</p>
 
         <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
           <Link
@@ -780,8 +789,10 @@ export function NearbyPage() {
   };
 
   return (
-    <div className="bg-gray-100 pb-12">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-8 sm:px-6 lg:flex-row lg:items-start lg:gap-8 lg:px-8">
+    <>
+      <Toaster position="top-center" />
+      <div className="bg-gray-100 pb-12">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-8 sm:px-6 lg:flex-row lg:items-start lg:gap-8 lg:px-8">
         {/* Sidebar filters */}
         <aside className="w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64">
           <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
@@ -894,9 +905,10 @@ export function NearbyPage() {
               />
             ))
           )}
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

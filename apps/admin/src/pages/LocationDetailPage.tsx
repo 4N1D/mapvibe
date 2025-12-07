@@ -124,7 +124,7 @@ export default function LocationDetailPage() {
 
   const handleAIAggregate = async () => {
     if (posts.length === 0) {
-      toast.error('No posts to aggregate');
+      toast.error('Không có bài viết để tổng hợp');
       return;
     }
     
@@ -148,10 +148,10 @@ export default function LocationDetailPage() {
         description: result.description || '',
       });
       
-      toast.success(`AI tổng hợp từ ${data.reviews_used.length} posts thành công!`);
+      toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
       setActiveTab('info');
     } catch (error: any) {
-      toast.error('Failed to aggregate: ' + (error.response?.data?.error || 'Unknown error'));
+      toast.error('Lỗi tổng hợp: ' + (error.response?.data?.error || 'Lỗi không xác định'));
     } finally {
       setIsAggregating(false);
     }
@@ -159,15 +159,15 @@ export default function LocationDetailPage() {
 
   const handleApprove = async () => {
     if (!formData.name_vi.trim()) {
-      toast.error('Restaurant name is required');
+      toast.error('Tên nhà hàng là bắt buộc');
       setActiveTab('info');
       return;
     }
     
     const confirmed = await confirm({
-      title: 'Approve Location',
-      message: `Create restaurant "${formData.name_vi}"?`,
-      confirmText: 'Approve',
+      title: 'Duyệt địa điểm',
+      message: `Tạo nhà hàng "${formData.name_vi}"?`,
+      confirmText: 'Duyệt',
       variant: 'info',
     });
     
@@ -181,10 +181,10 @@ export default function LocationDetailPage() {
         price_min: formData.price_min ? parseInt(formData.price_min) : null,
         price_max: formData.price_max ? parseInt(formData.price_max) : null,
       });
-      toast.success('Location approved! Restaurant created.');
+      toast.success('Đã duyệt! Nhà hàng đã được tạo.');
       navigate('/locations/pending');
     } catch (error: any) {
-      toast.error('Failed to approve: ' + (error.response?.data?.message || 'Unknown error'));
+      toast.error('Lỗi duyệt: ' + (error.response?.data?.message || 'Lỗi không xác định'));
     } finally {
       setSubmitting(false);
     }
@@ -192,9 +192,9 @@ export default function LocationDetailPage() {
 
   const handleReject = async () => {
     const confirmed = await confirm({
-      title: 'Reject Location',
-      message: 'Reject this location submission?',
-      confirmText: 'Reject',
+      title: 'Từ chối địa điểm',
+      message: 'Từ chối địa điểm này?',
+      confirmText: 'Từ chối',
       variant: 'danger',
     });
     
@@ -203,10 +203,10 @@ export default function LocationDetailPage() {
     setSubmitting(true);
     try {
       await apiClient.patch(`/admin/locations/${id}`, { action: 'reject' });
-      toast.success('Location rejected');
+      toast.success('Đã từ chối địa điểm');
       navigate('/locations/pending');
     } catch (error: any) {
-      toast.error('Failed to reject: ' + (error.response?.data?.message || 'Unknown error'));
+      toast.error('Lỗi từ chối: ' + (error.response?.data?.message || 'Lỗi không xác định'));
     } finally {
       setSubmitting(false);
     }
@@ -263,12 +263,12 @@ export default function LocationDetailPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900">Location not found</h3>
+        <h3 className="text-lg font-medium text-gray-900">Không tìm thấy địa điểm</h3>
         <button 
           onClick={() => navigate('/locations/pending')}
           className="mt-4 text-primary-600 hover:text-primary-700 font-medium"
         >
-          ← Back to pending locations
+          ← Quay lại danh sách chờ duyệt
         </button>
       </div>
     );
@@ -279,9 +279,9 @@ export default function LocationDetailPage() {
       <ConfirmDialog />
       
       <Breadcrumbs items={[
-        { label: 'Dashboard', href: '/' },
-        { label: 'Pending Locations', href: '/locations/pending' },
-        { label: location.restaurant_name || 'Review' },
+        { label: 'Tổng quan', href: '/' },
+        { label: 'Chờ duyệt', href: '/locations/pending' },
+        { label: location.restaurant_name || 'Chi tiết' },
       ]} />
 
       {/* Header Card */}
@@ -290,10 +290,10 @@ export default function LocationDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">
-                {location.restaurant_name || 'Unnamed Location'}
+                {location.restaurant_name || 'Chưa có tên'}
               </h1>
               <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                Pending
+                Chờ duyệt
               </span>
             </div>
             <p className="text-gray-600 flex items-center gap-2">
@@ -307,7 +307,7 @@ export default function LocationDetailPage() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                {location.submitted_by_name || 'Unknown user'}
+                {location.submitted_by_name || 'Không rõ'}
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -319,7 +319,7 @@ export default function LocationDetailPage() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
-                {posts.length} post{posts.length !== 1 ? 's' : ''}
+                {posts.length} bài viết
               </span>
             </div>
           </div>
@@ -337,14 +337,14 @@ export default function LocationDetailPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  AI Processing...
+                  Đang xử lý...
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  AI Aggregate
+                  AI Tổng hợp
                 </>
               )}
             </button>
@@ -353,7 +353,7 @@ export default function LocationDetailPage() {
               disabled={submitting}
               className="px-5 py-2.5 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors disabled:opacity-50"
             >
-              Reject
+              Từ chối
             </button>
             <button
               onClick={handleApprove}
@@ -366,14 +366,14 @@ export default function LocationDetailPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Processing...
+                  Đang xử lý...
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Approve
+                  Duyệt
                 </>
               )}
             </button>
@@ -387,9 +387,9 @@ export default function LocationDetailPage() {
         <div className="col-span-4 space-y-3">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              User Posts ({posts.length})
+              Bài viết ({posts.length})
             </h3>
-            <span className="text-xs text-gray-400">Sorted by upvotes</span>
+            <span className="text-xs text-gray-400">Theo lượt thích</span>
           </div>
           
           {posts.length === 0 ? (
@@ -397,7 +397,7 @@ export default function LocationDetailPage() {
               <svg className="w-10 h-10 mx-auto text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
               </svg>
-              <p className="text-sm text-gray-500">No posts yet</p>
+              <p className="text-sm text-gray-500">Chưa có bài viết</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
@@ -408,7 +408,7 @@ export default function LocationDetailPage() {
                     setSelectedPost(post);
                     setActiveTab('posts');
                   }}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all relative ${
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                     selectedPost?.id === post.id && activeTab === 'posts'
                       ? 'border-primary-500 bg-primary-50'
                       : isPostUsedInAggregate(post.id)
@@ -416,31 +416,24 @@ export default function LocationDetailPage() {
                         : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                 >
-                  {/* Rank Badge */}
-                  {index < 3 && (
-                    <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                      index === 1 ? 'bg-gray-300 text-gray-700' :
-                      'bg-amber-600 text-white'
-                    }`}>
-                      {index + 1}
-                    </div>
-                  )}
-                  
-                  {/* Used in AI badge */}
-                  {isPostUsedInAggregate(post.id) && (
-                    <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
-                      AI
-                    </div>
-                  )}
-                  
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                      {post.author_name?.[0]?.toUpperCase() || 'U'}
-                    </div>
+                    {/* Rank Badge - inside the card */}
+                    {index < 3 ? (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                        index === 1 ? 'bg-gray-300 text-gray-700' :
+                        'bg-amber-600 text-white'
+                      }`}>
+                        #{index + 1}
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
+                        {post.author_name?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 text-sm truncate">
-                        {post.author_name || 'Anonymous'}
+                        {post.author_name || 'Ẩn danh'}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span className="flex items-center gap-0.5 text-green-600 font-medium">
@@ -459,6 +452,12 @@ export default function LocationDetailPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         {post.photos.length}
+                      </span>
+                    )}
+                    {/* AI Used badge */}
+                    {isPostUsedInAggregate(post.id) && (
+                      <span className="px-2 py-0.5 bg-purple-600 text-white text-xs font-medium rounded-full">
+                        AI
                       </span>
                     )}
                   </div>
@@ -482,7 +481,7 @@ export default function LocationDetailPage() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Post Detail
+                Chi tiết bài viết
               </button>
               <button
                 onClick={() => setActiveTab('info')}
@@ -492,7 +491,7 @@ export default function LocationDetailPage() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Restaurant Info
+                Thông tin địa điểm
                 {aggregateResult && (
                   <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
                     AI
@@ -505,10 +504,10 @@ export default function LocationDetailPage() {
             {aggregateResult && activeTab === 'info' && (
               <div className="text-xs text-gray-500 flex items-center gap-2">
                 <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded">
-                  {aggregateResult.reviews_used.length} posts used
+                  {aggregateResult.reviews_used.length} bài viết
                 </span>
                 <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
-                  {aggregateResult.comments_used.length} comments
+                  {aggregateResult.comments_used.length} bình luận
                 </span>
               </div>
             )}
@@ -526,7 +525,7 @@ export default function LocationDetailPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900 text-lg">
-                          {selectedPost.author_name || 'Anonymous User'}
+                          {selectedPost.author_name || 'Ẩn danh'}
                         </h3>
                         <p className="text-sm text-gray-500">{formatDate(selectedPost.created_at)}</p>
                       </div>
@@ -540,7 +539,7 @@ export default function LocationDetailPage() {
                       </span>
                       {isPostUsedInAggregate(selectedPost.id) && (
                         <span className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                          Used by AI
+                          AI sử dụng
                         </span>
                       )}
                     </div>
@@ -554,7 +553,7 @@ export default function LocationDetailPage() {
 
                   {selectedPost.features && Object.keys(selectedPost.features).length > 0 && (
                     <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Features mentioned</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Đặc điểm đề cập</h4>
                       <div className="flex flex-wrap gap-2">
                         {Object.entries(selectedPost.features).map(([key, value]) => (
                           value && (
@@ -570,7 +569,7 @@ export default function LocationDetailPage() {
                   {selectedPost.photos && selectedPost.photos.length > 0 && (
                     <div className="mt-6">
                       <h4 className="text-sm font-medium text-gray-700 mb-3">
-                        Photos ({selectedPost.photos.length})
+                        Ảnh ({selectedPost.photos.length})
                       </h4>
                       <div className="grid grid-cols-3 gap-3">
                         {selectedPost.photos.map((photo, i) => (
@@ -594,16 +593,16 @@ export default function LocationDetailPage() {
                 <svg className="w-12 h-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
                 </svg>
-                <p className="mt-4 text-gray-500">Select a post to view details</p>
+                <p className="mt-4 text-gray-500">Chọn một bài viết để xem chi tiết</p>
               </div>
             )
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Restaurant Information</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Thông tin nhà hàng</h3>
                   <p className="text-sm text-gray-500">
-                    {aggregateResult ? 'Generated by AI - review and edit before approving' : 'Fill in details before approving'}
+                    {aggregateResult ? 'AI đã tổng hợp - kiểm tra và chỉnh sửa trước khi duyệt' : 'Điền thông tin trước khi duyệt'}
                   </p>
                 </div>
               </div>
@@ -611,23 +610,23 @@ export default function LocationDetailPage() {
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Restaurant Name <span className="text-red-500">*</span>
+                    Tên nhà hàng <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.name_vi}
                     onChange={(e) => setFormData({ ...formData, name_vi: e.target.value })}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="E.g., Pho Thin"
+                    placeholder="VD: Phở Thìn"
                   />
                 </div>
 
                 {/* Cuisine Types - New format with name/description */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cuisine Types
+                    Loại ẩm thực
                     {formData.cuisine_types.length > 0 && (
-                      <span className="ml-2 text-xs text-gray-400">({formData.cuisine_types.length} items)</span>
+                      <span className="ml-2 text-xs text-gray-400">({formData.cuisine_types.length} loại)</span>
                     )}
                   </label>
                   {formData.cuisine_types.length > 0 ? (
@@ -657,13 +656,13 @@ export default function LocationDetailPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">No cuisine types. Click AI Aggregate to generate.</p>
+                    <p className="text-sm text-gray-400 italic">Chưa có loại ẩm thực. Nhấn AI Tổng hợp để tạo.</p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Price (VND)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá thấp nhất (VND)</label>
                     <input
                       type="number"
                       value={formData.price_min}
@@ -673,7 +672,7 @@ export default function LocationDetailPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Price (VND)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá cao nhất (VND)</label>
                     <input
                       type="number"
                       value={formData.price_max}
@@ -685,7 +684,7 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Opening Hours</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Giờ mở cửa</label>
                   <input
                     type="text"
                     value={formData.opening_hours}
@@ -696,7 +695,7 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tiện ích</label>
                   <div className="grid grid-cols-3 gap-2">
                     {['wifi', 'parking', 'air_con', 'credit_card', 'delivery', 'outdoor'].map((feature) => (
                       <label
@@ -720,13 +719,13 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={4}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
-                    placeholder="Restaurant description..."
+                    placeholder="Mô tả nhà hàng..."
                   />
                 </div>
               </div>

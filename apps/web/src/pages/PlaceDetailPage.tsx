@@ -150,7 +150,7 @@ export function PlaceDetailPage() {
         );
 
       case "binh-luan":
-        return <CommentsTab restaurantId={restaurant.id} />
+        return <CommentsTab restaurantId={restaurant.id} slug={slug} />
 
       case "nhan-xet":
         return <ReviewsTab restaurantId={restaurant.id} />;

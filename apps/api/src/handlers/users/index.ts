@@ -6,3 +6,4 @@ export { handler as getMyStatsHandler } from './stats';
 export { handler as getMyVotesHandler } from './votes';
 export { getUploadUrlHandler as getAvatarUploadUrlHandler, updateAvatarHandler } from './avatar';
 export { getBackgroundUploadUrlHandler, updateBackgroundHandler } from './background';
+export { setPasswordHandler } from './set-password';

@@ -21,18 +21,18 @@ export default function PlacesPage() {
     mutationFn: (id: string) => adminApi.deletePlace(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-places'] });
-      toast.success('Place deleted successfully');
+      toast.success('Đã xóa địa điểm');
     },
     onError: () => {
-      toast.error('Failed to delete place');
+      toast.error('Lỗi khi xóa địa điểm');
     },
   });
 
   const handleDelete = async (id: string, name: string) => {
     const confirmed = await confirm({
-      title: 'Delete Place',
-      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
-      confirmText: 'Delete',
+      title: 'Xóa địa điểm',
+      message: `Bạn có chắc muốn xóa "${name}"? Hành động này không thể hoàn tác.`,
+      confirmText: 'Xóa',
       variant: 'danger',
     });
 
@@ -50,16 +50,16 @@ export default function PlacesPage() {
       <ConfirmDialog />
       
       <Breadcrumbs items={[
-        { label: 'Dashboard', href: '/' },
-        { label: 'Places' },
+        { label: 'Tổng quan', href: '/' },
+        { label: 'Địa điểm' },
       ]} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Places</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Địa điểm</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {pagination.total} total places
+            {pagination.total} địa điểm
           </p>
         </div>
         
@@ -71,7 +71,7 @@ export default function PlacesPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search places..."
+              placeholder="Tìm địa điểm..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -89,10 +89,10 @@ export default function PlacesPage() {
             }}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="pending">Pending</option>
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Đang hoạt động</option>
+            <option value="inactive">Không hoạt động</option>
+            <option value="pending">Chờ duyệt</option>
           </select>
         </div>
       </div>
@@ -107,22 +107,22 @@ export default function PlacesPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Place
+                    Địa điểm
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Address
+                    Địa chỉ
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Reviews
+                    Bài viết
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rating
+                    Đánh giá
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Trạng thái
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    Thao tác
                   </th>
                 </tr>
               </thead>
@@ -130,7 +130,7 @@ export default function PlacesPage() {
                 {places.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                      No places found
+                      Không tìm thấy địa điểm
                     </td>
                   </tr>
                 ) : (
@@ -179,7 +179,7 @@ export default function PlacesPage() {
                           <button
                             onClick={() => window.open(`https://mapvibe.site/places/${place.slug}`, '_blank')}
                             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="View on site"
+                            title="Xem trên web"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -188,7 +188,7 @@ export default function PlacesPage() {
                           <button
                             onClick={() => handleDelete(place.id as string, (place.name_vi || place.name) as string)}
                             className="p-2 text-red-400 hover:text-red-600 transition-colors"
-                            title="Delete"
+                            title="Xóa"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -208,9 +208,9 @@ export default function PlacesPage() {
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{page * 20 + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min((page + 1) * 20, pagination.total)}</span> of{' '}
-                  <span className="font-medium">{pagination.total}</span> results
+                  Hiển thị <span className="font-medium">{page * 20 + 1}</span> đến{' '}
+                  <span className="font-medium">{Math.min((page + 1) * 20, pagination.total)}</span> trong{' '}
+                  <span className="font-medium">{pagination.total}</span> kết quả
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -218,17 +218,17 @@ export default function PlacesPage() {
                     disabled={page === 0}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Previous
+                    Trước
                   </button>
                   <span className="text-sm text-gray-600">
-                    Page {page + 1} of {totalPages}
+                    Trang {page + 1} / {totalPages}
                   </span>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={(page + 1) * 20 >= pagination.total}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </div>

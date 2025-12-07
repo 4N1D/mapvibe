@@ -62,4 +62,19 @@ export const adminApi = {
   getUser: (id: string) => apiClient.get(`/admin/users/${id}`),
   updateUser: (id: string, action: string, reason?: string, role?: string) =>
     apiClient.patch(`/admin/users/${id}`, { action, reason, role }),
+
+  // Reports
+  getReports: (params?: { limit?: number; offset?: number; status?: string; target_type?: string; reason?: string }) =>
+    apiClient.get('/admin/reports', { params }),
+  getReport: (id: string) => apiClient.get(`/admin/reports/${id}`),
+  updateReport: (id: string, data: { status?: string; admin_notes?: string; action?: string }) =>
+    apiClient.patch(`/admin/reports/${id}`, data),
+
+  // Activities
+  getActivities: (params?: { limit?: number; offset?: number; user_id?: string; activity_type?: string; date_from?: string; date_to?: string }) =>
+    apiClient.get('/admin/activities', { params }),
+  getActivityStats: (params?: { days?: number }) =>
+    apiClient.get('/admin/activities/stats', { params }),
+  getUserActivities: (userId: string, params?: { limit?: number; offset?: number }) =>
+    apiClient.get(`/admin/activities/user/${userId}`, { params }),
 };

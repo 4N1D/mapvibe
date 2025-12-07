@@ -565,11 +565,14 @@ export function PostDetailPage() {
         {activeTab === "gioi-thieu" && (
           <div className="rounded-xl bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-lg font-semibold text-gray-900">Giới thiệu</h3>
-            <p className="text-gray-700">{post.description}</p>
+            <div 
+              className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
+              dangerouslySetInnerHTML={{ __html: post.description }}
+            />
           </div>
         )}
 
-        {activeTab === "binh-luan" && <CommentsTab restaurantId={post.restaurantId} />}
+        {activeTab === "binh-luan" && <CommentsTab restaurantId={post.restaurantId} slug={post.slug} />}
 
         {activeTab === "anh" && <PhotosTab restaurantId={post.restaurantId} showFilters={false} />}
 

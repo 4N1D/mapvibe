@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Input } from "@mapvibe/ui-components";
+import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ConfirmFormProps {
@@ -78,7 +79,7 @@ export const ConfirmForm = ({ email, onSuccess, onBack }: ConfirmFormProps) => {
           type="button"
           onClick={() => {
             // TODO: Resend code
-            alert("Tính năng gửi lại mã đang được phát triển");
+            toast("Tính năng gửi lại mã đang được phát triển", { icon: "🚧" });
           }}
           className="font-medium text-primary-600 hover:underline"
         >

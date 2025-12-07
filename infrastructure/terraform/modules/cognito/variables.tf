@@ -13,13 +13,21 @@ variable "environment" {
 variable "callback_urls" {
   description = "Callback URLs for OAuth"
   type        = list(string)
-  default     = ["http://localhost:5173/auth/callback", "https://mapvibe.site/auth/callback"]
+  default     = [
+    "http://localhost:5173/auth/callback",
+    "https://d1oasw0quh6m55.cloudfront.net/auth/callback",
+    "https://mapvibe.site/auth/callback"
+  ]
 }
 
 variable "logout_urls" {
   description = "Logout URLs for OAuth"
   type        = list(string)
-  default     = ["http://localhost:5173/", "https://mapvibe.site/"]
+  default     = [
+    "http://localhost:5173",
+    "https://d1oasw0quh6m55.cloudfront.net",
+    "https://mapvibe.site"
+  ]
 }
 
 # Google OAuth (optional)

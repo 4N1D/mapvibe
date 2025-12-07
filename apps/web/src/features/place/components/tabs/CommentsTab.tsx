@@ -7,17 +7,26 @@ import { CommentForm } from "../CommentForm";
 import { CommentItem } from "../CommentItem";
 
 interface CommentsTabProps {
-  restaurantId: number;
+  restaurantId?: number;
+  slug?: string;
 }
 
-const fetchComments = async (restaurantId: number, page: number) => {
+const fetchComments = async (slug: string, page: number) => {
   const response = await apiClient.get<CommentsResponse>(
-    `/comments/${restaurantId}?page=${page}&limit=10`
+    `/restaurants/${slug}/comments?page=${page}&limit=10`
   );
   return response.data;
 };
 
-export function CommentsTab({ restaurantId }: CommentsTabProps) {
+export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
+  // Need slug to fetch comments
+  if (!slug) {
+    return (
+      <div className="rounded-lg bg-white p-6 shadow-sm">
+        <p className="py-8 text-center text-gray-500">Không thể tải bình luận</p>
+      </div>
+    );
+  }
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -26,8 +35,8 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
   const [hasMore, setHasMore] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["comments", restaurantId],
-    queryFn: () => fetchComments(restaurantId, 1),
+    queryKey: ["comments", slug],
+    queryFn: () => fetchComments(slug, 1),
     placeholderData: (prev) => prev,
   });
 
@@ -41,7 +50,7 @@ export function CommentsTab({ restaurantId }: CommentsTabProps) {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchComments(restaurantId, nextPage);
+      const response = await fetchComments(slug, nextPage);
       const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
       setLocalComments([...currentComments, ...response.comments]);
       setHasMore(response.page < response.total_pages);

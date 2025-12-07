@@ -11,8 +11,55 @@ import {
   Bookmark,
   MessageCircle,
   Share2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { CommentsTab, PhotosTab, MenuTab } from "@/features/place";
+import { apiClient } from "@/lib/axios";
+
+interface ReviewPhoto {
+  url: string;
+  caption?: string;
+}
+
+interface ReviewFromAPI {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string | null;
+  location_address_id?: string;
+  text: string;
+  features?: string[];
+  photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] };
+  upvote_count: number;
+  downvote_count: number;
+  comment_count: number;
+  share_count: number;
+  view_count: number;
+  created_at: string;
+  location_name?: string;
+  location_street_address?: string;
+  location_ward?: string;
+  location_city?: string;
+  location_full_address?: string;
+  location_geo_lat?: number | null;
+  location_geo_lng?: number | null;
+  location_cuisine_types?: string[] | Array<{ name: string; description?: string }> | null;
+  location_price_min?: number | null;
+  location_price_max?: number | null;
+  location_phone?: string | null;
+  location_opening_hours?: Record<string, string> | null;
+  location_restaurant_id?: string | null;
+  location_review_count?: number;
+  location_avg_upvote_rate?: number | null;
+  location_status?: string;
+}
+
+interface ReviewsResponse {
+  count: number;
+  limit: number;
+  offset: number;
+  reviews: ReviewFromAPI[];
+}
 
 interface PostDetail {
   id: string;
@@ -39,36 +86,177 @@ interface PostDetail {
   images: string[];
 }
 
-// Mock data
-const mockPost: PostDetail = {
-  id: "p1",
-  slug: "kichi-kichi",
-  restaurantId: 1, // Temporary mock ID for API calls
-  author: "Đỗ Trung Quân",
-  userRank: "Hạng bạc",
-  timeAgo: "2 giờ trước",
-  approved: false,
-  title: "Kichi Kichi",
-  address: "Tầng 4 Vincom Plaza Lê Văn Việt, 50 Lê Văn Việt, Hiệp Phú, Quận 9, TP. HCM",
-  phone: "0123456789",
-  priceRange: "150.000 vnđ - 300.000 vnđ",
-  hours: "11:00 AM - 10:00 PM",
-  isOpen: true,
-  categories: ["Lẩu", "Buffet", "Nhật Bản", "Gia đình"],
-  description:
-    "Tôi thấy đồ ăn ở đây tuy ngon nhưng rất đỗ ăn, nhân viên có thái độ lồi lõm khi khách muốn ăn quýt.",
-  stats: {
-    likes: 1200,
-    dislikes: 503,
-    comments: 324,
-  },
-  images: [
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80",
-  ],
+// Helper function to format time ago
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) {
+    return "Vừa xong";
+  }
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} phút trước`;
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} giờ trước`;
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return `${diffInDays} ngày trước`;
+  }
+
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) {
+    return `${diffInWeeks} tuần trước`;
+  }
+
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) {
+    return `${diffInMonths} tháng trước`;
+  }
+
+  const diffInYears = Math.floor(diffInDays / 365);
+  return `${diffInYears} năm trước`;
+};
+
+// Helper function to format price range
+const formatPriceRange = (min?: number | null, max?: number | null): string => {
+  if (!min && !max) return "Chưa có thông tin";
+  if (!min) return `Dưới ${max?.toLocaleString("vi-VN")} VNĐ`;
+  if (!max) return `Từ ${min.toLocaleString("vi-VN")} VNĐ`;
+  return `${min.toLocaleString("vi-VN")} - ${max.toLocaleString("vi-VN")} VNĐ`;
+};
+
+// Helper function to format opening hours
+const formatOpeningHours = (hours?: Record<string, string> | null): string => {
+  if (!hours) return "Chưa có thông tin";
+  
+  // Get all unique hour ranges
+  const hourRanges = Object.values(hours).filter(Boolean);
+  if (hourRanges.length === 0) return "Chưa có thông tin";
+  
+  // Count frequency of each hour range
+  const hourCount: Record<string, number> = {};
+  hourRanges.forEach((range) => {
+    hourCount[range] = (hourCount[range] || 0) + 1;
+  });
+  
+  // Find the most common hour range
+  let mostCommonRange = "";
+  let maxCount = 0;
+  Object.entries(hourCount).forEach(([range, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      mostCommonRange = range;
+    }
+  });
+  
+  // If all days have the same hours, show just the hours
+  if (maxCount === hourRanges.length) {
+    return mostCommonRange;
+  }
+  
+  // If most days have the same hours, show it with note
+  const totalDays = Object.keys(hours).length;
+  if (maxCount >= totalDays * 0.7) {
+    // If 70% or more days have the same hours, show it
+    return mostCommonRange;
+  }
+  
+  // Otherwise, show the most common range with a note
+  return mostCommonRange || hourRanges[0];
+};
+
+// Helper function to generate slug from location name or use id
+const generateSlug = (locationName?: string, id?: string): string => {
+  if (locationName) {
+    return locationName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || id || "";
+  }
+  return id || "";
+};
+
+// Helper function to extract images from photos
+const extractImages = (photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] }): string[] => {
+  if (!photos) return [];
+  
+  // If photos is an array
+  if (Array.isArray(photos)) {
+    return photos.map((photo) => photo.url);
+  }
+  
+  // If photos is an object with general, food, menu
+  const allPhotos: ReviewPhoto[] = [
+    ...(photos.general || []),
+    ...(photos.food || []),
+    ...(photos.menu || []),
+  ];
+  return allPhotos.map((photo) => photo.url);
+};
+
+// Helper function to extract categories from cuisine types
+const extractCategories = (cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null): string[] => {
+  if (!cuisineTypes) return [];
+  
+  if (Array.isArray(cuisineTypes)) {
+    if (cuisineTypes.length === 0) return [];
+    
+    // Check if first item is string or object
+    if (typeof cuisineTypes[0] === "string") {
+      return cuisineTypes as string[];
+    } else {
+      return (cuisineTypes as Array<{ name: string }>).map((item) => item.name);
+    }
+  }
+  
+  return [];
+};
+
+// Map API review to PostDetail
+const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
+  const slug = generateSlug(review.location_name, review.id);
+  const images = extractImages(review.photos);
+  const categories = extractCategories(review.location_cuisine_types);
+  
+  // Determine if location is open (simplified - you might want to add actual logic)
+  const isOpen = true; // TODO: Add logic to check if location is currently open based on opening_hours
+  
+  return {
+    id: review.id,
+    slug,
+    restaurantId: review.location_restaurant_id ? parseInt(review.location_restaurant_id.replace("R_", ""), 16) || 0 : 0,
+    author: review.author_name,
+    authorAvatar: review.author_avatar || undefined,
+    userRank: "Hạng đồng", // Default rank
+    timeAgo: formatTimeAgo(review.created_at),
+    approved: review.location_status === "approved",
+    title: review.location_name || "Địa điểm chưa có tên",
+    address: review.location_full_address || review.location_street_address || "Chưa có địa chỉ",
+    phone: review.location_phone || "Chưa có số điện thoại",
+    priceRange: formatPriceRange(review.location_price_min, review.location_price_max),
+    hours: formatOpeningHours(review.location_opening_hours),
+    isOpen,
+    categories,
+    description: review.text,
+    stats: {
+      likes: review.upvote_count,
+      dislikes: review.downvote_count,
+      comments: review.comment_count,
+    },
+    images: images.length > 0 ? images : [
+      "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
+    ],
+  };
 };
 
 export function PostDetailPage() {
@@ -76,16 +264,88 @@ export function PostDetailPage() {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [activeTab, setActiveTab] = useState<string>("binh-luan");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  // Check if URL has #comments hash to auto-scroll to comments
+  useEffect(() => {
+    if (window.location.hash === "#comments" && !loading && post) {
+      setActiveTab("binh-luan");
+      // Scroll to comments section after a delay to ensure DOM is ready
+      const scrollToComments = () => {
+        const tabContent = document.getElementById("tab-content");
+        if (tabContent) {
+          // Calculate offset to account for sticky header
+          const headerOffset = 80;
+          const elementPosition = tabContent.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth"
+          });
+        }
+      };
+      
+      // Try multiple times to ensure DOM is ready
+      setTimeout(scrollToComments, 300);
+      setTimeout(scrollToComments, 600);
+      setTimeout(scrollToComments, 1000);
+    }
+  }, [loading, post]);
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      if (slug === mockPost.slug) {
-        setPost(mockPost);
-      }
+    if (!slug) {
       setLoading(false);
-    }, 300);
+      return;
+    }
+
+    const fetchPost = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch reviews from API
+        const response = await apiClient.get<ReviewsResponse>("/reviews", {
+          params: {
+            limit: 100, // Fetch more to increase chance of finding the review
+            offset: 0,
+          },
+        });
+
+        const reviews = response.data?.reviews || [];
+        
+        // Find review by slug or ID
+        const foundReview = reviews.find((review) => {
+          const reviewSlug = generateSlug(review.location_name, review.id);
+          return reviewSlug === slug || review.id === slug;
+        });
+
+        if (foundReview) {
+          const mappedPost = mapReviewToPostDetail(foundReview);
+          setPost(mappedPost);
+          setImageError(false); // Reset image error state khi load bài review mới
+        } else {
+          setError("Không tìm thấy bài review");
+        }
+      } catch (err) {
+        console.error("[PostDetailPage] Failed to fetch review:", err);
+        const error = err as { response?: { data?: { message?: string } }; message?: string };
+        setError(
+          error.response?.data?.message || error.message || "Không thể tải bài review"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPost();
   }, [slug]);
+
+  // Reset image error khi post thay đổi
+  useEffect(() => {
+    setImageError(false);
+  }, [post?.id]);
 
   if (loading) {
     return (
@@ -95,10 +355,10 @@ export function PostDetailPage() {
     );
   }
 
-  if (!post) {
+  if (error || !post) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <p className="text-lg text-gray-600">Không tìm thấy bài đăng</p>
+        <p className="text-lg text-gray-600">{error || "Không tìm thấy bài đăng"}</p>
         <Link to="/nearby" className="text-primary-500 hover:underline">
           ← Quay về danh sách
         </Link>
@@ -111,6 +371,10 @@ export function PostDetailPage() {
       {/* Back button */}
       <Link
         to="/nearby"
+        onClick={() => {
+          // Đánh dấu rằng đang quay lại từ PostDetailPage
+          sessionStorage.setItem("returningFromPostDetail", "true");
+        }}
         className="mb-4 inline-flex items-center gap-2 text-gray-600 hover:text-primary-500"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -122,36 +386,22 @@ export function PostDetailPage() {
         {/* Gallery - Left on Desktop (5 cols) */}
         <section className="lg:order-1 lg:col-span-5">
           <div className="h-full overflow-hidden rounded-xl shadow-sm">
-            <div className="flex h-96 gap-2">
-              {/* Main image - Left 60% */}
-              <div className="w-[60%] overflow-hidden rounded-lg">
+            <div className="h-96 w-full">
+              {post.images.length > 0 && post.images[0] && !imageError ? (
                 <img
                   src={post.images[0]}
                   alt={post.title}
                   className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                  onError={() => setImageError(true)}
                 />
-              </div>
-
-              {/* Grid 2x2 - Right 40% */}
-              <div className="grid w-[40%] grid-cols-2 grid-rows-2 gap-2">
-                {post.images.slice(1, 5).map((img, idx) => (
-                  <div
-                    key={idx}
-                    className={`overflow-hidden rounded-lg ${idx === 3 ? "relative" : ""}`}
-                  >
-                    <img
-                      src={img}
-                      alt=""
-                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                    />
-                    {idx === 3 && (
-                      <button className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-medium text-white transition-colors hover:bg-black/60">
-                        Xem thêm
-                      </button>
-                    )}
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                  <div className="flex flex-col items-center gap-3 text-gray-400">
+                    <ImageIcon className="h-12 w-12" />
+                    <span className="text-sm font-medium">Chưa có ảnh</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -162,10 +412,7 @@ export function PostDetailPage() {
             <div>
               {/* Title & Categories */}
               <div className="mb-4">
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
-                    Yêu thích
-                  </span>
+                <div className="mb-3">
                   <h1 className="text-2xl font-bold leading-tight text-gray-900 md:text-4xl">
                     {post.title}
                   </h1>
@@ -185,15 +432,7 @@ export function PostDetailPage() {
                 <div className="flex items-center gap-3 text-gray-700">
                   <Clock className="h-4 w-4 shrink-0 text-gray-400" />
                   <div className="flex items-center gap-2">
-                    <span
-                      className={
-                        post.isOpen ? "font-bold text-green-600" : "font-bold text-red-600"
-                      }
-                    >
-                      {post.isOpen ? "Đang mở cửa" : "Đã đóng cửa"}
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span>{post.hours}</span>
+                    <span>Giờ mở cửa | {post.hours}</span>
                   </div>
                 </div>
 
@@ -269,21 +508,6 @@ export function PostDetailPage() {
                   Chưa kiểm duyệt
                 </span>
               )}
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
-                  post.userRank === "Hạng đồng"
-                    ? "bg-orange-100 text-orange-700 ring-orange-200"
-                    : post.userRank === "Hạng bạc"
-                      ? "bg-gray-200 text-gray-700 ring-gray-300"
-                      : post.userRank === "Hạng vàng"
-                        ? "bg-yellow-100 text-yellow-700 ring-yellow-200"
-                        : post.userRank === "Hạng kim cương"
-                          ? "bg-blue-100 text-blue-700 ring-blue-200"
-                          : "bg-purple-100 text-purple-700 ring-purple-200"
-                }`}
-              >
-                {post.userRank}
-              </span>
             </div>
             <span className="text-sm text-gray-500">{post.timeAgo}</span>
           </div>
@@ -347,7 +571,7 @@ export function PostDetailPage() {
 
         {activeTab === "binh-luan" && <CommentsTab restaurantId={post.restaurantId} />}
 
-        {activeTab === "anh" && <PhotosTab restaurantId={post.restaurantId} />}
+        {activeTab === "anh" && <PhotosTab restaurantId={post.restaurantId} showFilters={false} />}
 
         {activeTab === "thuc-don" && <MenuTab restaurantId={post.restaurantId} />}
       </section>

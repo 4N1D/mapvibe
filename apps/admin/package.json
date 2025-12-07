@@ -13,6 +13,7 @@
     "deploy": "vite build && aws s3 sync dist s3://mapvibe-admin-static/ --delete"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "@mapvibe/types": "workspace:*",
     "@tanstack/react-query": "^5.90.12",
     "aws-amplify": "^6.15.8",
@@ -21,6 +22,7 @@
     "jwt-decode": "^4.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.6",
     "tailwind-merge": "^3.4.0"
   },

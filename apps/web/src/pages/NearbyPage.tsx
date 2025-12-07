@@ -70,7 +70,7 @@ interface PostItem {
   id: string;
   slug: string;
   author: string;
-  authorAvatar?: string | null;
+  authorAvatar?: string;
   userRank: "Hạng đồng" | "Hạng bạc" | "Hạng vàng" | "Hạng kim cương" | "Hạng bạch kim";
   timeAgo: string;
   approved: boolean;

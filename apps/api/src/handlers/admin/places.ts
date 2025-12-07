@@ -33,7 +33,6 @@ export const listPlacesHandler: Handler = {
           'name_vi',
           'slug',
           'address',
-          'district',
           'cuisine_types',
           'price_min',
           'price_max',

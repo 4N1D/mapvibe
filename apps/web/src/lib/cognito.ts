@@ -8,6 +8,7 @@ import {
   fetchUserAttributes,
   signInWithRedirect,
   fetchAuthSession,
+  updatePassword,
 } from "aws-amplify/auth";
 
 Amplify.configure({
@@ -118,5 +119,18 @@ export const getUserAttributes = async (): Promise<Record<string, string> | null
 export const signInWithGoogle = async (): Promise<void> => {
   await signInWithRedirect({
     provider: "Google",
+  });
+};
+
+/**
+ * Change password for authenticated user
+ */
+export const changePassword = async (
+  oldPassword: string,
+  newPassword: string
+): Promise<void> => {
+  await updatePassword({
+    oldPassword,
+    newPassword,
   });
 };

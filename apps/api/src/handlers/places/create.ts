@@ -8,7 +8,6 @@ interface CreatePlaceBody {
   name_vi: string;
   slug?: string;
   address: string;
-  district?: string;
   ward?: string;
   geo_lat: number;
   geo_lng: number;
@@ -35,7 +34,6 @@ export const handler: Handler = {
         name_vi,
         slug,
         address,
-        district,
         ward,
         geo_lat,
         geo_lng,
@@ -66,7 +64,6 @@ export const handler: Handler = {
           name_vi,
           slug: finalSlug,
           address,
-          district,
           ward,
           geo_lat,
           geo_lng,

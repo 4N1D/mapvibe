@@ -56,7 +56,6 @@ export interface Place {
   name_vi: string;
   slug?: string;
   address: string;
-  district?: string;
   ward?: string;
   geo_lat?: number;
   geo_lng?: number;

@@ -14,10 +14,7 @@ interface SubmitNewPlaceBody {
   restaurant_name: string;
   street_address: string;
   ward?: string;
-  district: string;
   city?: string;
-  geo_lat: number;
-  geo_lng: number;
   text: string;
   features?: string[];
   photos?: Photo[];
@@ -30,7 +27,6 @@ interface DuplicateCandidate {
   id: string;
   restaurant_name: string | null;
   street_address: string;
-  district: string;
   geo_lat: number | null;
   geo_lng: number | null;
   similarity_score: number;
@@ -39,7 +35,6 @@ interface DuplicateCandidate {
 }
 
 const DUPLICATE_THRESHOLD = 0.7;
-const PROXIMITY_METERS = 100;
 
 // Extract house number from street address (e.g., "123 Nguyen Hue" -> "123", "12A/3 Le Loi" -> "12A/3")
 const extractHouseNumber = (address: string): string | null => {
@@ -64,10 +59,7 @@ export const handler: Handler = {
         restaurant_name,
         street_address,
         ward,
-        district,
         city = 'TP. Hồ Chí Minh',
-        geo_lat,
-        geo_lng,
         text,
         features = [],
         photos = [],
@@ -86,17 +78,11 @@ export const handler: Handler = {
       if (!street_address) {
         return badRequest('street_address is required');
       }
-      if (!district) {
-        return badRequest('district is required');
-      }
-      if (geo_lat == null || geo_lng == null) {
-        return badRequest('geo_lat and geo_lng are required');
-      }
       if (!text) {
         return badRequest('text is required');
       }
-      if (text.length < 100) {
-        return badRequest('Review text must be at least 100 characters');
+      if (text.length < 50) {
+        return badRequest('Review text must be at least 50 characters');
       }
 
       // Verify author exists
@@ -112,38 +98,27 @@ export const handler: Handler = {
 
       // Normalize address for exact match comparison
       const normalizedStreetAddress = street_address.toLowerCase().replace(/\s+/g, ' ').trim();
-      const normalizedDistrict = district.toLowerCase().replace(/\s+/g, ' ').trim();
 
-      // Phase 1: Duplicate Check using fuzzy name matching (pg_trgm) and geospatial proximity (ST_DWithin)
+      // Phase 1: Duplicate Check using fuzzy name matching (pg_trgm)
       const duplicates: DuplicateCandidate[] = [];
 
-      // Check location_addresses table
-      // Check for exact address match OR fuzzy match
+      // Check location_addresses table - fuzzy name/address matching only
       const inputHouseNumber = extractHouseNumber(street_address);
       const locationDuplicates = await sql<DuplicateCandidate>`
         SELECT 
           id,
           restaurant_name,
           street_address,
-          district,
           geo_lat,
           geo_lng,
           similarity(COALESCE(restaurant_name, ''), ${restaurant_name}) as similarity_score,
-          CASE 
-            WHEN location IS NOT NULL THEN
-              ST_Distance(
-                location::geography,
-                ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography
-              )
-            ELSE NULL
-          END as distance_meters,
+          NULL::float as distance_meters,
           'location_addresses'::text as source
         FROM location_addresses
         WHERE status IN ('pending', 'approved')
           AND (
             -- Exact address match (normalized)
-            (LOWER(REGEXP_REPLACE(street_address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
-             AND LOWER(REGEXP_REPLACE(district, '\s+', ' ', 'g')) = ${normalizedDistrict})
+            LOWER(REGEXP_REPLACE(street_address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
             OR
             -- Fuzzy match conditions
             (
@@ -154,14 +129,6 @@ export const handler: Handler = {
               AND (
                 similarity(COALESCE(restaurant_name, ''), ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
                 OR similarity(street_address, ${street_address}) > ${DUPLICATE_THRESHOLD}
-                OR (
-                  location IS NOT NULL 
-                  AND ST_DWithin(
-                    location::geography,
-                    ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
-                    ${PROXIMITY_METERS}
-                  )
-                )
               )
             )
           )
@@ -171,32 +138,22 @@ export const handler: Handler = {
 
       duplicates.push(...(locationDuplicates.rows as DuplicateCandidate[]));
 
-      // Check restaurants table
-      // Check for exact address match OR fuzzy match
+      // Check restaurants table - fuzzy name/address matching only
       const restaurantDuplicates = await sql<DuplicateCandidate>`
         SELECT 
           id,
           name_vi as restaurant_name,
           address as street_address,
-          district,
           geo_lat,
           geo_lng,
           similarity(name_vi, ${restaurant_name}) as similarity_score,
-          CASE 
-            WHEN location IS NOT NULL THEN
-              ST_Distance(
-                location::geography,
-                ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography
-              )
-            ELSE NULL
-          END as distance_meters,
+          NULL::float as distance_meters,
           'restaurants'::text as source
         FROM restaurants
         WHERE status = 'approved'
           AND (
             -- Exact address match (normalized)
-            (LOWER(REGEXP_REPLACE(address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
-             AND LOWER(REGEXP_REPLACE(district, '\s+', ' ', 'g')) = ${normalizedDistrict})
+            LOWER(REGEXP_REPLACE(address, '\s+', ' ', 'g')) = ${normalizedStreetAddress}
             OR
             -- Fuzzy match conditions
             (
@@ -207,14 +164,6 @@ export const handler: Handler = {
               AND (
                 similarity(name_vi, ${restaurant_name}) > ${DUPLICATE_THRESHOLD}
                 OR similarity(address, ${street_address}) > ${DUPLICATE_THRESHOLD}
-                OR (
-                  location IS NOT NULL 
-                  AND ST_DWithin(
-                    location::geography,
-                    ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326)::geography,
-                    ${PROXIMITY_METERS}
-                  )
-                )
               )
             )
           )
@@ -243,7 +192,6 @@ export const handler: Handler = {
               id: d.id,
               name: d.restaurant_name,
               address: d.street_address,
-              district: d.district,
               similarity_score: Number(d.similarity_score).toFixed(2),
               distance_meters: d.distance_meters ? Math.round(d.distance_meters) : null,
               source: d.source,
@@ -257,6 +205,9 @@ export const handler: Handler = {
       const reviewPostId = crypto.randomUUID();
 
       await db.transaction().execute(async (trx) => {
+        // Build full address string
+        const fullAddress = [street_address, ward, city].filter(Boolean).join(', ');
+
         // Insert into location_addresses with status = 'pending'
         await sql`
           INSERT INTO location_addresses (
@@ -264,12 +215,8 @@ export const handler: Handler = {
             restaurant_name,
             street_address,
             ward,
-            district,
             city,
             full_address,
-            geo_lat,
-            geo_lng,
-            location,
             status,
             review_count,
             created_by_user_id,
@@ -283,12 +230,8 @@ export const handler: Handler = {
             ${restaurant_name},
             ${street_address},
             ${ward || null},
-            ${district},
             ${city},
-            ${`${street_address}, ${ward ? ward + ', ' : ''}${district}, ${city}`},
-            ${geo_lat},
-            ${geo_lng},
-            ST_SetSRID(ST_MakePoint(${geo_lng}, ${geo_lat}), 4326),
+            ${fullAddress},
             'pending',
             1,
             ${author_id},
@@ -346,7 +289,6 @@ export const handler: Handler = {
           id: locationAddressId,
           restaurant_name,
           street_address,
-          district,
           city,
           status: 'pending',
         },

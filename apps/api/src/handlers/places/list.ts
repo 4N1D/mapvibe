@@ -11,18 +11,16 @@ export const handler: Handler = {
       const params = event.queryStringParameters || {};
       const limit = Math.min(parseInt(params.limit || "20"), 100);
       const offset = parseInt(params.offset || "0");
-      const district = params.district;
       const status = params.status || "approved";
 
       // Build query
-      let query = db
+      const places = await db
         .selectFrom("restaurants")
         .select([
           "id",
           "name_vi",
           "slug",
           "address",
-          "district",
           "geo_lat",
           "geo_lng",
           "cuisine_types",
@@ -35,13 +33,8 @@ export const handler: Handler = {
         .where("status", "=", status)
         .orderBy("rating_overall", "desc")
         .limit(limit)
-        .offset(offset);
-
-      if (district) {
-        query = query.where("district", "=", district);
-      }
-
-      const places = await query.execute();
+        .offset(offset)
+        .execute();
 
       // Get total count
       const countResult = await db

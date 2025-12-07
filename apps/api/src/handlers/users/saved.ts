@@ -27,7 +27,6 @@ export const handler: Handler = {
           'restaurants.name_vi as name',
           'restaurants.slug',
           'restaurants.address',
-          'restaurants.district',
           'restaurants.ward',
           'restaurants.rating_overall',
           'restaurants.review_count',

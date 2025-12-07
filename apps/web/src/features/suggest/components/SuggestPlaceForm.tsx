@@ -114,7 +114,7 @@ export function SuggestPlaceForm() {
 
   const uploadPhotoToS3 = async (photo: PhotoUploadItem): Promise<{ url: string; caption: string }> => {
     const uploadResponse = await apiClient.post<{ upload_url: string; cdn_url: string }>("/photos/upload-url", {
-      photo_type: `suggest_place_${photo.type}`,
+      photo_type: photo.type,  // food | view | menu | other
       content_type: photo.file.type,
       file_size: photo.file.size,
     });
@@ -148,12 +148,11 @@ export function SuggestPlaceForm() {
       );
 
       // Call API
-      await apiClient.post("https://api.mapvibe.site/reviews/submit-new-place", {
+      await apiClient.post("/reviews/submit-new-place", {
         author_id: user.sub,
         restaurant_name: formData.name,
         street_address: formData.streetAddress,
         ward: formData.ward,
-        district: "",
         city: formData.city,
         text: formData.review,
         features: formData.features,

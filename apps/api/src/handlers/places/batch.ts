@@ -34,7 +34,6 @@ export const handler: Handler = {
           "name_vi",
           "slug",
           "address",
-          "district",
           "geo_lat",
           "geo_lng",
           "cuisine_types",

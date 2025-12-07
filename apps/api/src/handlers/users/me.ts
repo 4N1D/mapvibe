@@ -25,6 +25,7 @@ export const getMeHandler: Handler = {
           'display_name',
           'avatar',
           'bio',
+          'gender',
           'reputation',
           'roles',
           'account_status',

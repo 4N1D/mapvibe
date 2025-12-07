@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Input, Button } from "@mapvibe/ui-components";
-import { X, Upload } from "lucide-react";
+import { X, Upload, Loader2 } from "lucide-react";
 import {
   FEATURES,
   PHOTO_TYPES,
@@ -9,6 +9,8 @@ import {
   type PhotoType,
 } from "../types";
 import { useVietnamAddress } from "../hooks/useVietnamAddress";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/axios";
 
 const initialFormData: SuggestPlaceFormData = {
   name: "",
@@ -26,7 +28,11 @@ const initialFormData: SuggestPlaceFormData = {
 };
 
 export function SuggestPlaceForm() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<SuggestPlaceFormData>(initialFormData);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const fileInputRefs = useRef<Record<PhotoType, HTMLInputElement | null>>({
     food: null,
     view: null,
@@ -106,17 +112,97 @@ export function SuggestPlaceForm() {
     return formData.photos.filter((p) => p.type === type);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Form submitted:", formData);
-    // TODO: Call API
+  const uploadPhotoToS3 = async (photo: PhotoUploadItem): Promise<{ url: string; caption: string }> => {
+    const uploadResponse = await apiClient.post<{ upload_url: string; cdn_url: string }>("/photos/upload-url", {
+      photo_type: `suggest_place_${photo.type}`,
+      content_type: photo.file.type,
+      file_size: photo.file.size,
+    });
+
+    const { upload_url, cdn_url } = uploadResponse.data;
+
+    await fetch(upload_url, {
+      method: "PUT",
+      body: photo.file,
+      headers: { "Content-Type": photo.file.type },
+    });
+
+    return { url: cdn_url, caption: "" };
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) {
+      setSubmitError("Vui lòng đăng nhập để gửi địa điểm");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // Upload all photos to S3
+      const uploadedPhotos = await Promise.all(
+        formData.photos.map((photo) => uploadPhotoToS3(photo))
+      );
+
+      // Call API
+      await apiClient.post("https://api.mapvibe.site/reviews/submit-new-place", {
+        author_id: user.sub,
+        restaurant_name: formData.name,
+        street_address: formData.streetAddress,
+        ward: formData.ward,
+        district: "",
+        city: formData.city,
+        text: formData.review,
+        features: formData.features,
+        photos: uploadedPhotos,
+      });
+
+      setSubmitSuccess(true);
+      setFormData(initialFormData);
+      
+      // Cleanup photo previews
+      formData.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+    } catch (error) {
+      console.error("Submit failed:", error);
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      setSubmitError(err.response?.data?.message || err.message || "Có lỗi xảy ra, vui lòng thử lại");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitSuccess) {
+    return (
+      <div className="mx-auto max-w-4xl p-6 text-center">
+        <div className="rounded-lg bg-green-50 p-8">
+          <h2 className="text-xl font-bold text-green-800">Gửi địa điểm thành công!</h2>
+          <p className="mt-2 text-green-600">Cảm ơn bạn đã chia sẻ địa điểm. Chúng tôi sẽ xem xét và phê duyệt sớm nhất.</p>
+          <Button
+            type="button"
+            onClick={() => setSubmitSuccess(false)}
+            className="mt-4 rounded-full bg-primary-500 px-8 py-2 text-white hover:bg-primary-600"
+          >
+            Gửi địa điểm khác
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-6 p-6">
       <h1 className="text-center text-2xl font-bold uppercase tracking-wide">
         Hãy chia sẻ địa điểm yêu thích của bạn cùng với chúng tôi
       </h1>
+
+      {submitError && (
+        <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
+          {submitError}
+        </div>
+      )}
 
       <Input
         label="Tên địa điểm"
@@ -292,9 +378,17 @@ export function SuggestPlaceForm() {
       <div className="flex justify-center">
         <Button
           type="submit"
-          className="rounded-full bg-primary-500 px-12 py-3 text-white hover:bg-primary-600"
+          disabled={submitting}
+          className="rounded-full bg-primary-500 px-12 py-3 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Đăng
+          {submitting ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Đang gửi...
+            </span>
+          ) : (
+            "Đăng"
+          )}
         </Button>
       </div>
     </form>

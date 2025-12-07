@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -12,7 +13,18 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // User not authenticated, continue without token
+    }
+    
     console.log(`[${config.method?.toUpperCase()}] ${config.url}`);
     return config;
   },

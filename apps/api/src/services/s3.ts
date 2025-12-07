@@ -15,7 +15,7 @@ export function getS3Client(): S3Client {
   return s3Client;
 }
 
-export const S3_PHOTOS_BUCKET = process.env.S3_PHOTOS_BUCKET || "mapvibe-photos";
+export const S3_PHOTOS_BUCKET = process.env.S3_PHOTOS_BUCKET || "mapvibe-photos-mvp";
 export const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN || "";
 
 export interface PresignedUrlResult {

@@ -8,3 +8,4 @@ export {
 } from './comments';
 export { listHandler as reviewsListHandler, createHandler as reviewsCreateHandler } from './reviews';
 export { listHandler as photosListHandler, menuHandler as menuHandler } from './photos';
+export { handler as saveHandler } from './save';

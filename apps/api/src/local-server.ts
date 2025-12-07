@@ -12,6 +12,18 @@ import { URL } from "url";
 import { handler } from "./index";
 import type { APIGatewayEvent, APIGatewayResponse } from "./types";
 
+// Decode JWT token to extract user info (without verification for local dev)
+function decodeJwt(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 // Type guard: Kiểm tra xem response có phải APIGatewayResponse không
 function isAPIGatewayResponse(response: unknown): response is APIGatewayResponse {
   return (
@@ -33,6 +45,18 @@ const server = http.createServer(async (req, res) => {
   req.on("data", (chunk) => (body += chunk));
 
   req.on("end", async () => {
+    // Extract and decode JWT from Authorization header
+    const authHeader = req.headers.authorization;
+    let jwtClaims: Record<string, unknown> | null = null;
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      jwtClaims = decodeJwt(token);
+      if (jwtClaims) {
+        console.log(`  Auth: User ${jwtClaims.sub}`);
+      }
+    }
+
     // Build event similar to API Gateway
     const event: APIGatewayEvent = {
       httpMethod: req.method || "GET",
@@ -41,6 +65,13 @@ const server = http.createServer(async (req, res) => {
       pathParameters: null,
       headers: req.headers as Record<string, string>,
       body: body || null,
+      requestContext: jwtClaims ? {
+        authorizer: {
+          jwt: {
+            claims: jwtClaims,
+          },
+        },
+      } : undefined,
     };
 
     console.log(`\n→ ${event.httpMethod} ${event.path}`);

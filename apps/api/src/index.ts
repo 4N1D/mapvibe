@@ -20,6 +20,8 @@ import {
   submitNewPlaceHandler as reviewSubmitNewPlaceHandler,
   approveLocationHandler as reviewApproveLocationHandler,
   cleanupExpiredHandler as reviewCleanupExpiredHandler,
+  loadCommentsHandler as reviewLoadCommentsHandler,
+  detailHandler as reviewDetailHandler,
 } from './handlers/reviews';
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
@@ -31,6 +33,7 @@ import {
   getMyReviewsHandler,
   getMySavedHandler,
   getMyStatsHandler,
+  getMyVotesHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
@@ -61,6 +64,8 @@ import {
   adminGetReviewHandler,
   adminUpdateReviewHandler,
   adminListPendingLocationsHandler,
+  adminGetLocationHandler,
+  adminGetLocationReviewsHandler,
   adminUpdateLocationHandler,
   adminListUsersHandler,
   adminGetUserHandler,
@@ -170,6 +175,18 @@ const routes: RouteDefinition[] = [
     paramNames: [],
     handler: reviewCleanupExpiredHandler,
   },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/([^/]+)\/comments$/,
+    paramNames: ['reviewId'],
+    handler: reviewLoadCommentsHandler,
+  },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/([^/]+)$/,
+    paramNames: ['reviewId'],
+    handler: reviewDetailHandler,
+  },
 
   // Users routes
   {
@@ -207,6 +224,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/stats$/,
     paramNames: [],
     handler: getMyStatsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/votes$/,
+    paramNames: [],
+    handler: getMyVotesHandler,
   },
   {
     method: "POST",
@@ -382,6 +405,18 @@ const routes: RouteDefinition[] = [
     pattern: /^\/admin\/locations\/pending$/,
     paramNames: [],
     handler: adminListPendingLocationsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)\/reviews$/,
+    paramNames: ["id"],
+    handler: adminGetLocationReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetLocationHandler,
   },
   {
     method: "PATCH",

@@ -1,8 +1,28 @@
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
 import { getDb } from '../../services/db';
-import { getPresignedUploadUrl } from '../../services/s3';
+import { getPresignedUploadUrl, deleteFromS3, CLOUDFRONT_DOMAIN } from '../../services/s3';
 import { success, badRequest, unauthorized, notFound, error } from '../../middlewares/response';
 import { getUserIdFromEvent } from '@/utils/auth';
+
+function extractS3KeyFromUrl(url: string): string | null {
+  if (!url) return null;
+  
+  try {
+    if (CLOUDFRONT_DOMAIN && url.includes(CLOUDFRONT_DOMAIN)) {
+      const urlObj = new URL(url);
+      return urlObj.pathname.slice(1);
+    }
+    
+    if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
+      const urlObj = new URL(url);
+      return urlObj.pathname.slice(1);
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const ALLOWED_CONTENT_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -67,6 +87,19 @@ export const getUploadUrlHandler: Handler = {
 
       if (!user) {
         return notFound('User not found');
+      }
+
+      // Delete old avatar from S3 if exists
+      if (user.avatar) {
+        const oldS3Key = extractS3KeyFromUrl(user.avatar);
+        if (oldS3Key) {
+          try {
+            await deleteFromS3(oldS3Key);
+            console.log(`[users/me/avatar] Deleted old avatar: ${oldS3Key}`);
+          } catch (deleteErr) {
+            console.warn(`[users/me/avatar] Failed to delete old avatar: ${oldS3Key}`, deleteErr);
+          }
+        }
       }
 
       // Generate S3 key for avatar

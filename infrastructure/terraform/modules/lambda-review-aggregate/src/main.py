@@ -44,14 +44,18 @@ db_url = get_db_url()
 engine = create_engine(db_url, pool_size=1, max_overflow=0) if db_url else None
 
 
-def call_bedrock_retry(messages: List[Dict[str, Any]], max_retries: int = 3):
+def call_bedrock_retry(messages: List[Dict[str, Any]], system_prompt: str = None, max_retries: int = 3):
     for i in range(max_retries):
         try:
-            response = bedrock_client.converse(
-                modelId=MODEL_CHAT,
-                messages=messages,
-                inferenceConfig={"temperature": 0.2},
-            )
+            params = {
+                "modelId": MODEL_CHAT,
+                "messages": messages,
+                "inferenceConfig": {"temperature": 0.2},
+            }
+            if system_prompt:
+                params["system"] = [{"text": system_prompt}]
+            
+            response = bedrock_client.converse(**params)
             usage = response.get("usage", {})
             logger.info(
                 f"[BEDROCK] In: {usage.get('inputTokens', 0)} tok | Out: {usage.get('outputTokens', 0)} tok"
@@ -121,14 +125,14 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
         comments = conn.execute(
             text(
                 """
-                SELECT c.id, c.text, c.upvote_count, c.created_at
+                SELECT c.id, c.text, c.like_count, c.created_at
                 FROM comments c
                 JOIN review_posts rp ON c.review_post_id = rp.id
                 WHERE rp.location_address_id = :loc
                   AND rp.status = 'pending'
                   AND c.status = 'pending'
-                  AND c.upvote_count > 0
-                ORDER BY c.upvote_count DESC, c.created_at DESC
+                  AND c.like_count > 0
+                ORDER BY c.like_count DESC, c.created_at DESC
                 LIMIT 10
                 """
             ),
@@ -148,7 +152,7 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
         return {
             "id": row.id,
             "text": normalize_text(row.text, limit=400),
-            "upvote_count": int(row.upvote_count or 0),
+            "like_count": int(row.like_count or 0),
             "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
         }
 
@@ -178,13 +182,13 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
         comments = conn.execute(
             text(
                 """
-                SELECT c.id, c.text, c.upvote_count, c.created_at
+                SELECT c.id, c.text, c.like_count, c.created_at
                 FROM comments c
                 JOIN restaurant_reviews rr ON c.restaurant_review_id = rr.id
                 WHERE rr.restaurant_id = :rest_id
-                  AND c.upvote_count > 0
+                  AND c.like_count > 0
                   AND c.status = 'published'
-                ORDER BY c.upvote_count DESC, c.created_at DESC
+                ORDER BY c.like_count DESC, c.created_at DESC
                 LIMIT 10
                 """
             ),
@@ -204,7 +208,7 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
         return {
             "id": row.id,
             "text": normalize_text(row.text, limit=400),
-            "upvote_count": int(row.upvote_count or 0),
+            "like_count": int(row.like_count or 0),
             "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
         }
 
@@ -268,7 +272,7 @@ def build_prompt(
     reviews_str = "\n".join(reviews_lines) if reviews_lines else "None"
 
     comments_str = "\n".join(
-        [f"- Comment {c['id']} (upvotes {c['upvote_count']}): {c['text']}" for c in comments]
+        [f"- Comment {c['id']} (likes {c['like_count']}): {c['text']}" for c in comments]
     ) or "None"
 
     system_prompt = (
@@ -312,10 +316,8 @@ Top comment (top 10 upvote, status {status_text}):
 
 Hãy tổng hợp và trả JSON."""
 
-    return [
-        {"role": "system", "content": [{"text": system_prompt}]},
-        {"role": "user", "content": [{"text": user_prompt}]},
-    ]
+    messages = [{"role": "user", "content": [{"text": user_prompt}]}]
+    return messages, system_prompt
 
 
 def aggregate(location_address_id: str):
@@ -340,8 +342,8 @@ def aggregate(location_address_id: str):
             f"Invalid location status: {status}. Expected 'pending' or 'approved' with restaurant_id"
         )
 
-    messages = build_prompt(reviews, comments, source_type)
-    response = call_bedrock_retry(messages)
+    messages, system_prompt = build_prompt(reviews, comments, source_type)
+    response = call_bedrock_retry(messages, system_prompt)
     if not response:
         raise Exception("Bedrock returned empty response")
 

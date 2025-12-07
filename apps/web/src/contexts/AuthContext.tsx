@@ -9,6 +9,7 @@ import {
   signInWithGoogle as cognitoSignInWithGoogle,
 } from "@/lib/cognito";
 import { Hub } from "aws-amplify/utils";
+import { apiClient } from "@/lib/axios";
 
 /**
  * User type
@@ -17,6 +18,7 @@ export interface User {
   email: string;
   name?: string;
   sub: string; // Cognito user ID
+  avatar?: string;
 }
 
 /**
@@ -31,6 +33,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateUserAvatar: (avatarUrl: string) => void;
   isAuthenticated: boolean;
 }
 
@@ -54,11 +57,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const attributes = await getUserAttributes();
 
         if (attributes) {
-          setUser({
+          const userData: User = {
             email: attributes.email || "",
             name: attributes.name || attributes.email || cognitoUser.username,
             sub: attributes.sub || cognitoUser.userId,
-          });
+          };
+
+          // Fetch user profile to get avatar
+          try {
+            const response = await apiClient.get<{ user: { avatar?: string; display_name?: string } }>("/users/me");
+            if (response.data?.user) {
+              userData.avatar = response.data.user.avatar;
+              if (response.data.user.display_name) {
+                userData.name = response.data.user.display_name;
+              }
+            }
+          } catch (apiError) {
+            console.warn("[Auth] Failed to fetch user profile:", apiError);
+          }
+
+          setUser(userData);
         } else {
           setUser(null);
         }
@@ -166,6 +184,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * Update user avatar (for smooth UX without refetching)
+   */
+  const updateUserAvatar = useCallback((avatarUrl: string) => {
+    setUser((prev) => prev ? { ...prev, avatar: avatarUrl } : null);
+  }, []);
+
   const value: AuthContextType = {
     user,
     loading,
@@ -175,6 +200,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     signInWithGoogle,
     refreshAuth: checkAuth,
+    updateUserAvatar,
     isAuthenticated: !!user,
   };
 

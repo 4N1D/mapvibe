@@ -67,7 +67,7 @@ export const updateMeHandler: Handler = {
         return badRequest('Invalid JSON body');
       }
 
-      const allowedFields = ['display_name', 'avatar', 'bio', 'phone'];
+      const allowedFields = ['display_name', 'avatar', 'bio', 'phone', 'gender'];
       const updateData: Record<string, unknown> = {};
 
       for (const field of allowedFields) {
@@ -94,6 +94,14 @@ export const updateMeHandler: Handler = {
         }
       }
 
+      if (updateData.gender) {
+        const gender = updateData.gender as string;
+        const validGenders = ['Nam', 'Nữ', 'Khác'];
+        if (!validGenders.includes(gender)) {
+          return badRequest('Invalid gender. Allowed: Nam, Nữ, Khác');
+        }
+      }
+
       const db = await getDb();
 
       updateData.updated_at = new Date();
@@ -109,6 +117,7 @@ export const updateMeHandler: Handler = {
           'display_name',
           'avatar',
           'bio',
+          'gender',
           'reputation',
           'roles',
           'account_status',
@@ -174,4 +183,5 @@ interface UpdateProfileBody {
   avatar?: string;
   bio?: string;
   phone?: string;
+  gender?: string;
 }

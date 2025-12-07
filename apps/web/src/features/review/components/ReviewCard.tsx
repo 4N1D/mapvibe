@@ -11,7 +11,7 @@ interface ReviewCardProps {
   formatTime?: (date: string) => string;
 }
 
-export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardProps) {
+export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
   if (loading) {
     return (
       <Card className="h-full flex flex-col overflow-hidden">
@@ -125,11 +125,19 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
         {/* Reviewer info */}
         <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
-              <span className="text-xs font-medium text-gray-600">
-                {(data.author_name || data.author_id).charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {data.author_avatar ? (
+              <img
+                src={data.author_avatar}
+                alt={data.author_name || "Avatar"}
+                className="h-6 w-6 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
+                <span className="text-xs font-medium text-gray-600">
+                  {(data.author_name || data.author_id).charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div>
               <p className="text-xs font-medium text-gray-900">{data.author_name || data.author_id}</p>
               <p className="text-xs text-gray-500">

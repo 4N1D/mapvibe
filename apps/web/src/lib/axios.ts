@@ -14,6 +14,21 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     console.log(`[${config.method?.toUpperCase()}] ${config.url}`);
+    
+    // Add Authorization header with JWT token
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      
+      if (idToken) {
+        config.headers.Authorization = `Bearer ${idToken}`;
+        console.log("[Auth] Added JWT token to request");
+      }
+    } catch (error) {
+      console.warn("[Auth] Failed to get session token:", error);
+      // Continue with request even if token is not available
+    }
+    
     return config;
   },
   (error) => {

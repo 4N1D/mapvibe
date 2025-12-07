@@ -58,25 +58,6 @@ interface PostItem {
   bookmarked?: boolean;
 }
 
-// Mock data for development
-const MOCK_PROFILE: UserProfile = {
-  id: "mock-user-id-123",
-  email: "test@example.com",
-  phone: "+84 123 456 789",
-  display_name: "Nguyễn Huỳnh Nguyên Phú",
-  avatar: undefined,
-  bio: "Đây là tài khoản test để phát triển ứng dụng MapVibe",
-  gender: "Nam",
-  reputation: 1250,
-  roles: ["user"],
-  account_status: "active",
-  email_verified: true,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  last_login_at: new Date().toISOString(),
-  date_of_birth: "1990-01-01",
-};
-
 type MenuItem = "thong-tin" | "anh" | "bai-viet-dang" | "bai-viet-luu";
 
 export function ProfilePage() {
@@ -89,7 +70,6 @@ export function ProfilePage() {
   const [formData, setFormData] = useState({
     display_name: "",
     email: "",
-    date_of_birth: "",
     bio: "",
     gender: "Khác",
     new_password: "",
@@ -137,7 +117,6 @@ export function ProfilePage() {
       setFormData({
         display_name: profile.display_name || "",
         email: profile.email || "",
-        date_of_birth: profile.date_of_birth || "",
         bio: profile.bio || "",
         gender: profile.gender || "Khác",
         new_password: "",
@@ -160,15 +139,7 @@ export function ProfilePage() {
       setLoading(true);
       setError(null);
 
-      // Mock mode: Return mock data
-      if (isMockModeEnabled()) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        setProfile(MOCK_PROFILE);
-        setLoading(false);
-        return;
-      }
-
-      // Real API call
+      // Always fetch from real API for user profile
       const response = await apiClient.get<{ user: UserProfile }>("/users/me");
       setProfile(response.data.user);
     } catch (err: any) {
@@ -708,14 +679,6 @@ export function ProfilePage() {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   placeholder="Nhập email"
-                />
-                <Input
-                  label="Ngày sinh"
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date_of_birth: e.target.value })
-                  }
                 />
               </div>
 

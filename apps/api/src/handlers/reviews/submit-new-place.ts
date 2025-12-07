@@ -9,6 +9,16 @@ interface Photo {
   caption?: string;
 }
 
+interface OpeningHours {
+  monday?: string;
+  tuesday?: string;
+  wednesday?: string;
+  thursday?: string;
+  friday?: string;
+  saturday?: string;
+  sunday?: string;
+}
+
 interface SubmitNewPlaceBody {
   author_id: string;
   restaurant_name: string;
@@ -21,6 +31,8 @@ interface SubmitNewPlaceBody {
   cuisine_types?: string[];
   price_min?: number;
   price_max?: number;
+  phone: string;
+  opening_hours: OpeningHours;
 }
 
 interface DuplicateCandidate {
@@ -66,6 +78,8 @@ export const handler: Handler = {
         cuisine_types,
         price_min,
         price_max,
+        phone,
+        opening_hours,
       } = body;
 
       // Validate required fields
@@ -83,6 +97,12 @@ export const handler: Handler = {
       }
       if (text.length < 300) {
         return badRequest('Review text must be at least 300 characters');
+      }
+      if (!phone) {
+        return badRequest('phone is required');
+      }
+      if (!opening_hours) {
+        return badRequest('opening_hours is required');
       }
 
       // Verify author exists
@@ -223,6 +243,8 @@ export const handler: Handler = {
             cuisine_types,
             price_min,
             price_max,
+            phone,
+            opening_hours,
             created_at,
             updated_at
           ) VALUES (
@@ -238,6 +260,8 @@ export const handler: Handler = {
             ${cuisine_types ? JSON.stringify(cuisine_types) : null}::json,
             ${price_min || null},
             ${price_max || null},
+            ${phone},
+            ${JSON.stringify(opening_hours)}::json,
             NOW(),
             NOW()
           )

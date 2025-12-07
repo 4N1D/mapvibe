@@ -22,7 +22,8 @@ interface UserProfile {
   phone?: string;
   display_name?: string;
   avatar?: string;
-  background_image?: string;
+  background?: string;
+  background_image?: string; // Keep for backward compatibility
   bio?: string;
   reputation: number;
   roles: string[];
@@ -555,11 +556,15 @@ export function ProfilePage() {
       // Wait a bit for preview to show
       await new Promise((resolve) => setTimeout(resolve, 100));
       
-      // Get upload URL
-      const uploadResponse = await apiClient.post("/photos/upload-url", {
-        photo_type: "user_background",
+      // Get upload URL from background endpoint
+      const uploadResponse = await apiClient.post<{
+        upload_url: string;
+        cdn_url: string;
+        s3_key: string;
+        expires_in: number;
+        content_type: string;
+      }>("/users/me/background", {
         content_type: file.type,
-        file_size: file.size,
       });
 
       const { upload_url, cdn_url } = uploadResponse.data;
@@ -573,24 +578,26 @@ export function ProfilePage() {
         },
       });
 
-      // Update user profile with new background URL
-      await apiClient.put("/users/me", {
-        background_image: cdn_url,
-      });
-
-      // Update local profile and keep preview
+      // Update local profile with new background URL
       if (profile) {
-        setProfile({ ...profile, background_image: cdn_url } as UserProfile);
+        setProfile({ ...profile, background: cdn_url, background_image: cdn_url } as UserProfile);
       }
       
-      // Keep preview even after upload
-      setBackgroundPreview(cdn_url);
+      // Fetch updated profile to ensure consistency
+      await fetchProfile();
+      
+      // Clear preview and use the new background URL
+      setBackgroundPreview(null);
 
-      alert("Đã cập nhật ảnh nền thành công!");
+      // Show success toast
+      setToast({ message: "Đã cập nhật ảnh nền thành công!", type: "success" });
+      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error("[Profile] Failed to upload background:", err);
-      const error = err as { message?: string };
-      alert("Lỗi khi tải lên ảnh nền: " + (error.message || "Vui lòng thử lại"));
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = error.response?.data?.message || error.message || "Vui lòng thử lại";
+      setToast({ message: `Lỗi khi tải lên ảnh nền: ${errorMessage}`, type: "error" });
+      setTimeout(() => setToast(null), 4000);
       // Don't clear preview on error, let user see what they selected
     } finally {
       setIsUploadingBackground(false);
@@ -887,8 +894,8 @@ export function ProfilePage() {
           style={{
             backgroundImage: backgroundPreview
               ? `url(${backgroundPreview})`
-              : profile?.background_image
-              ? `url(${profile.background_image})`
+              : profile?.background || profile?.background_image
+              ? `url(${profile.background || profile.background_image})`
               : undefined,
             minHeight: "200px",
           }}

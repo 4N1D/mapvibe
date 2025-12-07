@@ -22,7 +22,7 @@ function generateBackgroundKey(userId: string, extension: string): string {
   return `backgrounds/${userId}/${timestamp}.${extension}`;
 }
 
-// POST /users/me/background - Get presigned URL for background upload
+// POST /users/me/background - Get presigned URL for background upload and save CDN URL to database
 export const getBackgroundUploadUrlHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -72,6 +72,16 @@ export const getBackgroundUploadUrlHandler: Handler = {
       const s3Key = generateBackgroundKey(userId, extension);
 
       const presignedResult = await getPresignedUploadUrl(s3Key, content_type, 300);
+
+      // Pre-save CDN URL to user table so it's available after S3 upload
+      await db
+        .updateTable('users')
+        .set({
+          background: presignedResult.cdnUrl,
+          updated_at: new Date(),
+        })
+        .where('id', '=', userId)
+        .execute();
 
       return success({
         upload_url: presignedResult.uploadUrl,

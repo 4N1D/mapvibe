@@ -391,6 +391,12 @@ resource "aws_apigatewayv2_route" "reviews_detail" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "reviews_liked_comments" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /reviews/{reviewId}/liked-comments"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
 resource "aws_apigatewayv2_route" "reviews_comments_like" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "POST /reviews/comments/{commentId}/like"

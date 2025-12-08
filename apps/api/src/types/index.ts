@@ -2,7 +2,7 @@
 export interface JWTClaims {
   sub?: string;
   email?: string;
-  'cognito:username'?: string;
+  "cognito:username"?: string;
   [key: string]: string | undefined;
 }
 
@@ -25,6 +25,10 @@ export interface APIGatewayEvent {
       path?: string;
     };
     authorizer?: APIGatewayAuthorizer;
+    identity?: {
+      sourceIp?: string;
+      userAgent?: string;
+    };
   };
   pathParameters?: Record<string, string> | null;
   queryStringParameters?: Record<string, string> | null;

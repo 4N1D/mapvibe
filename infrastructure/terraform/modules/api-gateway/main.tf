@@ -11,7 +11,7 @@ resource "aws_apigatewayv2_api" "main" {
 
   cors_configuration {
     allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     allow_headers = ["*"]
     max_age       = 86400
   }
@@ -174,6 +174,14 @@ resource "aws_apigatewayv2_route" "users_me_stats" {
 resource "aws_apigatewayv2_route" "users_me_votes" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "GET /users/me/votes"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "users_me_liked_comments" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /users/me/liked-comments"
   target             = "integrations/${aws_apigatewayv2_integration.places.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
@@ -367,6 +375,14 @@ resource "aws_apigatewayv2_route" "reviews_detail" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "reviews_comments_like" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /reviews/comments/{commentId}/like"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 # RAG Search routes
 resource "aws_apigatewayv2_route" "rag_search" {
   api_id    = aws_apigatewayv2_api.main.id
@@ -515,6 +531,72 @@ resource "aws_apigatewayv2_route" "admin_users_update" {
 resource "aws_apigatewayv2_route" "photos_delete" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "DELETE /photos/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# ============================================
+# ACTIVITIES ROUTES (User tracking)
+# ============================================
+
+resource "aws_apigatewayv2_route" "activities_log" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /activities"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+resource "aws_apigatewayv2_route" "activities_batch" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /activities/batch"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
+# Admin Activities routes
+resource "aws_apigatewayv2_route" "admin_activities_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/activities"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_activities_stats" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/activities/stats"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_activities_user" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/activities/user/{userId}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# Admin Reports routes
+resource "aws_apigatewayv2_route" "admin_reports_list" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reports"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reports_get" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /admin/reports/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "admin_reports_update" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PATCH /admin/reports/{id}"
   target             = "integrations/${aws_apigatewayv2_integration.places.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id

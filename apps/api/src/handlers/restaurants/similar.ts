@@ -1,7 +1,8 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, notFound, badRequest, error } from "../../middlewares/response";
+// sql import kept for potential future use
+import { sql as _sql } from "kysely";
 
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -10,51 +11,44 @@ export const handler: Handler = {
       const slug = event.pathParameters?.slug;
 
       if (!slug) {
-        return badRequest('Restaurant slug is required');
+        return badRequest("Restaurant slug is required");
       }
 
       // Get current restaurant
       const currentRestaurant = await db
-        .selectFrom('restaurants')
-        .select([
-          'id',
-          'district',
-          'cuisine_types',
-          'price_min',
-          'price_max',
-          'rating_overall',
-        ])
-        .where('slug', '=', slug)
+        .selectFrom("restaurants")
+        .select(["id", "district", "cuisine_types", "price_min", "price_max", "rating_overall"])
+        .where("slug", "=", slug)
         .executeTakeFirst();
 
       if (!currentRestaurant) {
-        return notFound('Restaurant not found');
+        return notFound("Restaurant not found");
       }
 
       // Extract cuisine type names for comparison
-      const currentCuisineTypes = (currentRestaurant.cuisine_types as any[] || []).map(
-        (ct: any) => ct.name
+      const currentCuisineTypes = ((currentRestaurant.cuisine_types as { name: string }[]) || []).map(
+        (ct) => ct.name
       );
 
       // Find similar restaurants
       const similarRestaurants = await db
-        .selectFrom('restaurants')
+        .selectFrom("restaurants")
         .select([
-          'id',
-          'name_vi as name',
-          'slug',
-          'address',
-          'district',
-          'ward',
-          'price_min',
-          'price_max',
-          'rating_overall',
-          'opening_hours',
-          'cuisine_types',
+          "id",
+          "name_vi as name",
+          "slug",
+          "address",
+          "district",
+          "ward",
+          "price_min",
+          "price_max",
+          "rating_overall",
+          "opening_hours",
+          "cuisine_types",
         ])
-        .where('id', '!=', currentRestaurant.id)
-        .where('status', '=', 'approved')
-        .where('district', '=', currentRestaurant.district || '')
+        .where("id", "!=", currentRestaurant.id)
+        .where("status", "=", "approved")
+        .where("district", "=", currentRestaurant.district || "")
         .execute();
 
       // Calculate similarity score for each restaurant
@@ -62,8 +56,8 @@ export const handler: Handler = {
         let score = 0;
 
         // 1. Cuisine type overlap (most important - 40 points)
-        const restaurantCuisineTypes = (restaurant.cuisine_types as any[] || []).map(
-          (ct: any) => ct.name
+        const restaurantCuisineTypes = ((restaurant.cuisine_types as { name: string }[]) || []).map(
+          (ct) => ct.name
         );
         const cuisineOverlap = currentCuisineTypes.filter((ct) =>
           restaurantCuisineTypes.includes(ct)
@@ -71,7 +65,12 @@ export const handler: Handler = {
         score += cuisineOverlap * 40;
 
         // 2. Price range similarity (20 points)
-        if (restaurant.price_min && restaurant.price_max && currentRestaurant.price_min && currentRestaurant.price_max) {
+        if (
+          restaurant.price_min &&
+          restaurant.price_max &&
+          currentRestaurant.price_min &&
+          currentRestaurant.price_max
+        ) {
           const priceDiff = Math.abs(
             (restaurant.price_min + restaurant.price_max) / 2 -
               (currentRestaurant.price_min + currentRestaurant.price_max) / 2
@@ -85,8 +84,8 @@ export const handler: Handler = {
         }
 
         // 3. Rating similarity (20 points)
-        const currentRating = parseFloat(currentRestaurant.rating_overall || '0');
-        const restaurantRating = parseFloat(restaurant.rating_overall || '0');
+        const currentRating = parseFloat(currentRestaurant.rating_overall || "0");
+        const restaurantRating = parseFloat(restaurant.rating_overall || "0");
         const ratingDiff = Math.abs(currentRating - restaurantRating);
         const ratingScore = Math.max(0, 20 - ratingDiff * 2);
         score += ratingScore;
@@ -109,11 +108,11 @@ export const handler: Handler = {
       const restaurantsWithImages = await Promise.all(
         topSimilar.map(async (restaurant) => {
           const photos = await db
-            .selectFrom('photos')
-            .select(['s3_url'])
-            .where('restaurant_id', '=', restaurant.id)
-            .where('is_safe', '=', true)
-            .orderBy('display_order', 'asc')
+            .selectFrom("photos")
+            .select(["s3_url"])
+            .where("restaurant_id", "=", restaurant.id)
+            .where("is_safe", "=", true)
+            .orderBy("display_order", "asc")
             .limit(1)
             .executeTakeFirst();
 
@@ -125,9 +124,10 @@ export const handler: Handler = {
             ward: restaurant.ward,
             district: restaurant.district,
             rating: restaurant.rating_overall,
-            priceRange: restaurant.price_min && restaurant.price_max
-              ? `${restaurant.price_min.toLocaleString()} vnđ - ${restaurant.price_max.toLocaleString()} vnđ`
-              : null,
+            priceRange:
+              restaurant.price_min && restaurant.price_max
+                ? `${restaurant.price_min.toLocaleString()} vnđ - ${restaurant.price_max.toLocaleString()} vnđ`
+                : null,
             hours: restaurant.opening_hours,
             image: photos?.s3_url || null,
             similarity_score: restaurant.similarity_score,
@@ -140,7 +140,7 @@ export const handler: Handler = {
         similar_places: restaurantsWithImages,
       });
     } catch (err) {
-      console.error('[restaurants/similar] Error:', err);
+      console.error("[restaurants/similar] Error:", err);
       return error((err as Error).message);
     }
   },

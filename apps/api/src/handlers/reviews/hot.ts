@@ -1,19 +1,19 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 function getRankTag(score: number, hoursAge: number): string {
   if (hoursAge <= 24 && score >= 0) {
-    return 'new';
+    return "new";
   }
   if (score >= 10) {
-    return 'hot';
+    return "hot";
   }
   if (score >= 3) {
-    return 'trending';
+    return "trending";
   }
-  return 'normal';
+  return "normal";
 }
 
 export const handler: Handler = {
@@ -23,7 +23,7 @@ export const handler: Handler = {
 
       const params = event.queryStringParameters || {};
       const restaurantId = params.restaurant_id;
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
 
       // score =
       //   upvote_count * 2
@@ -82,7 +82,24 @@ export const handler: Handler = {
       const query = sql`${baseQuery}${whereClause}${orderLimit}`;
       const result = await query.execute(db);
 
-      const reviews = result.rows.map((row: any) => ({
+      interface HotReviewRow {
+        id: string;
+        author_id: string;
+        author_name: string;
+        author_avatar: string | null;
+        restaurant_id: string;
+        text: string;
+        photos: unknown;
+        upvote_count: number;
+        downvote_count: number;
+        comment_count: number;
+        share_count: number;
+        view_count: number;
+        created_at: string;
+        hours_age: string;
+        score: string;
+      }
+      const reviews = (result.rows as HotReviewRow[]).map((row) => ({
         id: row.id,
         author_id: row.author_id,
         author_name: row.author_name,
@@ -106,10 +123,8 @@ export const handler: Handler = {
         reviews,
       });
     } catch (err) {
-      console.error('[reviews/hot] Error:', err);
+      console.error("[reviews/hot] Error:", err);
       return error((err as Error).message);
     }
   },
 };
-
-

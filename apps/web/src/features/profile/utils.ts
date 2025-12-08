@@ -13,7 +13,7 @@ export function formatDateDisplay(dateString: string): string {
 
 export function formatPrice(min?: number, max?: number): string {
   if (!min && !max) return "";
-  
+
   const formatNumber = (n: number) => {
     if (n >= 1000000) {
       return `${(n / 1000000).toFixed(1)}tr`;

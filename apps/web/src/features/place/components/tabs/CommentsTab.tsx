@@ -34,11 +34,17 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string; rootParentId: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{
+    id: string;
+    name: string;
+    rootParentId: string;
+  } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  const queryKey = reviewId ? ["comments", "review", reviewId] : ["comments", "restaurant", restaurantId];
+  const queryKey = reviewId
+    ? ["comments", "review", reviewId]
+    : ["comments", "restaurant", restaurantId];
 
   const { data } = useQuery({
     queryKey,
@@ -47,9 +53,9 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
     enabled: !!(restaurantId || reviewId),
   });
 
-  const comments = localComments.length > 0 ? localComments : (data?.comments || []);
+  const comments = localComments.length > 0 ? localComments : data?.comments || [];
 
-  if (data && localComments.length === 0 && hasMore !== (data.page < data.total_pages)) {
+  if (data && localComments.length === 0 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
@@ -58,7 +64,7 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
       setLoadingMore(true);
       const nextPage = page + 1;
       const response = await fetchComments(restaurantId, reviewId, nextPage);
-      const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
+      const currentComments = localComments.length > 0 ? localComments : data?.comments || [];
       setLocalComments([...currentComments, ...response.comments]);
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
@@ -95,11 +101,11 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
 
       const endpoint = reviewId ? "/reviews/comment" : "/comments";
       const response = await apiClient.post<{ comment: any }>(endpoint, payload);
-      
+
       // Extract comment from response (API returns { comment: ... })
       // Map text to content to match Comment interface
       const rawComment = response.data.comment || response.data;
-      
+
       // Get user info from auth context to populate author_name and author_avatar
       // since API might not return these fields (API only returns comment record without user join)
       const newComment: Comment = {
@@ -111,8 +117,8 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
         restaurant_id: restaurantId?.toString() || rawComment.restaurant_id,
       };
 
-      const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
-      
+      const currentComments = localComments.length > 0 ? localComments : data?.comments || [];
+
       if (replyingTo) {
         // When replying, parent_id should be the ID of the comment being replied to directly
         // API response already has parent_comment_id, but we need to set parent_id for UI consistency
@@ -121,7 +127,7 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
           reply_to_name: replyingTo.name,
           parent_id: replyingTo.id, // Direct parent (the comment being replied to)
         };
-        
+
         // Find the root parent comment (top-level) and add the reply to its replies array
         // All replies are grouped under the top-level comment for display
         setLocalComments(

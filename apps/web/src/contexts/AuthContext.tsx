@@ -68,7 +68,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           // Fetch user profile to get avatar
           try {
-            const response = await apiClient.get<{ user: { avatar?: string; display_name?: string } }>("/users/me");
+            const response = await apiClient.get<{
+              user: { avatar?: string; display_name?: string };
+            }>("/users/me");
             if (response.data?.user) {
               userData.avatar = response.data.user.avatar;
               if (response.data.user.display_name) {
@@ -101,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case "signedIn":
         case "signInWithRedirect":
           checkAuth();
-          trackActivityImmediate('login', { metadata: { method: 'google' } });
+          trackActivityImmediate("login", { metadata: { method: "google" } });
           break;
         case "signInWithRedirect_failure":
           console.error("[Auth] OAuth login failed:", payload.data);
@@ -127,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await cognitoSignIn(email, password);
       await checkAuth();
       // Track login activity
-      trackActivityImmediate('login', { metadata: { method: 'email' } });
+      trackActivityImmediate("login", { metadata: { method: "email" } });
     } catch (error: any) {
       // Handle "There is already a signed in user" error
       if (error.message?.includes("There is already a signed in user")) {
@@ -135,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           await cognitoSignIn(email, password);
           await checkAuth();
-          trackActivityImmediate('login', { metadata: { method: 'email' } });
+          trackActivityImmediate("login", { metadata: { method: "email" } });
           return;
         } catch (retryError: any) {
           throw new Error(retryError.message || "Đăng nhập thất bại");
@@ -153,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await cognitoSignUp(email, password, { name });
       // Track register activity
-      trackActivityImmediate('register', { metadata: { method: 'email' } });
+      trackActivityImmediate("register", { metadata: { method: "email" } });
     } catch (error: any) {
       throw new Error(error.message || "Đăng ký thất bại");
     }
@@ -175,7 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    */
   const signOut = async () => {
     // Track logout before signing out
-    trackActivityImmediate('logout');
+    trackActivityImmediate("logout");
     try {
       await cognitoSignOut();
     } catch (error) {
@@ -202,7 +204,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * Update user avatar (for smooth UX without refetching)
    */
   const updateUserAvatar = useCallback((avatarUrl: string) => {
-    setUser((prev) => prev ? { ...prev, avatar: avatarUrl } : null);
+    setUser((prev) => (prev ? { ...prev, avatar: avatarUrl } : null));
   }, []);
 
   const value: AuthContextType = {

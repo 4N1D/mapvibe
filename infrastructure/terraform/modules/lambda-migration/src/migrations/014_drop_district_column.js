@@ -22,7 +22,9 @@ async function down(db) {
   console.log("  ✓ Added district column to restaurants");
 
   // Add district column back to location_addresses table
-  await sql`ALTER TABLE location_addresses ADD COLUMN IF NOT EXISTS district VARCHAR(100)`.execute(db);
+  await sql`ALTER TABLE location_addresses ADD COLUMN IF NOT EXISTS district VARCHAR(100)`.execute(
+    db
+  );
   console.log("  ✓ Added district column to location_addresses");
 }
 

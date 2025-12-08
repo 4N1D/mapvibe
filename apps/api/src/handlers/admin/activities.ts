@@ -1,7 +1,7 @@
-import { sql } from 'kysely';
-import { getDb } from '@/services/db';
-import { success, badRequest, error } from '@/middlewares/response';
-import { Handler, APIGatewayResponse, APIGatewayEvent } from '@/types';
+import { sql } from "kysely";
+import { getDb } from "@/services/db";
+import { success, badRequest, error } from "@/middlewares/response";
+import { Handler, APIGatewayResponse, APIGatewayEvent } from "@/types";
 
 // GET /admin/activities - List user activities
 export const listActivitiesHandler: Handler = {
@@ -9,15 +9,15 @@ export const listActivitiesHandler: Handler = {
     try {
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '50'), 200);
-      const offset = parseInt(params.offset || '0');
+      const limit = Math.min(parseInt(params.limit || "50"), 200);
+      const offset = parseInt(params.offset || "0");
       const userId = params.user_id;
       const activityType = params.activity_type;
       const dateFrom = params.date_from; // YYYY-MM-DD
       const dateTo = params.date_to; // YYYY-MM-DD
 
       let whereClause = sql`WHERE 1=1`;
-      
+
       if (userId) {
         whereClause = sql`${whereClause} AND ua.user_id = ${userId}`;
       }
@@ -66,13 +66,13 @@ export const listActivitiesHandler: Handler = {
       return success({
         activities: activities.rows,
         pagination: {
-          total: parseInt((countResult.rows[0] as any).total),
+          total: parseInt(String((countResult.rows[0] as { total: string }).total)),
           limit,
           offset,
         },
       });
     } catch (err) {
-      console.error('[admin/activities/list] Error:', err);
+      console.error("[admin/activities/list] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -84,7 +84,7 @@ export const activityStatsHandler: Handler = {
     try {
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      const days = Math.min(parseInt(params.days || '7'), 30);
+      const days = Math.min(parseInt(params.days || "7"), 30);
 
       // Activities by type (last N days)
       const byType = await sql`
@@ -175,7 +175,7 @@ export const activityStatsHandler: Handler = {
         online_users: onlineUsers.rows,
       });
     } catch (err) {
-      console.error('[admin/activities/stats] Error:', err);
+      console.error("[admin/activities/stats] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -188,11 +188,11 @@ export const userActivitiesHandler: Handler = {
       const db = await getDb();
       const userId = event.pathParameters?.userId;
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '50'), 200);
-      const offset = parseInt(params.offset || '0');
+      const limit = Math.min(parseInt(params.limit || "50"), 200);
+      const offset = parseInt(params.offset || "0");
 
       if (!userId) {
-        return badRequest('User ID is required');
+        return badRequest("User ID is required");
       }
 
       const activities = await sql`
@@ -233,13 +233,13 @@ export const userActivitiesHandler: Handler = {
         activities: activities.rows,
         summary: userSummary.rows[0],
         pagination: {
-          total: parseInt((countResult.rows[0] as any).total),
+          total: parseInt(String((countResult.rows[0] as { total: string }).total)),
           limit,
           offset,
         },
       });
     } catch (err) {
-      console.error('[admin/activities/user] Error:', err);
+      console.error("[admin/activities/user] Error:", err);
       return error((err as Error).message);
     }
   },

@@ -1,8 +1,8 @@
-import crypto from 'crypto';
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import crypto from "crypto";
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 interface Photo {
   url: string;
@@ -43,7 +43,7 @@ interface DuplicateCandidate {
   geo_lng: number | null;
   similarity_score: number;
   distance_meters: number | null;
-  source: 'location_addresses' | 'restaurants';
+  source: "location_addresses" | "restaurants";
 }
 
 const DUPLICATE_THRESHOLD = 0.7;
@@ -61,9 +61,9 @@ export const handler: Handler = {
 
       let body: SubmitNewPlaceBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const {
@@ -71,7 +71,7 @@ export const handler: Handler = {
         restaurant_name,
         street_address,
         ward,
-        city = 'TP. Hồ Chí Minh',
+        city = "TP. Hồ Chí Minh",
         text,
         features = [],
         photos = [],
@@ -84,40 +84,40 @@ export const handler: Handler = {
 
       // Validate required fields
       if (!author_id) {
-        return badRequest('author_id is required');
+        return badRequest("author_id is required");
       }
       if (!restaurant_name) {
-        return badRequest('restaurant_name is required');
+        return badRequest("restaurant_name is required");
       }
       if (!street_address) {
-        return badRequest('street_address is required');
+        return badRequest("street_address is required");
       }
       if (!text) {
-        return badRequest('text is required');
+        return badRequest("text is required");
       }
       if (text.length < 300) {
-        return badRequest('Review text must be at least 300 characters');
+        return badRequest("Review text must be at least 300 characters");
       }
       if (!phone) {
-        return badRequest('phone is required');
+        return badRequest("phone is required");
       }
       if (!opening_hours) {
-        return badRequest('opening_hours is required');
+        return badRequest("opening_hours is required");
       }
 
       // Verify author exists
       const author = await db
-        .selectFrom('users')
-        .select('id')
-        .where('id', '=', author_id)
+        .selectFrom("users")
+        .select("id")
+        .where("id", "=", author_id)
         .executeTakeFirst();
 
       if (!author) {
-        return badRequest('Invalid author_id: user does not exist');
+        return badRequest("Invalid author_id: user does not exist");
       }
 
       // Normalize address for exact match comparison
-      const normalizedStreetAddress = street_address.toLowerCase().replace(/\s+/g, ' ').trim();
+      const normalizedStreetAddress = street_address.toLowerCase().replace(/\s+/g, " ").trim();
 
       // Phase 1: Duplicate Check using fuzzy name matching (pg_trgm)
       const duplicates: DuplicateCandidate[] = [];
@@ -199,16 +199,17 @@ export const handler: Handler = {
         return {
           statusCode: 400,
           headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-            'Content-Type': 'application/json',
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            error: 'Potential duplicate location found',
-            code: 'DUPLICATE_LOCATION',
-            message: 'This location may already exist. Please select an existing place or confirm creation of a new entry.',
-            potential_duplicates: duplicates.map(d => ({
+            error: "Potential duplicate location found",
+            code: "DUPLICATE_LOCATION",
+            message:
+              "This location may already exist. Please select an existing place or confirm creation of a new entry.",
+            potential_duplicates: duplicates.map((d) => ({
               id: d.id,
               name: d.restaurant_name,
               address: d.street_address,
@@ -226,7 +227,7 @@ export const handler: Handler = {
 
       await db.transaction().execute(async (trx) => {
         // Build full address string
-        const fullAddress = [street_address, ward, city].filter(Boolean).join(', ');
+        const fullAddress = [street_address, ward, city].filter(Boolean).join(", ");
 
         // Insert into location_addresses with status = 'pending'
         await sql`
@@ -292,7 +293,10 @@ export const handler: Handler = {
             ${locationAddressId},
             NULL,
             ${text},
-            ${sql`ARRAY[${sql.join(features.map(f => sql`${f}`), sql`, `)}]::varchar[]`},
+            ${sql`ARRAY[${sql.join(
+              features.map((f) => sql`${f}`),
+              sql`, `
+            )}]::varchar[]`},
             ${JSON.stringify(photos)}::json,
             0,
             0,
@@ -307,26 +311,29 @@ export const handler: Handler = {
         `.execute(trx);
       });
 
-      return success({
-        message: 'New place and review submitted successfully. Pending moderation.',
-        location_address: {
-          id: locationAddressId,
-          restaurant_name,
-          street_address,
-          city,
-          status: 'pending',
+      return success(
+        {
+          message: "New place and review submitted successfully. Pending moderation.",
+          location_address: {
+            id: locationAddressId,
+            restaurant_name,
+            street_address,
+            city,
+            status: "pending",
+          },
+          review_post: {
+            id: reviewPostId,
+            status: "pending",
+          },
+          moderation_info: {
+            waiting_period_days: 14,
+            note: "The location will be reviewed and approved within 14 days.",
+          },
         },
-        review_post: {
-          id: reviewPostId,
-          status: 'pending',
-        },
-        moderation_info: {
-          waiting_period_days: 14,
-          note: 'The location will be reviewed and approved within 14 days.',
-        },
-      }, 201);
+        201
+      );
     } catch (err) {
-      console.error('[reviews/submit-new-place] Error:', err);
+      console.error("[reviews/submit-new-place] Error:", err);
       return error((err as Error).message);
     }
   },

@@ -1,7 +1,7 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -9,8 +9,8 @@ export const handler: Handler = {
       const db = await getDb();
 
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
       const restaurantId = params.restaurant_id;
 
       let query;
@@ -106,7 +106,7 @@ export const handler: Handler = {
         reviews: result.rows,
       });
     } catch (err) {
-      console.error('[reviews/list] Error:', err);
+      console.error("[reviews/list] Error:", err);
       return error((err as Error).message);
     }
   },

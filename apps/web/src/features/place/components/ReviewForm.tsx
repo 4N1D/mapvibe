@@ -4,11 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 
 interface ReviewFormProps {
-  onSubmit: (data: {
-    content: string;
-    ratings: Record<string, number>;
-    photos: File[];
-  }) => void;
+  onSubmit: (data: { content: string; ratings: Record<string, number>; photos: File[] }) => void;
   loading?: boolean;
 }
 
@@ -106,7 +102,10 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
         <p className="text-gray-500">
           Vui lòng{" "}
-          <a href="/login" className="text-primary-500 font-medium hover:underline">
+          <a
+            href="/login"
+            className="font-medium text-primary-500 hover:underline"
+          >
             đăng nhập
           </a>{" "}
           để viết nhận xét
@@ -116,7 +115,10 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-gray-200 bg-white p-4">
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-lg border border-gray-200 bg-white p-4"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <div className="flex-1">
           <div className="mb-3 flex gap-3">
@@ -159,7 +161,10 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
             {photosPreviews.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {photosPreviews.map((src, index) => (
-                  <div key={index} className="group relative h-16 w-16">
+                  <div
+                    key={index}
+                    className="group relative h-16 w-16"
+                  >
                     <img
                       src={src}
                       alt={`Preview ${index + 1}`}

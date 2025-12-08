@@ -1,7 +1,7 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, notFound, badRequest, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 // GET /reviews/:reviewId - Get review detail by ID
 export const handler: Handler = {
@@ -11,7 +11,7 @@ export const handler: Handler = {
       const reviewId = event.pathParameters?.reviewId;
 
       if (!reviewId) {
-        return badRequest('Review ID is required');
+        return badRequest("Review ID is required");
       }
 
       const query = sql`
@@ -57,23 +57,23 @@ export const handler: Handler = {
       const result = await query.execute(db);
 
       if (!result.rows || result.rows.length === 0) {
-        return notFound('Review not found');
+        return notFound("Review not found");
       }
 
       // Increment view count
       await db
-        .updateTable('review_posts')
+        .updateTable("review_posts")
         .set((eb) => ({
-          view_count: eb('view_count', '+', 1),
+          view_count: eb("view_count", "+", 1),
         }))
-        .where('id', '=', reviewId)
+        .where("id", "=", reviewId)
         .execute();
 
       const review = result.rows[0];
 
       return success({ review });
     } catch (err) {
-      console.error('[reviews/detail] Error:', err);
+      console.error("[reviews/detail] Error:", err);
       return error((err as Error).message);
     }
   },

@@ -107,11 +107,40 @@ module "cognito" {
   acm_certificate_arn = module.dns.certificate_arn
   route53_zone_id     = module.dns.zone_id
 
-  # Lambda Triggers
+  # Lambda triggers for user events
   lambda_trigger_arn = module.lambda_api.function_arn
 
   depends_on = [module.dns, module.lambda_api]
 }
+
+# Lambda permission for Cognito to invoke Lambda API
+resource "aws_lambda_permission" "cognito_trigger" {
+  statement_id  = "AllowCognitoInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_api.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = module.cognito.user_pool_arn
+
+  depends_on = [module.cognito, module.lambda_api]
+}
+
+# Update Lambda environment with Cognito info (after Cognito is created)
+resource "terraform_data" "lambda_api_cognito_config" {
+  triggers_replace = {
+    function_name = module.lambda_api.function_name
+    user_pool_id  = module.cognito.user_pool_id
+  }
+
+  provisioner "local-exec" {
+    command = "aws lambda update-function-configuration --region ${var.aws_region} --function-name ${module.lambda_api.function_name} --environment 'Variables={DB_HOST=${module.rds.address},DB_NAME=${module.rds.database_name},DB_SECRET_ARN=${aws_secretsmanager_secret.db_credentials.arn},NODE_ENV=${var.environment},S3_PHOTOS_BUCKET=${module.cdn.photos_bucket_name},CLOUDFRONT_DOMAIN=${module.cdn.cloudfront_domain_name},SQS_EMBEDDING_QUEUE_URL=${module.lambda_embeddings.sqs_queue_url},COGNITO_USER_POOL_ID=${module.cognito.user_pool_id}}'"
+  }
+
+  depends_on = [module.lambda_api, module.cognito]
+}
+
+
+
+
 
 # ============================================
 # RDS MODULE
@@ -177,7 +206,7 @@ module "lambda_api" {
   cloudfront_domain        = module.cdn.cloudfront_domain_name
   sqs_embedding_queue_url  = module.lambda_embeddings.sqs_queue_url
   sqs_embedding_queue_arn  = module.lambda_embeddings.sqs_queue_arn
-  cognito_user_pool_id     = module.cognito.user_pool_id
+  # Note: cognito_user_pool_id is set via lambda_api_cognito_config below to break circular dependency
 }
 
 # ============================================

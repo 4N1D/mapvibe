@@ -1,12 +1,15 @@
 # MapVibe
 
 ## Overview
+
 MapVibe is a modern web application built using a monorepo architecture. It leverages the power of AWS for infrastructure and serverless functions, with a high-performance frontend built with React and Vite.
 
 ## Architecture
+
 The project is organized as a monorepo using **TurboRepo** and **Bun**, ensuring fast builds and efficient dependency management.
 
 ### Structure
+
 - **apps/**
   - `web`: The main frontend application built with React 19, Vite, and TailwindCSS.
 - **packages/**
@@ -20,6 +23,7 @@ The project is organized as a monorepo using **TurboRepo** and **Bun**, ensuring
 - **infrastructure/**: Infrastructure as Code (IaC) for AWS deployments.
 
 ## Tech Stack
+
 - **Runtime**: Bun / Node.js
 - **Language**: TypeScript
 - **Frontend**: React 19, Vite, TailwindCSS, Lucide React
@@ -28,6 +32,7 @@ The project is organized as a monorepo using **TurboRepo** and **Bun**, ensuring
 - **Tools**: TurboRepo, Prettier, ESLint
 
 ## Getting Started
+
 1. Install dependencies:
    ```bash
    bun install
@@ -42,5 +47,6 @@ The project is organized as a monorepo using **TurboRepo** and **Bun**, ensuring
    ```
 
 ## Attention:
+
 - To work properly, create .env files for both the root project and the frontend (apps/web) folder.
 - Contact me for those .env files: [Facebook - Minh](https://www.facebook.com/mikenguyen.ntm)

@@ -48,13 +48,23 @@ async function up(db) {
 
   // Create indexes for efficient querying
   await sql`CREATE INDEX IF NOT EXISTS idx_activities_user ON user_activities(user_id)`.execute(db);
-  await sql`CREATE INDEX IF NOT EXISTS idx_activities_type ON user_activities(activity_type)`.execute(db);
-  await sql`CREATE INDEX IF NOT EXISTS idx_activities_created ON user_activities(created_at DESC)`.execute(db);
-  await sql`CREATE INDEX IF NOT EXISTS idx_activities_target ON user_activities(target_type, target_id)`.execute(db);
-  await sql`CREATE INDEX IF NOT EXISTS idx_activities_session ON user_activities(session_id)`.execute(db);
-  
+  await sql`CREATE INDEX IF NOT EXISTS idx_activities_type ON user_activities(activity_type)`.execute(
+    db
+  );
+  await sql`CREATE INDEX IF NOT EXISTS idx_activities_created ON user_activities(created_at DESC)`.execute(
+    db
+  );
+  await sql`CREATE INDEX IF NOT EXISTS idx_activities_target ON user_activities(target_type, target_id)`.execute(
+    db
+  );
+  await sql`CREATE INDEX IF NOT EXISTS idx_activities_session ON user_activities(session_id)`.execute(
+    db
+  );
+
   // Composite index for common queries
-  await sql`CREATE INDEX IF NOT EXISTS idx_activities_user_created ON user_activities(user_id, created_at DESC)`.execute(db);
+  await sql`CREATE INDEX IF NOT EXISTS idx_activities_user_created ON user_activities(user_id, created_at DESC)`.execute(
+    db
+  );
 
   console.log("Indexes created");
 

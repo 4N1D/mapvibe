@@ -26,9 +26,9 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
     placeholderData: (prev) => prev,
   });
 
-  const photos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+  const photos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
 
-  if (data && localPhotos.length === 0 && hasMore !== (data.page < data.total_pages)) {
+  if (data && localPhotos.length === 0 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
@@ -37,7 +37,7 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
       setLoadingMore(true);
       const nextPage = page + 1;
       const response = await fetchMenuPhotos(restaurantId, nextPage);
-      const currentPhotos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+      const currentPhotos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
       setLocalPhotos([...currentPhotos, ...response.photos]);
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
@@ -55,7 +55,10 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {photos.map((photo) => (
-            <div key={photo.id} className="group">
+            <div
+              key={photo.id}
+              className="group"
+            >
               <div className="relative aspect-[3/4] cursor-pointer overflow-hidden rounded-lg bg-gray-100">
                 <img
                   src={photo.thumbnail_url || photo.url}

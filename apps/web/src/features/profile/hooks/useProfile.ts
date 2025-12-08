@@ -43,7 +43,9 @@ export function useProfile(): UseProfileReturn {
     } catch (err) {
       console.error("[useProfile] Failed to update:", err);
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      throw new Error(error.response?.data?.message || error.message || "Không thể cập nhật profile");
+      throw new Error(
+        error.response?.data?.message || error.message || "Không thể cập nhật profile"
+      );
     } finally {
       setUpdating(false);
     }
@@ -51,12 +53,12 @@ export function useProfile(): UseProfileReturn {
 
   // Update avatar URL directly without refetching (for smooth UX)
   const setAvatarUrl = useCallback((url: string) => {
-    setProfile((prev) => prev ? { ...prev, avatar: url } : null);
+    setProfile((prev) => (prev ? { ...prev, avatar: url } : null));
   }, []);
 
   // Update background URL directly without refetching (for smooth UX)
   const setBackgroundUrl = useCallback((url: string) => {
-    setProfile((prev) => prev ? { ...prev, background: url } : null);
+    setProfile((prev) => (prev ? { ...prev, background: url } : null));
   }, []);
 
   useEffect(() => {

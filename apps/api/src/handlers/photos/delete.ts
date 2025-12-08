@@ -31,7 +31,7 @@ export const handler: Handler = {
 
       const isOwner = photo.uploaded_by === userId;
       const isAdmin = await isUserAdmin(userId);
-      
+
       if (!isOwner && !isAdmin) {
         return unauthorized("You can only delete your own photos");
       }
@@ -42,10 +42,7 @@ export const handler: Handler = {
         await deleteFromS3(s3Key);
       }
 
-      await db
-        .deleteFrom("photos")
-        .where("id", "=", photoId)
-        .execute();
+      await db.deleteFrom("photos").where("id", "=", photoId).execute();
 
       return success({ message: "Photo deleted successfully" });
     } catch (err) {

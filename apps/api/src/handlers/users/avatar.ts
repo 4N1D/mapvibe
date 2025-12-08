@@ -1,23 +1,23 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { getPresignedUploadUrl, deleteFromS3, CLOUDFRONT_DOMAIN } from '../../services/s3';
-import { success, badRequest, unauthorized, notFound, error } from '../../middlewares/response';
-import { getUserIdFromEvent } from '@/utils/auth';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { getPresignedUploadUrl, deleteFromS3, CLOUDFRONT_DOMAIN } from "../../services/s3";
+import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
+import { getUserIdFromEvent } from "@/utils/auth";
 
 function extractS3KeyFromUrl(url: string): string | null {
   if (!url) return null;
-  
+
   try {
     if (CLOUDFRONT_DOMAIN && url.includes(CLOUDFRONT_DOMAIN)) {
       const urlObj = new URL(url);
       return urlObj.pathname.slice(1);
     }
-    
-    if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
+
+    if (url.includes(".s3.") && url.includes(".amazonaws.com")) {
       const urlObj = new URL(url);
       return urlObj.pathname.slice(1);
     }
-    
+
     return null;
   } catch {
     return null;
@@ -25,9 +25,9 @@ function extractS3KeyFromUrl(url: string): string | null {
 }
 
 const ALLOWED_CONTENT_TYPES: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -49,27 +49,27 @@ export const getUploadUrlHandler: Handler = {
       const userId = getUserIdFromEvent(event);
 
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       let body: GetAvatarUploadUrlBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { content_type, file_size } = body;
 
       if (!content_type || !ALLOWED_CONTENT_TYPES[content_type]) {
         return badRequest(
-          `Invalid content_type. Allowed: ${Object.keys(ALLOWED_CONTENT_TYPES).join(', ')}`
+          `Invalid content_type. Allowed: ${Object.keys(ALLOWED_CONTENT_TYPES).join(", ")}`
         );
       }
 
-      if (typeof file_size === 'number') {
+      if (typeof file_size === "number") {
         if (file_size < 0) {
-          return badRequest('file_size must be a positive number');
+          return badRequest("file_size must be a positive number");
         }
         if (file_size > MAX_FILE_SIZE) {
           return badRequest(`File too large. Maximum: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
@@ -80,13 +80,13 @@ export const getUploadUrlHandler: Handler = {
 
       // Verify user exists
       const user = await db
-        .selectFrom('users')
-        .select(['id', 'avatar'])
-        .where('id', '=', userId)
+        .selectFrom("users")
+        .select(["id", "avatar"])
+        .where("id", "=", userId)
         .executeTakeFirst();
 
       if (!user) {
-        return notFound('User not found');
+        return notFound("User not found");
       }
 
       // Delete old avatar from S3 if exists
@@ -111,12 +111,12 @@ export const getUploadUrlHandler: Handler = {
 
       // Pre-save CDN URL to user table so it's available after S3 upload
       await db
-        .updateTable('users')
+        .updateTable("users")
         .set({
           avatar: presignedResult.cdnUrl,
           updated_at: new Date(),
         })
-        .where('id', '=', userId)
+        .where("id", "=", userId)
         .execute();
 
       return success({
@@ -127,7 +127,7 @@ export const getUploadUrlHandler: Handler = {
         content_type,
       });
     } catch (err) {
-      console.error('[users/me/avatar] getUploadUrl Error:', err);
+      console.error("[users/me/avatar] getUploadUrl Error:", err);
       return error((err as Error).message);
     }
   },
@@ -140,51 +140,51 @@ export const updateAvatarHandler: Handler = {
       const userId = getUserIdFromEvent(event);
 
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       let body: { avatar_url: string };
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { avatar_url } = body;
 
       if (!avatar_url) {
-        return badRequest('avatar_url is required');
+        return badRequest("avatar_url is required");
       }
 
       // Basic URL validation
       try {
         new URL(avatar_url);
       } catch {
-        return badRequest('Invalid avatar_url format');
+        return badRequest("Invalid avatar_url format");
       }
 
       const db = await getDb();
 
       const updatedUser = await db
-        .updateTable('users')
+        .updateTable("users")
         .set({
           avatar: avatar_url,
           updated_at: new Date(),
         })
-        .where('id', '=', userId)
-        .returning(['id', 'avatar', 'updated_at'])
+        .where("id", "=", userId)
+        .returning(["id", "avatar", "updated_at"])
         .executeTakeFirst();
 
       if (!updatedUser) {
-        return notFound('User not found');
+        return notFound("User not found");
       }
 
       return success({
-        message: 'Avatar updated successfully',
+        message: "Avatar updated successfully",
         avatar: updatedUser.avatar,
       });
     } catch (err) {
-      console.error('[users/me/avatar] updateAvatar Error:', err);
+      console.error("[users/me/avatar] updateAvatar Error:", err);
       return error((err as Error).message);
     }
   },

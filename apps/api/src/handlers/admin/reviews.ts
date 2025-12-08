@@ -1,8 +1,8 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, unauthorized, notFound, error } from '../../middlewares/response';
-import { getUserIdFromEvent, isUserAdmin } from '../../utils/auth';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
+import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
+import { sql } from "kysely";
 
 // GET /admin/reviews - List all reviews with filters
 export const listReviewsHandler: Handler = {
@@ -10,28 +10,28 @@ export const listReviewsHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
       const status = params.status; // all, reported, hidden
-      const sortBy = params.sort_by || 'created_at';
-      const sortOrder = params.sort_order === 'asc' ? 'asc' : 'desc';
+      const _sortBy = params.sort_by || "created_at";
+      const _sortOrder = params.sort_order === "asc" ? "asc" : "desc";
 
       // Build query based on status filter
       let whereClause = sql``;
-      if (status === 'reported') {
+      if (status === "reported") {
         whereClause = sql`WHERE rp.report_count > 0`;
-      } else if (status === 'hidden') {
+      } else if (status === "hidden") {
         whereClause = sql`WHERE rp.status = 'hidden'`;
       }
 
@@ -64,8 +64,9 @@ export const listReviewsHandler: Handler = {
         OFFSET ${offset}
       `.execute(db);
 
-      const countResult = await db.selectFrom('review_posts')
-        .select(sql<number>`count(*)::int`.as('total'))
+      const countResult = await db
+        .selectFrom("review_posts")
+        .select(sql<number>`count(*)::int`.as("total"))
         .executeTakeFirst();
 
       return success({
@@ -77,7 +78,7 @@ export const listReviewsHandler: Handler = {
         },
       });
     } catch (err) {
-      console.error('[admin/reviews] Error:', err);
+      console.error("[admin/reviews] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -89,17 +90,17 @@ export const getReviewHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const reviewId = event.pathParameters?.id;
       if (!reviewId) {
-        return badRequest('Review ID required');
+        return badRequest("Review ID required");
       }
 
       const db = await getDb();
@@ -119,12 +120,12 @@ export const getReviewHandler: Handler = {
       `.execute(db);
 
       if (result.rows.length === 0) {
-        return notFound('Review not found');
+        return notFound("Review not found");
       }
 
       return success({ review: result.rows[0] });
     } catch (err) {
-      console.error('[admin/reviews/:id] Error:', err);
+      console.error("[admin/reviews/:id] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -136,72 +137,72 @@ export const updateReviewHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const reviewId = event.pathParameters?.id;
       if (!reviewId) {
-        return badRequest('Review ID required');
+        return badRequest("Review ID required");
       }
 
       let body: { action: string; reason?: string };
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { action, reason } = body;
       if (!action) {
-        return badRequest('Action required (approve, hide, delete, restore)');
+        return badRequest("Action required (approve, hide, delete, restore)");
       }
 
       const db = await getDb();
       const updateData: Record<string, unknown> = { updated_at: new Date() };
 
       switch (action) {
-        case 'approve':
-          updateData.status = 'approved';
+        case "approve":
+          updateData.status = "approved";
           updateData.report_count = 0;
           break;
-        case 'hide':
-          updateData.status = 'hidden';
-          updateData.hidden_reason = reason || 'Violated community guidelines';
+        case "hide":
+          updateData.status = "hidden";
+          updateData.hidden_reason = reason || "Violated community guidelines";
           break;
-        case 'delete':
-          updateData.status = 'deleted';
-          updateData.hidden_reason = reason || 'Deleted by admin';
+        case "delete":
+          updateData.status = "deleted";
+          updateData.hidden_reason = reason || "Deleted by admin";
           break;
-        case 'restore':
-          updateData.status = 'active';
+        case "restore":
+          updateData.status = "active";
           updateData.hidden_reason = null;
           break;
         default:
-          return badRequest('Invalid action. Use: approve, hide, delete, restore');
+          return badRequest("Invalid action. Use: approve, hide, delete, restore");
       }
 
       const updated = await db
-        .updateTable('review_posts')
+        .updateTable("review_posts")
         .set(updateData)
-        .where('id', '=', reviewId)
+        .where("id", "=", reviewId)
         .returningAll()
         .executeTakeFirst();
 
       if (!updated) {
-        return notFound('Review not found');
+        return notFound("Review not found");
       }
 
-      return success({ 
+      return success({
         message: `Review ${action}d successfully`,
         review: updated,
       });
     } catch (err) {
-      console.error('[admin/reviews/:id] Error:', err);
+      console.error("[admin/reviews/:id] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -213,19 +214,19 @@ export const listPendingLocationsHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
 
       const result = await sql`
         SELECT 
@@ -240,9 +241,10 @@ export const listPendingLocationsHandler: Handler = {
         OFFSET ${offset}
       `.execute(db);
 
-      const countResult = await db.selectFrom('location_addresses')
-        .select(sql<number>`count(*)::int`.as('total'))
-        .where('status', '=', 'pending')
+      const countResult = await db
+        .selectFrom("location_addresses")
+        .select(sql<number>`count(*)::int`.as("total"))
+        .where("status", "=", "pending")
         .executeTakeFirst();
 
       return success({
@@ -254,7 +256,7 @@ export const listPendingLocationsHandler: Handler = {
         },
       });
     } catch (err) {
-      console.error('[admin/locations/pending] Error:', err);
+      console.error("[admin/locations/pending] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -266,17 +268,17 @@ export const getLocationHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const locationId = event.pathParameters?.id;
       if (!locationId) {
-        return badRequest('Location ID required');
+        return badRequest("Location ID required");
       }
 
       const db = await getDb();
@@ -292,12 +294,12 @@ export const getLocationHandler: Handler = {
       `.execute(db);
 
       if (result.rows.length === 0) {
-        return notFound('Location not found');
+        return notFound("Location not found");
       }
 
       return success({ location: result.rows[0] });
     } catch (err) {
-      console.error('[admin/locations/:id] Error:', err);
+      console.error("[admin/locations/:id] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -309,24 +311,24 @@ export const getLocationReviewsHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const locationId = event.pathParameters?.id;
       if (!locationId) {
-        return badRequest('Location ID required');
+        return badRequest("Location ID required");
       }
 
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      
-      const limit = Math.min(parseInt(params.limit || '50'), 100);
-      const offset = parseInt(params.offset || '0');
+
+      const limit = Math.min(parseInt(params.limit || "50"), 100);
+      const offset = parseInt(params.offset || "0");
 
       const result = await sql`
         SELECT 
@@ -358,17 +360,46 @@ export const getLocationReviewsHandler: Handler = {
       return success({
         reviews: result.rows,
         pagination: {
-          total: (countResult.rows[0] as any)?.total || 0,
+          total: (countResult.rows[0] as { total: number } | undefined)?.total || 0,
           limit,
           offset,
         },
       });
     } catch (err) {
-      console.error('[admin/locations/:id/reviews] Error:', err);
+      console.error("[admin/locations/:id/reviews] Error:", err);
       return error((err as Error).message);
     }
   },
 };
+
+interface CuisineType {
+  name: string;
+  description?: string;
+}
+
+interface LocationAddress {
+  id: string;
+  full_address?: string;
+  street_address?: string;
+  ward?: string;
+  city?: string;
+  geo_lat?: number;
+  geo_lng?: number;
+  [key: string]: unknown;
+}
+
+interface UpdateLocationBody {
+  action: "approve" | "reject";
+  reason?: string;
+  // Restaurant info for approve action
+  name_vi?: string;
+  cuisine_types?: CuisineType[];
+  price_min?: number | null;
+  price_max?: number | null;
+  opening_hours?: string;
+  features?: string[];
+  description?: string;
+}
 
 // PATCH /admin/locations/:id - Approve/reject location
 export const updateLocationHandler: Handler = {
@@ -376,56 +407,137 @@ export const updateLocationHandler: Handler = {
     try {
       const userId = getUserIdFromEvent(event);
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const isAdmin = await isUserAdmin(userId);
       if (!isAdmin) {
-        return unauthorized('Admin access required');
+        return unauthorized("Admin access required");
       }
 
       const locationId = event.pathParameters?.id;
       if (!locationId) {
-        return badRequest('Location ID required');
+        return badRequest("Location ID required");
       }
 
-      let body: { action: string; reason?: string };
+      let body: UpdateLocationBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { action, reason } = body;
-      if (!['approve', 'reject'].includes(action)) {
-        return badRequest('Invalid action. Use: approve, reject');
+      if (!["approve", "reject"].includes(action)) {
+        return badRequest("Invalid action. Use: approve, reject");
       }
 
       const db = await getDb();
 
-      const updated = await db
-        .updateTable('location_addresses')
-        .set({
-          status: action === 'approve' ? 'approved' : 'rejected',
-          approved_by: action === 'approve' ? userId : null,
-          approved_at: action === 'approve' ? new Date() : null,
-          rejection_reason: action === 'reject' ? reason : null,
-          updated_at: new Date(),
-        })
-        .where('id', '=', locationId)
+      // Get the location first
+      const location = await db
+        .selectFrom("location_addresses")
+        .selectAll()
+        .where("id", "=", locationId)
+        .executeTakeFirst();
+
+      if (!location) {
+        return notFound("Location not found");
+      }
+
+      if (action === "reject") {
+        // Just update status for rejection
+        const updated = await db
+          .updateTable("location_addresses")
+          .set({
+            status: "rejected",
+            rejection_reason: reason || null,
+            updated_at: new Date(),
+          })
+          .where("id", "=", locationId)
+          .returningAll()
+          .executeTakeFirst();
+
+        return success({
+          message: "Location rejected successfully",
+          location: updated,
+        });
+      }
+
+      // For approve action - create restaurant and link reviews
+      const { name_vi, cuisine_types, price_min, price_max, opening_hours, features, description } =
+        body;
+
+      if (!name_vi?.trim()) {
+        return badRequest("Restaurant name (name_vi) is required for approval");
+      }
+
+      // Generate slug from name
+      const slug = name_vi
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      // Create restaurant
+      const restaurant = await db
+        .insertInto("restaurants")
+        .values({
+          name_vi,
+          slug: `${slug}-${Date.now()}`,
+          address: (location as LocationAddress).full_address || (location as LocationAddress).street_address,
+          ward: (location as LocationAddress).ward,
+          city: (location as LocationAddress).city,
+          geo_lat: (location as LocationAddress).geo_lat,
+          geo_lng: (location as LocationAddress).geo_lng,
+          cuisine_types: cuisine_types ? JSON.stringify(cuisine_types) : null,
+          price_min: price_min || null,
+          price_max: price_max || null,
+          opening_hours: opening_hours || null,
+          features: features ? JSON.stringify(features) : null,
+          description: description || null,
+          status: "approved",
+          created_by: userId,
+        } as Record<string, unknown>)
         .returningAll()
         .executeTakeFirst();
 
-      if (!updated) {
-        return notFound('Location not found');
+      if (!restaurant) {
+        return error("Failed to create restaurant");
       }
 
-      return success({ 
-        message: `Location ${action}d successfully`,
-        location: updated,
+      // Update location status
+      await db
+        .updateTable("location_addresses")
+        .set({
+          status: "approved",
+          approved_by: userId,
+          approved_at: new Date(),
+          restaurant_id: restaurant.id,
+          updated_at: new Date(),
+        } as Record<string, unknown>)
+        .where("id", "=", locationId)
+        .execute();
+
+      // Link review_posts to the new restaurant
+      await db
+        .updateTable("review_posts")
+        .set({
+          restaurant_id: restaurant.id,
+          status: "approved",
+          updated_at: new Date(),
+        } as Record<string, unknown>)
+        .where("location_address_id", "=", locationId)
+        .execute();
+
+      return success({
+        message: "Location approved and restaurant created successfully",
+        restaurant,
       });
     } catch (err) {
-      console.error('[admin/locations/:id] Error:', err);
+      console.error("[admin/locations/:id] Error:", err);
       return error((err as Error).message);
     }
   },

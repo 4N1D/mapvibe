@@ -1,11 +1,11 @@
 // Admin handlers exports
-export { statsHandler } from './stats';
+export { statsHandler } from "./stats";
 export {
   listPlacesHandler as adminListPlacesHandler,
   getPlaceHandler as adminGetPlaceHandler,
   updatePlaceHandler as adminUpdatePlaceHandler,
   deletePlaceHandler as adminDeletePlaceHandler,
-} from './places';
+} from "./places";
 export {
   listReviewsHandler as adminListReviewsHandler,
   getReviewHandler as adminGetReviewHandler,
@@ -14,19 +14,19 @@ export {
   getLocationHandler as adminGetLocationHandler,
   getLocationReviewsHandler as adminGetLocationReviewsHandler,
   updateLocationHandler as adminUpdateLocationHandler,
-} from './reviews';
+} from "./reviews";
 export {
   listUsersHandler as adminListUsersHandler,
   getUserHandler as adminGetUserHandler,
   updateUserHandler as adminUpdateUserHandler,
-} from './users';
+} from "./users";
 export {
   listReportsHandler as adminListReportsHandler,
   getReportHandler as adminGetReportHandler,
   updateReportHandler as adminUpdateReportHandler,
-} from './reports';
+} from "./reports";
 export {
   listActivitiesHandler as adminListActivitiesHandler,
   activityStatsHandler as adminActivityStatsHandler,
   userActivitiesHandler as adminUserActivitiesHandler,
-} from './activities';
+} from "./activities";

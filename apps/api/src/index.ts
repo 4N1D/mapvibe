@@ -14,6 +14,7 @@ import {
   createHandler as reviewCreateHandler,
   voteHandler as reviewVoteHandler,
   commentHandler as reviewCommentHandler,
+  commentLikeHandler as reviewCommentLikeHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
   shareHandler as reviewShareHandler,
@@ -22,7 +23,8 @@ import {
   cleanupExpiredHandler as reviewCleanupExpiredHandler,
   loadCommentsHandler as reviewLoadCommentsHandler,
   detailHandler as reviewDetailHandler,
-} from './handlers/reviews';
+  reviewLikedCommentsHandler,
+} from "./handlers/reviews";
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
 import {
@@ -34,13 +36,17 @@ import {
   getMySavedHandler,
   getMyStatsHandler,
   getMyVotesHandler,
+  getMyLikedCommentsHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
   updateBackgroundHandler,
   setPasswordHandler,
 } from "./handlers/users";
-import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
+import {
+  getUploadUrlHandler as photoGetUploadUrlHandler,
+  deletePhotoHandler,
+} from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
   similarHandler as restaurantSimilarHandler,
@@ -78,11 +84,7 @@ import {
   adminActivityStatsHandler,
   adminUserActivitiesHandler,
 } from "./handlers/admin";
-import {
-  logActivityHandler,
-  batchLogActivityHandler,
-} from "./handlers/activities";
-
+import { logActivityHandler, batchLogActivityHandler } from "./handlers/activities";
 
 // Route definitions
 interface RouteDefinition {
@@ -169,33 +171,45 @@ const routes: RouteDefinition[] = [
     handler: reviewShareHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/reviews\/submit-new-place$/,
     paramNames: [],
     handler: reviewSubmitNewPlaceHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/reviews\/approve-location$/,
     paramNames: [],
     handler: reviewApproveLocationHandler,
   },
   {
-    method: 'POST',
+    method: "POST",
     pattern: /^\/reviews\/cleanup-expired$/,
     paramNames: [],
     handler: reviewCleanupExpiredHandler,
   },
   {
-    method: 'GET',
+    method: "GET",
     pattern: /^\/reviews\/([^/]+)\/comments$/,
-    paramNames: ['reviewId'],
+    paramNames: ["reviewId"],
     handler: reviewLoadCommentsHandler,
   },
   {
-    method: 'GET',
+    method: "POST",
+    pattern: /^\/reviews\/comments\/([^/]+)\/like$/,
+    paramNames: ["commentId"],
+    handler: reviewCommentLikeHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/reviews\/([^/]+)\/liked-comments$/,
+    paramNames: ["reviewId"],
+    handler: reviewLikedCommentsHandler,
+  },
+  {
+    method: "GET",
     pattern: /^\/reviews\/([^/]+)$/,
-    paramNames: ['reviewId'],
+    paramNames: ["reviewId"],
     handler: reviewDetailHandler,
   },
 
@@ -241,6 +255,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/votes$/,
     paramNames: [],
     handler: getMyVotesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/liked-comments$/,
+    paramNames: [],
+    handler: getMyLikedCommentsHandler,
   },
   {
     method: "POST",
@@ -536,11 +556,7 @@ function matchRoute(
 function isCognitoTriggerEvent(
   event: APIGatewayEvent | CognitoTriggerEvent
 ): event is CognitoTriggerEvent {
-  return (
-    'triggerSource' in event &&
-    'userPoolId' in event &&
-    'request' in event
-  );
+  return "triggerSource" in event && "userPoolId" in event && "request" in event;
 }
 
 // Lambda handler - handles both API Gateway and Cognito triggers

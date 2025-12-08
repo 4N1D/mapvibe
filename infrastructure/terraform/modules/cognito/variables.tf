@@ -63,9 +63,9 @@ variable "route53_zone_id" {
   default     = ""
 }
 
-# Lambda Triggers (optional)
+# Lambda Trigger (optional)
 variable "lambda_trigger_arn" {
-  description = "Lambda function ARN for Cognito triggers (PostConfirmation, PostAuthentication, PreTokenGeneration)"
+  description = "Lambda ARN for Cognito triggers (post_confirmation, post_authentication, pre_token_generation)"
   type        = string
   default     = ""
 }

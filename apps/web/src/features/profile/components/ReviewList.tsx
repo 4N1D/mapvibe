@@ -21,9 +21,7 @@ export function ReviewList({ reviews, loading, error, hasMore, onLoadMore }: Rev
   }
 
   if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>
-    );
+    return <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>;
   }
 
   if (reviews.length === 0) {
@@ -39,10 +37,13 @@ export function ReviewList({ reviews, loading, error, hasMore, onLoadMore }: Rev
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {reviews.map((review) => (
-          <ReviewCard key={review.id} review={review} />
+          <ReviewCard
+            key={review.id}
+            review={review}
+          />
         ))}
       </div>
-      
+
       {hasMore && (
         <div className="flex justify-center">
           <button
@@ -60,8 +61,8 @@ export function ReviewList({ reviews, loading, error, hasMore, onLoadMore }: Rev
 
 function ReviewCard({ review }: { review: UserReview }) {
   const coverPhoto = review.photos?.[0];
-  const linkTo = review.restaurant_slug 
-    ? `/place/${review.restaurant_slug}` 
+  const linkTo = review.restaurant_slug
+    ? `/place/${review.restaurant_slug}`
     : `/review/${review.id}`;
 
   return (
@@ -91,7 +92,7 @@ function ReviewCard({ review }: { review: UserReview }) {
           {review.restaurant_name || "Bài viết"}
         </h3>
         <p className="mb-3 line-clamp-2 text-sm text-gray-600">{review.text}</p>
-        
+
         {/* Meta */}
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>{formatDateDisplay(review.created_at)}</span>

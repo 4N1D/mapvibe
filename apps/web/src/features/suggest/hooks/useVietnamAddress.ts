@@ -61,9 +61,7 @@ export function useVietnamAddress() {
     const fetchWards = async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `${API_BASE}/new-provinces/${selectedProvince}/wards?limit=500`
-        );
+        const res = await fetch(`${API_BASE}/new-provinces/${selectedProvince}/wards?limit=500`);
         const json: ApiResponse<WardApi[]> = await res.json();
         if (json.success && json.data) {
           setWards(

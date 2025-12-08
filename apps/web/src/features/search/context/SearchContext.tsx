@@ -3,7 +3,6 @@ import { Message } from "../components/ChatMessage";
 import apiClient, { createCancelToken, retryRequest } from "@/lib/axios";
 import axios from "axios";
 
-
 // Generate unique session ID
 const generateSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 

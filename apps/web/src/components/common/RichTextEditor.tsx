@@ -101,7 +101,9 @@ export function RichTextEditor({
   );
 
   return (
-    <div className={`rounded-lg border ${isUnderMinLength ? "border-red-300" : "border-gray-300"} ${className}`}>
+    <div
+      className={`rounded-lg border ${isUnderMinLength ? "border-red-300" : "border-gray-300"} ${className}`}
+    >
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
         {/* Text formatting */}
@@ -191,7 +193,7 @@ export function RichTextEditor({
 
         {/* Character count */}
         <div className="ml-auto text-xs text-gray-500">
-          <span className={isUnderMinLength ? "text-red-500 font-medium" : ""}>
+          <span className={isUnderMinLength ? "font-medium text-red-500" : ""}>
             {characterCount}
           </span>
           {minLength > 0 && (

@@ -21,40 +21,45 @@ export function useUserReviews(): UseUserReviewsReturn {
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
 
-  const fetchReviews = useCallback(async (reset = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const currentOffset = reset ? 0 : offset;
-      const response = await apiClient.get<{
-        reviews: UserReview[];
-        total: number;
-        limit: number;
-        offset: number;
-      }>("/users/me/reviews", {
-        params: { limit: LIMIT, offset: currentOffset },
-      });
-      
-      const newReviews = response.data?.reviews || [];
-      
-      if (reset) {
-        setReviews(newReviews);
-        setOffset(LIMIT);
-      } else {
-        setReviews((prev) => [...prev, ...newReviews]);
-        setOffset((prev) => prev + LIMIT);
+  const fetchReviews = useCallback(
+    async (reset = false) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const currentOffset = reset ? 0 : offset;
+        const response = await apiClient.get<{
+          reviews: UserReview[];
+          total: number;
+          limit: number;
+          offset: number;
+        }>("/users/me/reviews", {
+          params: { limit: LIMIT, offset: currentOffset },
+        });
+
+        const newReviews = response.data?.reviews || [];
+
+        if (reset) {
+          setReviews(newReviews);
+          setOffset(LIMIT);
+        } else {
+          setReviews((prev) => [...prev, ...newReviews]);
+          setOffset((prev) => prev + LIMIT);
+        }
+
+        setTotal(response.data?.total || 0);
+      } catch (err) {
+        console.error("[useUserReviews] Failed to fetch:", err);
+        const error = err as { response?: { data?: { message?: string } }; message?: string };
+        setError(
+          error.response?.data?.message || error.message || "Không thể tải danh sách bài viết"
+        );
+      } finally {
+        setLoading(false);
       }
-      
-      setTotal(response.data?.total || 0);
-    } catch (err) {
-      console.error("[useUserReviews] Failed to fetch:", err);
-      const error = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(error.response?.data?.message || error.message || "Không thể tải danh sách bài viết");
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
+    },
+    [offset]
+  );
 
   const loadMore = useCallback(async () => {
     if (!loading && reviews.length < total) {

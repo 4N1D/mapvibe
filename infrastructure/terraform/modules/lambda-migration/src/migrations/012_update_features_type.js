@@ -1,7 +1,6 @@
 const { sql } = require("kysely");
 
 async function up(db) {
-
   await sql`
     ALTER TABLE restaurants 
     ALTER COLUMN features TYPE TEXT;

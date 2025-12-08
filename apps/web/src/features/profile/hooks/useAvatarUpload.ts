@@ -36,50 +36,55 @@ export function useAvatarUpload(onSuccess?: (cdnUrl: string) => void): UseAvatar
     }
   }, []);
 
-  const uploadAvatar = useCallback(async (file: File): Promise<string> => {
-    if (!file.type.startsWith("image/")) {
-      throw new Error("Vui lòng chọn file ảnh");
-    }
+  const uploadAvatar = useCallback(
+    async (file: File): Promise<string> => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Vui lòng chọn file ảnh");
+      }
 
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error("Kích thước ảnh không được vượt quá 5MB");
-    }
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error("Kích thước ảnh không được vượt quá 5MB");
+      }
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
 
-    try {
-      setUploading(true);
+      try {
+        setUploading(true);
 
-      // Get presigned URL
-      const uploadResponse = await apiClient.post<UploadResponse>("/users/me/avatar", {
-        content_type: file.type,
-      });
+        // Get presigned URL
+        const uploadResponse = await apiClient.post<UploadResponse>("/users/me/avatar", {
+          content_type: file.type,
+        });
 
-      const { upload_url, cdn_url } = uploadResponse.data;
+        const { upload_url, cdn_url } = uploadResponse.data;
 
-      // Upload to S3
-      await fetch(upload_url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
+        // Upload to S3
+        await fetch(upload_url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
 
-      clearPreview();
-      onSuccess?.(cdn_url);
-      return cdn_url;
-    } catch (err) {
-      clearPreview();
-      const error = err as { response?: { data?: { message?: string } }; message?: string };
-      throw new Error(error.response?.data?.message || error.message || "Lỗi khi tải lên ảnh đại diện");
-    } finally {
-      setUploading(false);
-    }
-  }, [clearPreview, onSuccess]);
+        clearPreview();
+        onSuccess?.(cdn_url);
+        return cdn_url;
+      } catch (err) {
+        clearPreview();
+        const error = err as { response?: { data?: { message?: string } }; message?: string };
+        throw new Error(
+          error.response?.data?.message || error.message || "Lỗi khi tải lên ảnh đại diện"
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [clearPreview, onSuccess]
+  );
 
   return {
     preview,

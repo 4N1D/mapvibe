@@ -177,6 +177,7 @@ module "lambda_api" {
   cloudfront_domain        = module.cdn.cloudfront_domain_name
   sqs_embedding_queue_url  = module.lambda_embeddings.sqs_queue_url
   sqs_embedding_queue_arn  = module.lambda_embeddings.sqs_queue_arn
+  cognito_user_pool_id     = module.cognito.user_pool_id
 }
 
 # ============================================

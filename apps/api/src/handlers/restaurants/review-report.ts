@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error, unauthorized } from "../../middlewares/response";
@@ -69,14 +70,17 @@ export const handler: Handler = {
       }
 
       // Create report
+      const reportId = crypto.randomUUID();
       await db
         .insertInto("reports")
         .values({
+          id: reportId,
           reporter_id: userId,
           target_type: "review",
           target_id: reviewId,
           reason,
           details: details || null,
+          status: "pending",
         })
         .execute();
 

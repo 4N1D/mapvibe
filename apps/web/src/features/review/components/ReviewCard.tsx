@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@mapvibe/ui-components";
 import { Heart, MessageCircle, Share2, MapPin, Clock, DollarSign } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
 import toast from "react-hot-toast";
+import { apiClient } from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatPriceRange(priceMin?: number | null, priceMax?: number | null): string | null {
   if (!priceMin && !priceMax) return null;
@@ -37,10 +39,48 @@ interface ReviewCardProps {
 
 export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [liked, setLiked] = useState(data?.user_has_liked || false);
+  const [likeCount, setLikeCount] = useState(data?.upvote_count || 0);
 
   const handleCardClick = () => {
     if (data) {
       navigate(`/post/${data.id}`);
+    }
+  };
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để thích bài viết");
+      navigate("/login");
+      return;
+    }
+    if (!data) return;
+
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!wasLiked);
+    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+
+    try {
+      await apiClient.post("/reviews/vote", {
+        user_id: user.sub,
+        review_post_id: data.id,
+        vote_type: "upvote",
+      });
+    } catch (error) {
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      console.error("Failed to like review:", error);
+      toast.error("Không thể thích bài viết. Vui lòng thử lại.");
+    }
+  };
+
+  const handleComment = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data) {
+      navigate(`/post/${data.id}#comments`);
     }
   };
 
@@ -211,14 +251,22 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
 
           {/* Engagement */}
           <div className="flex items-center gap-3 text-gray-500">
-            <span className="flex items-center gap-1 text-xs">
-              <Heart className="h-3 w-3" />
-              {data.upvote_count}
-            </span>
-            <span className="flex items-center gap-1 text-xs">
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100 ${liked ? "text-red-500" : ""}`}
+              title="Thích"
+            >
+              <Heart className={`h-3 w-3 ${liked ? "fill-current" : ""}`} />
+              {likeCount}
+            </button>
+            <button
+              onClick={handleComment}
+              className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"
+              title="Bình luận"
+            >
               <MessageCircle className="h-3 w-3" />
               {data.comment_count}
-            </span>
+            </button>
             <button
               onClick={handleShare}
               className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"

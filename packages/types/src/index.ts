@@ -148,6 +148,7 @@ export interface HotReview {
   price_min?: number | null;
   price_max?: number | null;
   opening_hours?: string | null;
+  user_has_liked?: boolean;
 }
 
 export interface HotReviewsResponse {

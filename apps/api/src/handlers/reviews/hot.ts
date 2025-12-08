@@ -2,6 +2,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, error } from "../../middlewares/response";
 import { sql } from "kysely";
+import { getUserIdFromEvent } from "../../utils/auth";
 
 function getRankTag(score: number, hoursAge: number): string {
   if (hoursAge <= 24 && score >= 0) {
@@ -111,6 +112,22 @@ export const handler: Handler = {
         price_max: number | null;
         opening_hours: string | null;
       }
+
+      const userId = getUserIdFromEvent(event);
+      let userLikedReviewIds = new Set<string>();
+
+      if (userId && result.rows.length > 0) {
+        const reviewIds = (result.rows as HotReviewRow[]).map((r) => r.id);
+        const userVotes = await db
+          .selectFrom("votes")
+          .select("review_post_id")
+          .where("user_id", "=", userId)
+          .where("review_post_id", "in", reviewIds)
+          .where("vote_type", "=", "upvote")
+          .execute();
+        userLikedReviewIds = new Set(userVotes.map((v) => v.review_post_id));
+      }
+
       const reviews = (result.rows as HotReviewRow[]).map((row) => ({
         id: row.id,
         author_id: row.author_id,
@@ -132,6 +149,7 @@ export const handler: Handler = {
         price_min: row.price_min,
         price_max: row.price_max,
         opening_hours: row.opening_hours,
+        user_has_liked: userLikedReviewIds.has(row.id),
       }));
 
       return success({

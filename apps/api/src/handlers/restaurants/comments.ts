@@ -458,9 +458,11 @@ export const reportHandler: Handler = {
       }
 
       // Create report
+      const reportId = crypto.randomUUID();
       await db
         .insertInto("reports")
         .values({
+          id: reportId,
           reporter_id: userId,
           target_type: "comment",
           target_id: commentId,

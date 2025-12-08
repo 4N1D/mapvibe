@@ -363,16 +363,52 @@ def update_restaurant_embedding(restaurant_id: str, embedding: List[float]):
                     search_parts.append(restaurant_data['address'])
                 if restaurant_data.get('description'):
                     search_parts.append(restaurant_data['description'])
-                if restaurant_data.get('features'):
-                    search_parts.append(restaurant_data['features'])
+                
+                # Xử lý features
+                features = restaurant_data.get('features')
+                if features:
+                    if isinstance(features, list):
+                        feature_names = []
+                        for item in features:
+                            if isinstance(item, dict):
+                                name = item.get('name') or item.get('value') or item.get('label')
+                                if name:
+                                    feature_names.append(str(name))
+                                elif len(item) > 0:
+                                    feature_names.append(str(list(item.values())[0]))
+                            elif isinstance(item, str):
+                                feature_names.append(item)
+                            else:
+                                feature_names.append(str(item))
+                        if feature_names:
+                            search_parts.append(', '.join(feature_names))
+                    elif isinstance(features, str):
+                        search_parts.append(features)
+                
                 if restaurant_data.get('business_type'):
                     search_parts.append(restaurant_data['business_type'])        
+                
+                # Xử lý cuisine_types
                 cuisine_types = restaurant_data.get('cuisine_types')
                 if cuisine_types:
                     if isinstance(cuisine_types, list):
-                        search_parts.append(', '.join(cuisine_types))
+                        cuisine_names = []
+                        for item in cuisine_types:
+                            if isinstance(item, dict):
+                                name = item.get('name') or item.get('value') or item.get('label')
+                                if name:
+                                    cuisine_names.append(str(name))
+                                elif len(item) > 0:
+                                    cuisine_names.append(str(list(item.values())[0]))
+                            elif isinstance(item, str):
+                                cuisine_names.append(item)
+                            else:
+                                cuisine_names.append(str(item))
+                        if cuisine_names:
+                            search_parts.append(', '.join(cuisine_names))
                     elif isinstance(cuisine_types, str):
                         search_parts.append(cuisine_types)
+                
                 menu_items = restaurant_data.get('menu_items', [])
                 if menu_items:
                     search_parts.append(', '.join([item.get('name', '') for item in menu_items[:10]]))

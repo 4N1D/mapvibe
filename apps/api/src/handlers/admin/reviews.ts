@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
@@ -167,7 +168,7 @@ export const updateReviewHandler: Handler = {
 
       switch (action) {
         case "approve":
-          updateData.status = "approved";
+          updateData.status = "published";
           updateData.report_count = 0;
           break;
         case "hide":
@@ -179,7 +180,7 @@ export const updateReviewHandler: Handler = {
           updateData.hidden_reason = reason || "Deleted by admin";
           break;
         case "restore":
-          updateData.status = "active";
+          updateData.status = "published";
           updateData.hidden_reason = null;
           break;
         default:
@@ -481,9 +482,11 @@ export const updateLocationHandler: Handler = {
         .replace(/^-|-$/g, "");
 
       // Create restaurant
+      const restaurantId = crypto.randomUUID();
       const restaurant = await db
         .insertInto("restaurants")
         .values({
+          id: restaurantId,
           name_vi,
           slug: `${slug}-${Date.now()}`,
           address: (location as LocationAddress).full_address || (location as LocationAddress).street_address,
@@ -525,7 +528,7 @@ export const updateLocationHandler: Handler = {
         .updateTable("review_posts")
         .set({
           restaurant_id: restaurant.id,
-          status: "approved",
+          status: "published",
           updated_at: new Date(),
         } as Record<string, unknown>)
         .where("location_address_id", "=", locationId)

@@ -211,7 +211,7 @@ export default function PlacesPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() =>
-                              window.open(`https://mapvibe.site/places/${place.slug}`, "_blank")
+                              window.open(`https://mapvibe.site/place/${place.slug}`, "_blank")
                             }
                             className="p-2 text-gray-400 transition-colors hover:text-gray-600"
                             title="Xem trên web"

@@ -10,5 +10,6 @@ export { handler as approveLocationHandler } from './approve-location';
 export { handler as cleanupExpiredHandler } from './cleanup-expired';
 export { handler as loadCommentsHandler } from './load-comments';
 export { handler as detailHandler } from './detail';
+export { handler as reviewLikedCommentsHandler } from './review-liked-comments';
 
 

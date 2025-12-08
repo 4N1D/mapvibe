@@ -23,6 +23,7 @@ import {
   cleanupExpiredHandler as reviewCleanupExpiredHandler,
   loadCommentsHandler as reviewLoadCommentsHandler,
   detailHandler as reviewDetailHandler,
+  reviewLikedCommentsHandler,
 } from './handlers/reviews';
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
@@ -199,6 +200,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/reviews\/comments\/([^/]+)\/like$/,
     paramNames: ['commentId'],
     handler: reviewCommentLikeHandler,
+  },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/([^/]+)\/liked-comments$/,
+    paramNames: ['reviewId'],
+    handler: reviewLikedCommentsHandler,
   },
   {
     method: 'GET',

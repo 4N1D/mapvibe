@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error, unauthorized } from "../../middlewares/response";
@@ -30,43 +31,12 @@ export const handler: Handler = {
         return notFound("Review not found");
       }
 
-      // Check if user already liked this review
-      const existingLike = await db
-        .selectFrom("likes")
-        .select(["id"])
-        .where("target_type", "=", "review")
-        .where("target_id", "=", reviewId)
-        .where("user_id", "=", userId)
-        .executeTakeFirst();
+      // Use the toggle_like function from database
+      const result = await sql<{ liked: boolean; like_count: number }>`
+        SELECT * FROM toggle_like(${userId}, 'review', ${reviewId})
+      `.execute(db);
 
-      let liked: boolean;
-      let newLikeCount: number;
-
-      if (existingLike) {
-        // Unlike
-        await db
-          .deleteFrom("likes")
-          .where("target_type", "=", "review")
-          .where("target_id", "=", reviewId)
-          .where("user_id", "=", userId)
-          .execute();
-
-        newLikeCount = Math.max((review.upvote_count ?? 0) - 1, 0);
-        liked = false;
-      } else {
-        // Like
-        await db
-          .insertInto("likes")
-          .values({
-            user_id: userId,
-            target_type: "review",
-            target_id: reviewId,
-          })
-          .execute();
-
-        newLikeCount = (review.upvote_count ?? 0) + 1;
-        liked = true;
-      }
+      const { liked, like_count: newLikeCount } = result.rows[0];
 
       // Update upvote_count on restaurant_reviews
       await db

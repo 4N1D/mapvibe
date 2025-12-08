@@ -8,28 +8,29 @@ import { CommentItem } from "../CommentItem";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface CommentsTabProps {
-  restaurantId?: number;
+  restaurantId?: string;
+  slug?: string;
   reviewId?: string;
 }
 
-const fetchComments = async (restaurantId?: number, reviewId?: string, page: number = 1) => {
+const fetchComments = async (slug?: string, reviewId?: string, page: number = 1) => {
   if (reviewId) {
     // Fetch comments for a specific review post
     const response = await apiClient.get<CommentsResponse>(
       `/reviews/${reviewId}/comments?page=${page}&limit=10`
     );
     return response.data;
-  } else if (restaurantId) {
+  } else if (slug) {
     // Fetch comments for a restaurant
     const response = await apiClient.get<CommentsResponse>(
-      `/comments/${restaurantId}?page=${page}&limit=10`
+      `/restaurants/${slug}/comments?page=${page}&limit=10`
     );
     return response.data;
   }
-  throw new Error("Either restaurantId or reviewId must be provided");
+  throw new Error("Either slug or reviewId must be provided");
 };
 
-export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
+export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) {
   const { user } = useAuth();
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -44,13 +45,13 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
 
   const queryKey = reviewId
     ? ["comments", "review", reviewId]
-    : ["comments", "restaurant", restaurantId];
+    : ["comments", "restaurant", slug];
 
   const { data } = useQuery({
     queryKey,
-    queryFn: () => fetchComments(restaurantId, reviewId, 1),
+    queryFn: () => fetchComments(slug, reviewId, 1),
     placeholderData: (prev) => prev,
-    enabled: !!(restaurantId || reviewId),
+    enabled: !!(slug || reviewId),
   });
 
   const comments = localComments.length > 0 ? localComments : data?.comments || [];
@@ -63,7 +64,7 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchComments(restaurantId, reviewId, nextPage);
+      const response = await fetchComments(slug, reviewId, nextPage);
       const currentComments = localComments.length > 0 ? localComments : data?.comments || [];
       setLocalComments([...currentComments, ...response.comments]);
       setHasMore(response.page < response.total_pages);

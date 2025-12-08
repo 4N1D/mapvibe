@@ -8,17 +8,18 @@ import { ReviewItem } from "../ReviewItem";
 import toast from "react-hot-toast";
 
 interface ReviewsTabProps {
-  restaurantId: number;
+  restaurantId: string;
+  slug?: string;
 }
 
-const fetchReviews = async (restaurantId: number, page: number) => {
+const fetchReviews = async (slug: string, page: number) => {
   const response = await apiClient.get<RestaurantReviewsResponse>(
-    `/reviews/restaurant/${restaurantId}?page=${page}&limit=10`
+    `/restaurants/${slug}/reviews?page=${page}&limit=10`
   );
   return response.data;
 };
 
-export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
+export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {
   const [localReviews, setLocalReviews] = useState<RestaurantReview[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);

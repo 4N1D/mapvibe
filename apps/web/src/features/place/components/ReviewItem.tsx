@@ -61,7 +61,7 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>{formatTime(review.created_at)}</span>
             <span className="flex items-center gap-0.5 font-medium text-yellow-500">
-              {review.overall_rating.toFixed(1)}
+              {Number(review.overall_rating || 0).toFixed(1)}
               <Star className="h-3.5 w-3.5 fill-current" />
             </span>
           </div>

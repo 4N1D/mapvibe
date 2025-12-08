@@ -84,23 +84,30 @@ export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) 
 
     try {
       setSubmitting(true);
-      const payload: any = {
-        author_id: user.sub,
-        text: content,
-      };
-
-      // Only include parent_comment_id for replies
-      if (replyingTo?.id) {
-        payload.parent_comment_id = replyingTo.id;
-      }
+      let endpoint: string;
+      let payload: any;
 
       if (reviewId) {
-        payload.review_post_id = reviewId;
-      } else if (restaurantId) {
-        payload.restaurant_id = restaurantId;
+        // For review post comments
+        endpoint = "/reviews/comment";
+        payload = {
+          author_id: user.sub,
+          text: content,
+          review_post_id: reviewId,
+          parent_comment_id: replyingTo?.id || null,
+        };
+      } else if (slug) {
+        // For restaurant comments - API expects slug and content
+        endpoint = "/restaurants/comments";
+        payload = {
+          slug,
+          content,
+          parent_id: replyingTo?.id || null,
+        };
+      } else {
+        throw new Error("Missing slug or reviewId");
       }
 
-      const endpoint = reviewId ? "/reviews/comment" : "/comments";
       const response = await apiClient.post<{ comment: any }>(endpoint, payload);
 
       // Extract comment from response (API returns { comment: ... })

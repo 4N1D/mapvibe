@@ -12,11 +12,61 @@ interface ReviewsTabProps {
   slug?: string;
 }
 
+interface ReviewsApiResponse {
+  restaurant_id: string;
+  reviews: Array<{
+    id: string;
+    text: string;
+    photos?: string;
+    rating_service: number;
+    rating_location: number;
+    rating_price: number;
+    rating_quality: number;
+    rating_ambiance: number;
+    rating_overall: number;
+    upvote_count: number;
+    comment_count: number;
+    created_at: string;
+    author_id: string;
+    author_name: string;
+    author_avatar?: string;
+  }>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
 const fetchReviews = async (slug: string, page: number) => {
-  const response = await apiClient.get<RestaurantReviewsResponse>(
-    `/restaurants/${slug}/reviews?page=${page}&limit=10`
+  const offset = (page - 1) * 10;
+  const response = await apiClient.get<ReviewsApiResponse>(
+    `/restaurants/${slug}/reviews?limit=10&offset=${offset}`
   );
-  return response.data;
+  
+  const data = response.data;
+  const reviews = (data.reviews || []).map(r => ({
+    id: r.id,
+    author_id: r.author_id,
+    author_name: r.author_name,
+    author_avatar: r.author_avatar,
+    restaurant_id: data.restaurant_id,
+    content: r.text,
+    ratings: {
+      quality: r.rating_quality,
+      service: r.rating_service,
+      location: r.rating_location,
+      price: r.rating_price,
+      ambiance: r.rating_ambiance,
+    },
+    overall_rating: r.rating_overall,
+    photos: r.photos ? (typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos) : [],
+    like_count: r.upvote_count,
+    comment_count: r.comment_count,
+    created_at: r.created_at,
+  }));
+  
+  return {
+    reviews,
+    page,
+    total_pages: Math.ceil((data.pagination?.total || reviews.length) / 10),
+  };
 };
 
 export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {

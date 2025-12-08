@@ -8,11 +8,36 @@ interface MenuTabProps {
   slug?: string;
 }
 
+interface MenuApiResponse {
+  restaurant_id: string;
+  menu_photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+  }>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
 const fetchMenuPhotos = async (slug: string, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/restaurants/${slug}/menu?page=${page}&limit=12`
+  const offset = (page - 1) * 12;
+  const response = await apiClient.get<MenuApiResponse>(
+    `/restaurants/${slug}/menu?limit=12&offset=${offset}`
   );
-  return response.data;
+  
+  // Transform API response to expected format
+  const data = response.data;
+  const photos = (data.menu_photos || []).map(p => ({
+    id: p.id,
+    url: p.s3_url,
+    thumbnail_url: p.s3_thumbnail_url,
+    category: "menu" as const,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination?.total || photos.length) / 12),
+  };
 };
 
 export function MenuTab({ restaurantId, slug }: MenuTabProps) {

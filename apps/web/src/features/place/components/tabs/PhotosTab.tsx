@@ -18,11 +18,44 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   comment: "Bình luận",
 };
 
+interface PhotosApiResponse {
+  restaurant_id: string;
+  photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+    photo_type: string;
+  }>;
+  counts: Record<string, number>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
 const fetchPhotos = async (slug: string, category: string, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/restaurants/${slug}/photos?page=${page}&limit=15&category=${category}`
-  );
-  return response.data;
+  const offset = (page - 1) * 15;
+  const type = category === "all" ? "" : category;
+  const url = `/restaurants/${slug}/photos?limit=15&offset=${offset}${type ? `&type=${type}` : ""}`;
+  const response = await apiClient.get<PhotosApiResponse>(url);
+  
+  // Transform API response to expected format
+  const data = response.data;
+  const photos = data.photos.map(p => ({
+    id: p.id,
+    url: p.s3_url,
+    thumbnail_url: p.s3_thumbnail_url,
+    category: p.photo_type as any,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination.total || photos.length) / 15),
+    category_counts: {
+      all: Object.values(data.counts || {}).reduce((a, b) => a + b, 0),
+      food: data.counts?.food || 0,
+      view: data.counts?.view || 0,
+      comment: data.counts?.other || 0,
+    },
+  };
 };
 
 export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabProps) {

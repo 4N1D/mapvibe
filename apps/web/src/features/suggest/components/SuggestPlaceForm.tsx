@@ -184,6 +184,16 @@ export function SuggestPlaceForm() {
       return;
     }
 
+    if (!formData.phone.trim()) {
+      toast.error("Vui lòng nhập số điện thoại");
+      return;
+    }
+
+    if (!formData.openTime || !formData.closeTime) {
+      toast.error("Vui lòng nhập giờ mở cửa");
+      return;
+    }
+
     const reviewTextLength = getTextLength(formData.review);
     if (reviewTextLength < MIN_REVIEW_LENGTH) {
       toast.error(`Đánh giá phải có ít nhất ${MIN_REVIEW_LENGTH} ký tự (hiện tại: ${reviewTextLength})`);
@@ -214,6 +224,15 @@ export function SuggestPlaceForm() {
         uploadedPhotos.push({ url: result.url, caption: result.caption });
       }
 
+      // Build opening_hours object from form data
+      const opening_hours: Record<string, string> = {};
+      if (formData.openTime && formData.closeTime) {
+        const timeRange = `${formData.openTime} - ${formData.closeTime}`;
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+          opening_hours[day] = timeRange;
+        });
+      }
+
       // Call API
       await apiClient.post("/reviews/submit-new-place", {
         author_id: user.sub,
@@ -224,6 +243,10 @@ export function SuggestPlaceForm() {
         text: formData.review,
         features: formData.features,
         photos: uploadedPhotos,
+        phone: formData.phone,
+        opening_hours,
+        price_min: formData.priceMin || undefined,
+        price_max: formData.priceMax || undefined,
       });
 
       // Cleanup photo previews

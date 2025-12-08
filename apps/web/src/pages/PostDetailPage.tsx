@@ -569,7 +569,7 @@ export function PostDetailPage() {
           </div>
         )}
 
-        {activeTab === "binh-luan" && <CommentsTab restaurantId={post.restaurantId} />}
+        {activeTab === "binh-luan" && <CommentsTab reviewId={post.id} />}
 
         {activeTab === "anh" && <PhotosTab restaurantId={post.restaurantId} showFilters={false} />}
 

@@ -5,20 +5,9 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Permission cho Cognito gọi Lambda (tạo trước User Pool với wildcard ARN)
-resource "aws_lambda_permission" "cognito_trigger" {
-  count         = var.lambda_trigger_arn != "" ? 1 : 0
-  statement_id  = "AllowCognitoInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_trigger_arn
-  principal     = "cognito-idp.amazonaws.com"
-  # Dùng wildcard để không phụ thuộc vào specific User Pool ARN (tránh circular dependency)
-  source_arn    = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
-}
+# NOTE: Lambda permission đã được di chuyển ra main.tf để tránh circular dependency
 
 resource "aws_cognito_user_pool" "main" {
-  # Đảm bảo Lambda permission được tạo trước khi User Pool có lambda_config
-  depends_on = [aws_lambda_permission.cognito_trigger]
   name = "${var.project_name}-users-${var.environment}"
 
   # Username settings

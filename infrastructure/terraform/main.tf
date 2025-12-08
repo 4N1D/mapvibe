@@ -107,10 +107,12 @@ module "cognito" {
   acm_certificate_arn = module.dns.certificate_arn
   route53_zone_id     = module.dns.zone_id
 
-  # Lambda Triggers
-  lambda_trigger_arn = module.lambda_api.function_arn
+  # Lambda Triggers - TEMPORARILY DISABLED to break circular dependency
+  # TODO: Re-enable after fixing cycle properly
+  # lambda_trigger_arn = module.lambda_api.function_arn
+  lambda_trigger_arn = ""
 
-  depends_on = [module.dns, module.lambda_api]
+  depends_on = [module.dns]
 }
 
 # ============================================

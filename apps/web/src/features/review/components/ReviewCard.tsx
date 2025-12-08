@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@mapvibe/ui-components";
 import { Heart, MessageCircle, Share2, MapPin, Clock, DollarSign } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
@@ -35,6 +36,14 @@ interface ReviewCardProps {
 }
 
 export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    if (data) {
+      navigate(`/post/${data.id}`);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="flex h-full flex-col overflow-hidden">
@@ -95,7 +104,10 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
   };
 
   return (
-    <Card className="flex h-full cursor-pointer flex-col overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
+    <Card
+      className="flex h-full cursor-pointer flex-col overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg"
+      onClick={handleCardClick}
+    >
       {/* Image */}
       <div className="relative h-48 bg-gray-200">
         {data.photos.length > 0 ? (
@@ -141,35 +153,35 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
       </div>
 
       <CardContent className="flex flex-1 flex-col p-4">
-        {/* Restaurant info */}
-        {data.restaurant_name && (
-          <div className="mb-3 border-b border-gray-100 pb-3">
-            <h3 className="font-semibold text-gray-900 line-clamp-1">{data.restaurant_name}</h3>
-            {data.restaurant_address && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 line-clamp-1">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                {data.restaurant_address}
-              </p>
+        {/* Restaurant info - always show */}
+        <div className="mb-3 border-b border-gray-100 pb-3">
+          <h3 className="font-semibold text-gray-900 line-clamp-1">
+            {data.restaurant_name || "Địa điểm chưa xác định"}
+          </h3>
+          {data.restaurant_address && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-blue-600 line-clamp-1">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+              {data.restaurant_address}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {formatPriceRange(data.price_min, data.price_max) && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                <DollarSign className="h-3 w-3" />
+                {formatPriceRange(data.price_min, data.price_max)}
+              </span>
             )}
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-              {formatPriceRange(data.price_min, data.price_max) && (
-                <span className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" />
-                  {formatPriceRange(data.price_min, data.price_max)}
-                </span>
-              )}
-              {formatOpeningHours(data.opening_hours) && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {formatOpeningHours(data.opening_hours)}
-                </span>
-              )}
-            </div>
+            {formatOpeningHours(data.opening_hours) && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
+                <Clock className="h-3 w-3" />
+                {formatOpeningHours(data.opening_hours)}
+              </span>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Review content */}
-        <p className="line-clamp-3 text-sm text-gray-600">{data.text}</p>
+        {/* Review content - secondary */}
+        <p className="line-clamp-2 text-sm text-gray-600">{data.text}</p>
 
         {/* Reviewer info */}
         <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">

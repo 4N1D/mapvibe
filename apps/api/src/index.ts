@@ -14,6 +14,7 @@ import {
   createHandler as reviewCreateHandler,
   voteHandler as reviewVoteHandler,
   commentHandler as reviewCommentHandler,
+  commentLikeHandler as reviewCommentLikeHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
   shareHandler as reviewShareHandler,
@@ -34,6 +35,7 @@ import {
   getMySavedHandler,
   getMyStatsHandler,
   getMyVotesHandler,
+  getMyLikedCommentsHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
@@ -193,6 +195,12 @@ const routes: RouteDefinition[] = [
     handler: reviewLoadCommentsHandler,
   },
   {
+    method: 'POST',
+    pattern: /^\/reviews\/comments\/([^/]+)\/like$/,
+    paramNames: ['commentId'],
+    handler: reviewCommentLikeHandler,
+  },
+  {
     method: 'GET',
     pattern: /^\/reviews\/([^/]+)$/,
     paramNames: ['reviewId'],
@@ -241,6 +249,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/votes$/,
     paramNames: [],
     handler: getMyVotesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/liked-comments$/,
+    paramNames: [],
+    handler: getMyLikedCommentsHandler,
   },
   {
     method: "POST",

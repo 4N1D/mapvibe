@@ -1,7 +1,7 @@
-import { getDb } from '@/services/db';
-import { getUserIdFromEvent, getClientIp } from '@/utils/auth';
-import { success, badRequest, error } from '@/middlewares/response';
-import { Handler, APIGatewayResponse, APIGatewayEvent } from '@/types';
+import { getDb } from "@/services/db";
+import { getUserIdFromEvent, getClientIp } from "@/utils/auth";
+import { success, badRequest, error } from "@/middlewares/response";
+import { Handler, APIGatewayResponse, APIGatewayEvent } from "@/types";
 
 interface LogActivityBody {
   activity_type: string;
@@ -14,17 +14,32 @@ interface LogActivityBody {
 }
 
 const VALID_ACTIVITY_TYPES = [
-  'login', 'logout', 'register',
-  'view_place', 'view_review', 'view_profile',
-  'search', 'search_nearby',
-  'create_review', 'edit_review', 'delete_review',
-  'create_comment', 'edit_comment', 'delete_comment',
-  'like', 'unlike',
-  'report', 'share',
-  'upload_photo', 'delete_photo',
-  'follow', 'unfollow',
-  'update_profile', 'update_avatar',
-  'page_view', 'other'
+  "login",
+  "logout",
+  "register",
+  "view_place",
+  "view_review",
+  "view_profile",
+  "search",
+  "search_nearby",
+  "create_review",
+  "edit_review",
+  "delete_review",
+  "create_comment",
+  "edit_comment",
+  "delete_comment",
+  "like",
+  "unlike",
+  "report",
+  "share",
+  "upload_photo",
+  "delete_photo",
+  "follow",
+  "unfollow",
+  "update_profile",
+  "update_avatar",
+  "page_view",
+  "other",
 ];
 
 // POST /activities - Log user activity
@@ -36,29 +51,30 @@ export const logActivityHandler: Handler = {
 
       let body: LogActivityBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
-      const { activity_type, target_type, target_id, metadata, page_url, referrer, session_id } = body;
+      const { activity_type, target_type, target_id, metadata, page_url, referrer, session_id } =
+        body;
 
       if (!activity_type || !VALID_ACTIVITY_TYPES.includes(activity_type)) {
-        return badRequest(`Invalid activity_type. Valid types: ${VALID_ACTIVITY_TYPES.join(', ')}`);
+        return badRequest(`Invalid activity_type. Valid types: ${VALID_ACTIVITY_TYPES.join(", ")}`);
       }
 
       const ipAddress = getClientIp(event);
-      const userAgent = event.headers?.['User-Agent'] || event.headers?.['user-agent'] || null;
+      const userAgent = event.headers?.["User-Agent"] || event.headers?.["user-agent"] || null;
 
       await db
-        .insertInto('user_activities')
+        .insertInto("user_activities")
         .values({
           user_id: userId || null,
           session_id: session_id || null,
-          activity_type: activity_type as any,
+          activity_type: activity_type as (typeof VALID_ACTIVITY_TYPES)[number],
           target_type: target_type || null,
           target_id: target_id || null,
-          metadata: metadata ? JSON.stringify(metadata) : '{}',
+          metadata: metadata ? JSON.stringify(metadata) : "{}",
           ip_address: ipAddress,
           user_agent: userAgent,
           referrer: referrer || null,
@@ -68,7 +84,7 @@ export const logActivityHandler: Handler = {
 
       return success({ success: true });
     } catch (err) {
-      console.error('[activities/log] Error:', err);
+      console.error("[activities/log] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -83,37 +99,37 @@ export const batchLogActivityHandler: Handler = {
 
       let body: { activities: LogActivityBody[] };
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       if (!body.activities || !Array.isArray(body.activities) || body.activities.length === 0) {
-        return badRequest('activities array is required');
+        return badRequest("activities array is required");
       }
 
       if (body.activities.length > 50) {
-        return badRequest('Maximum 50 activities per batch');
+        return badRequest("Maximum 50 activities per batch");
       }
 
       const ipAddress = getClientIp(event);
-      const userAgent = event.headers?.['User-Agent'] || event.headers?.['user-agent'] || null;
+      const userAgent = event.headers?.["User-Agent"] || event.headers?.["user-agent"] || null;
 
-      const validActivities = body.activities.filter(a => 
-        a.activity_type && VALID_ACTIVITY_TYPES.includes(a.activity_type)
+      const validActivities = body.activities.filter(
+        (a) => a.activity_type && VALID_ACTIVITY_TYPES.includes(a.activity_type)
       );
 
       if (validActivities.length > 0) {
         await db
-          .insertInto('user_activities')
+          .insertInto("user_activities")
           .values(
-            validActivities.map(activity => ({
+            validActivities.map((activity) => ({
               user_id: userId || null,
               session_id: activity.session_id || null,
-              activity_type: activity.activity_type as any,
+              activity_type: activity.activity_type as (typeof VALID_ACTIVITY_TYPES)[number],
               target_type: activity.target_type || null,
               target_id: activity.target_id || null,
-              metadata: activity.metadata ? JSON.stringify(activity.metadata) : '{}',
+              metadata: activity.metadata ? JSON.stringify(activity.metadata) : "{}",
               ip_address: ipAddress,
               user_agent: userAgent,
               referrer: activity.referrer || null,
@@ -123,13 +139,13 @@ export const batchLogActivityHandler: Handler = {
           .execute();
       }
 
-      return success({ 
-        success: true, 
+      return success({
+        success: true,
         logged: validActivities.length,
-        skipped: body.activities.length - validActivities.length
+        skipped: body.activities.length - validActivities.length,
       });
     } catch (err) {
-      console.error('[activities/batch] Error:', err);
+      console.error("[activities/batch] Error:", err);
       return error((err as Error).message);
     }
   },

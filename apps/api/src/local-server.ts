@@ -10,14 +10,14 @@ import "dotenv/config";
 import http from "http";
 import { URL } from "url";
 import { handler } from "./index";
-import type { APIGatewayEvent, APIGatewayResponse } from "./types";
+import type { APIGatewayEvent, APIGatewayResponse, JWTClaims } from "./types";
 
 // Decode JWT token to extract user info (without verification for local dev)
 function decodeJwt(token: string): Record<string, unknown> | null {
   try {
-    const parts = token.split('.');
+    const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
+    const payload = Buffer.from(parts[1], "base64").toString("utf8");
     return JSON.parse(payload);
   } catch {
     return null;
@@ -27,10 +27,10 @@ function decodeJwt(token: string): Record<string, unknown> | null {
 // Type guard: Kiểm tra xem response có phải APIGatewayResponse không
 function isAPIGatewayResponse(response: unknown): response is APIGatewayResponse {
   return (
-    typeof response === 'object' &&
+    typeof response === "object" &&
     response !== null &&
-    'statusCode' in response &&
-    'body' in response
+    "statusCode" in response &&
+    "body" in response
   );
 }
 
@@ -48,8 +48,8 @@ const server = http.createServer(async (req, res) => {
     // Extract and decode JWT from Authorization header
     const authHeader = req.headers.authorization;
     let jwtClaims: Record<string, unknown> | null = null;
-    
-    if (authHeader?.startsWith('Bearer ')) {
+
+    if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       jwtClaims = decodeJwt(token);
       if (jwtClaims) {
@@ -65,13 +65,15 @@ const server = http.createServer(async (req, res) => {
       pathParameters: null,
       headers: req.headers as Record<string, string>,
       body: body || null,
-      requestContext: jwtClaims ? {
-        authorizer: {
-          jwt: {
-            claims: jwtClaims,
-          },
-        },
-      } : undefined,
+      requestContext: jwtClaims
+        ? {
+            authorizer: {
+              jwt: {
+                claims: jwtClaims as JWTClaims,
+              },
+            },
+          }
+        : undefined,
     };
 
     console.log(`\n→ ${event.httpMethod} ${event.path}`);
@@ -82,7 +84,7 @@ const server = http.createServer(async (req, res) => {
       // Local server chỉ handle API Gateway responses
       if (!isAPIGatewayResponse(response)) {
         res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Invalid response type for local server' }));
+        res.end(JSON.stringify({ error: "Invalid response type for local server" }));
         return;
       }
 

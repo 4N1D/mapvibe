@@ -30,7 +30,10 @@ export function Toast({ toast, onClose }: ToastProps) {
             <X className="h-5 w-5 text-white" />
           )}
           <span className="text-sm font-medium text-white">{toast.message}</span>
-          <button onClick={onClose} className="ml-2 rounded p-1 hover:bg-white/20">
+          <button
+            onClick={onClose}
+            className="ml-2 rounded p-1 hover:bg-white/20"
+          >
             <X className="h-4 w-4 text-white" />
           </button>
         </motion.div>

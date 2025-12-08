@@ -14,7 +14,14 @@ interface PasswordInputProps {
   onToggleShow: () => void;
 }
 
-function PasswordInput({ label, value, onChange, placeholder, show, onToggleShow }: PasswordInputProps) {
+function PasswordInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  show,
+  onToggleShow,
+}: PasswordInputProps) {
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-700">{label}</label>
@@ -84,7 +91,7 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
 
   const handleSubmit = async () => {
     const updateData: UpdateProfileData = {};
-    
+
     if (formData.display_name !== profile.display_name) {
       updateData.display_name = formData.display_name;
     }
@@ -152,13 +159,16 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
         await apiClient.post("/users/me/set-password", {
           password: passwordData.new_password,
         });
-        onToast?.("Tạo mật khẩu thành công! Giờ bạn có thể đăng nhập bằng email và mật khẩu.", "success");
+        onToast?.(
+          "Tạo mật khẩu thành công! Giờ bạn có thể đăng nhập bằng email và mật khẩu.",
+          "success"
+        );
       } else {
         // Regular user: Change password via Cognito
         await changePassword(passwordData.current_password, passwordData.new_password);
         onToast?.("Đổi mật khẩu thành công!", "success");
       }
-      
+
       // Clear form on success
       setPasswordData({
         current_password: "",
@@ -166,8 +176,12 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
         confirm_password: "",
       });
     } catch (err) {
-      const error = err as { message?: string; name?: string; response?: { data?: { error?: string } } };
-      
+      const error = err as {
+        message?: string;
+        name?: string;
+        response?: { data?: { error?: string } };
+      };
+
       // Handle API errors for OAuth users
       if (isOAuthUser) {
         const apiError = error.response?.data?.error || error.message;
@@ -183,7 +197,9 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
           setPasswordError("Mật khẩu hiện tại không đúng");
         }
       } else if (error.name === "InvalidPasswordException") {
-        setPasswordError("Mật khẩu mới không đủ mạnh. Cần có chữ hoa, chữ thường, số và ký tự đặc biệt");
+        setPasswordError(
+          "Mật khẩu mới không đủ mạnh. Cần có chữ hoa, chữ thường, số và ký tự đặc biệt"
+        );
       } else if (error.name === "LimitExceededException") {
         setPasswordError("Bạn đã thử quá nhiều lần. Vui lòng thử lại sau");
       } else {
@@ -286,7 +302,9 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
               onChange={(value) => setPasswordData({ ...passwordData, current_password: value })}
               placeholder="Nhập mật khẩu hiện tại"
               show={showPasswords.current}
-              onToggleShow={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+              onToggleShow={() =>
+                setShowPasswords({ ...showPasswords, current: !showPasswords.current })
+              }
             />
           )}
           <PasswordInput
@@ -303,17 +321,21 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
             onChange={(value) => setPasswordData({ ...passwordData, confirm_password: value })}
             placeholder="Nhập lại mật khẩu"
             show={showPasswords.confirm}
-            onToggleShow={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+            onToggleShow={() =>
+              setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })
+            }
           />
 
-          {passwordError && (
-            <p className="text-sm text-red-600">{passwordError}</p>
-          )}
+          {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
 
           <div className="flex justify-end">
             <Button
               onClick={handleChangePassword}
-              disabled={changingPassword || (!isOAuthUser && !passwordData.current_password) || !passwordData.new_password}
+              disabled={
+                changingPassword ||
+                (!isOAuthUser && !passwordData.current_password) ||
+                !passwordData.new_password
+              }
               className="bg-gray-800 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {changingPassword ? (
@@ -321,8 +343,10 @@ export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: P
                   <Loader2 className="h-4 w-4 animate-spin" />
                   {isOAuthUser ? "Đang tạo..." : "Đang đổi..."}
                 </span>
+              ) : isOAuthUser ? (
+                "Tạo mật khẩu"
               ) : (
-                isOAuthUser ? "Tạo mật khẩu" : "Đổi mật khẩu"
+                "Đổi mật khẩu"
               )}
             </Button>
           </div>

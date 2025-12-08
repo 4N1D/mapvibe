@@ -21,9 +21,7 @@ export function SavedList({ saved, loading, error, hasMore, onLoadMore }: SavedL
   }
 
   if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>
-    );
+    return <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>;
   }
 
   if (saved.length === 0) {
@@ -39,10 +37,13 @@ export function SavedList({ saved, loading, error, hasMore, onLoadMore }: SavedL
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {saved.map((item) => (
-          <SavedCard key={item.restaurant_id} item={item} />
+          <SavedCard
+            key={item.restaurant_id}
+            item={item}
+          />
         ))}
       </div>
-      
+
       {hasMore && (
         <div className="flex justify-center">
           <button
@@ -85,13 +86,14 @@ function SavedCard({ item }: { item: SavedRestaurant }) {
       {/* Content */}
       <div className="p-4">
         <h3 className="mb-1 truncate font-semibold text-gray-900">{item.name}</h3>
-        
+
         {item.address && (
           <p className="mb-2 truncate text-sm text-gray-500">
-            {item.address}{item.ward ? `, ${item.ward}` : ""}
+            {item.address}
+            {item.ward ? `, ${item.ward}` : ""}
           </p>
         )}
-        
+
         {/* Meta */}
         <div className="flex items-center justify-between text-xs text-gray-500">
           <div className="flex items-center gap-2">
@@ -100,15 +102,11 @@ function SavedCard({ item }: { item: SavedRestaurant }) {
                 ★ {item.rating_overall.toFixed(1)}
               </span>
             )}
-            {item.review_count !== undefined && (
-              <span>({item.review_count} đánh giá)</span>
-            )}
+            {item.review_count !== undefined && <span>({item.review_count} đánh giá)</span>}
           </div>
-          
+
           {(item.price_min || item.price_max) && (
-            <span className="text-gray-600">
-              {formatPrice(item.price_min, item.price_max)}
-            </span>
+            <span className="text-gray-600">{formatPrice(item.price_min, item.price_max)}</span>
           )}
         </div>
 

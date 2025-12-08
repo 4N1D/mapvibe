@@ -28,7 +28,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
           Vui lòng{" "}
           <a
             href="/login"
-            className="text-primary-500 font-medium hover:underline"
+            className="font-medium text-primary-500 hover:underline"
           >
             đăng nhập
           </a>{" "}

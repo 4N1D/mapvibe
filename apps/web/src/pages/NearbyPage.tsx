@@ -147,17 +147,17 @@ const formatPriceRange = (min?: number | null, max?: number | null): string => {
 // Helper function to format opening hours
 const formatOpeningHours = (hours?: Record<string, string> | null): string => {
   if (!hours) return "Chưa có thông tin";
-  
+
   // Get all unique hour ranges
   const hourRanges = Object.values(hours).filter(Boolean);
   if (hourRanges.length === 0) return "Chưa có thông tin";
-  
+
   // Count frequency of each hour range
   const hourCount: Record<string, number> = {};
   hourRanges.forEach((range) => {
     hourCount[range] = (hourCount[range] || 0) + 1;
   });
-  
+
   // Find the most common hour range
   let mostCommonRange = "";
   let maxCount = 0;
@@ -167,19 +167,19 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
       mostCommonRange = range;
     }
   });
-  
+
   // If all days have the same hours, show just the hours
   if (maxCount === hourRanges.length) {
     return mostCommonRange;
   }
-  
+
   // If most days have the same hours, show it with note
   const totalDays = Object.keys(hours).length;
   if (maxCount >= totalDays * 0.7) {
     // If 70% or more days have the same hours, show it
     return mostCommonRange;
   }
-  
+
   // Otherwise, show the most common range with a note
   return mostCommonRange || hourRanges[0];
 };
@@ -216,7 +216,7 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
       downvotes: review.downvote_count,
       shares: review.share_count,
     },
-    images: Array.isArray(review.photos) 
+    images: Array.isArray(review.photos)
       ? review.photos.map((photo) => ({ url: photo.url, caption: photo.caption }))
       : [],
   };
@@ -365,7 +365,9 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
   const [localUpvotes, setLocalUpvotes] = useState(post.stats.upvotes);
   const [localDownvotes, setLocalDownvotes] = useState(post.stats.downvotes);
   const [_isVoting, setIsVoting] = useState(false);
-  const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(initialVoteStatus ?? null);
+  const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(
+    initialVoteStatus ?? null
+  );
   const [voteAnimation, setVoteAnimation] = useState<"upvote" | "downvote" | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -489,7 +491,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
       // Update with actual counts from server (in case of race conditions)
       const actualUpvotes = response.data.review_post.upvote_count;
       const actualDownvotes = response.data.review_post.downvote_count;
-      
+
       setLocalUpvotes(actualUpvotes);
       setLocalDownvotes(actualDownvotes);
 
@@ -502,7 +504,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
         newVoteStatus = vote_type === "upvote" ? "upvoted" : "downvoted";
       }
       setVoteStatus(newVoteStatus);
-      
+
       // Notify parent to update voteStatusMap if needed
       // (This will be handled by the parent component if needed)
 
@@ -512,15 +514,17 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
       }
     } catch (err) {
       console.error("[PostCard] Failed to vote:", err);
-      
+
       // Rollback optimistic update on error
       setLocalUpvotes(previousUpvotes);
       setLocalDownvotes(previousDownvotes);
       setVoteStatus(previousStatus);
-      
+
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại.");
-      
+      toast.error(
+        error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại."
+      );
+
       // Notify parent to rollback
       if (onVoteUpdate) {
         onVoteUpdate(post.id, previousUpvotes, previousDownvotes);
@@ -581,11 +585,11 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
             <div className="flex items-center gap-2">
               <div className="text-sm font-semibold text-gray-900">{post.author}</div>
               {post.approved ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 ring-1 ring-green-200 text-[11px] font-semibold">
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
                   Đã kiểm duyệt
                 </span>
               ) : (
-                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-yellow-800 ring-1 ring-yellow-200 text-[11px] font-semibold">
+                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-semibold text-yellow-800 ring-1 ring-yellow-200">
                   Chưa kiểm duyệt
                 </span>
               )}
@@ -637,12 +641,18 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
             <motion.button
               onClick={() => handleVote("upvote")}
               disabled={!isAuthenticated}
-              className={`flex items-center justify-center gap-1 rounded-full px-2 h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`flex h-[28px] items-center justify-center gap-1 rounded-full px-2 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 voteStatus === "upvoted"
                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
-              title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "upvoted" ? "Bỏ upvote" : "Upvote"}
+              title={
+                !isAuthenticated
+                  ? "Vui lòng đăng nhập để vote"
+                  : voteStatus === "upvoted"
+                    ? "Bỏ upvote"
+                    : "Upvote"
+              }
               whileTap={{ scale: 0.95 }}
               animate={
                 voteAnimation === "upvote"
@@ -664,12 +674,18 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
             <motion.button
               onClick={() => handleVote("downvote")}
               disabled={!isAuthenticated}
-              className={`flex items-center justify-center gap-1 rounded-full px-2 py-1 min-h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`flex min-h-[28px] items-center justify-center gap-1 rounded-full px-2 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 voteStatus === "downvoted"
                   ? "bg-red-100 text-red-700 hover:bg-red-200"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
-              title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "downvoted" ? "Bỏ downvote" : "Downvote"}
+              title={
+                !isAuthenticated
+                  ? "Vui lòng đăng nhập để vote"
+                  : voteStatus === "downvoted"
+                    ? "Bỏ downvote"
+                    : "Downvote"
+              }
               whileTap={{ scale: 0.95 }}
               animate={
                 voteAnimation === "downvote"
@@ -695,14 +711,14 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
                 sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
                 sessionStorage.setItem("nearbyPostId", post.id);
               }}
-              className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+              className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
             >
               <MessageCircle className="h-4 w-4" />
               {post.stats.comments}
             </Link>
             <button
               onClick={handleShare}
-              className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+              className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
               title="Chia sẻ"
             >
               <Share2 className="h-4 w-4" />
@@ -735,11 +751,13 @@ export function NearbyPage() {
   const [posts, setPosts] = useState<PostItem[]>([]); // Filtered posts to display
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [voteStatusMap, setVoteStatusMap] = useState<Record<string, "upvoted" | "downvoted" | null>>({});
+  const [voteStatusMap, setVoteStatusMap] = useState<
+    Record<string, "upvoted" | "downvoted" | null>
+  >({});
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  
+
   // Filter states
   const [filters, setFilters] = useState<FilterState>({
     trends: {
@@ -760,17 +778,14 @@ export function NearbyPage() {
   useEffect(() => {
     const fetchData = async () => {
       // Fetch reviews and votes in parallel for better performance
-      await Promise.all([
-        fetchReviews(),
-        isAuthenticated ? fetchVoteHistory() : Promise.resolve(),
-      ]);
+      await Promise.all([fetchReviews(), isAuthenticated ? fetchVoteHistory() : Promise.resolve()]);
     };
     fetchData();
   }, [isAuthenticated]);
 
   const fetchVoteHistory = async () => {
     if (!isAuthenticated) return;
-    
+
     try {
       const response = await apiClient.get<{
         votes: Array<{
@@ -779,7 +794,7 @@ export function NearbyPage() {
           created_at: string;
         }>;
       }>("/users/me/votes");
-      
+
       // Create a map from review_post_id to vote status
       const map: Record<string, "upvoted" | "downvoted" | null> = {};
       response.data.votes.forEach((vote) => {
@@ -799,9 +814,15 @@ export function NearbyPage() {
     const returningFromPostDetail = sessionStorage.getItem("returningFromPostDetail");
 
     // Chỉ khôi phục nếu thực sự quay lại từ PostDetailPage
-    if (savedScrollPosition && savedPostId && returningFromPostDetail === "true" && !loading && posts.length > 0) {
+    if (
+      savedScrollPosition &&
+      savedPostId &&
+      returningFromPostDetail === "true" &&
+      !loading &&
+      posts.length > 0
+    ) {
       const scrollPosition = parseInt(savedScrollPosition, 10);
-      
+
       // Scroll ngay trong layout effect
       window.scrollTo(0, scrollPosition);
     }
@@ -813,23 +834,29 @@ export function NearbyPage() {
     const savedPostId = sessionStorage.getItem("nearbyPostId");
     const returningFromPostDetail = sessionStorage.getItem("returningFromPostDetail");
 
-    if (savedScrollPosition && savedPostId && returningFromPostDetail === "true" && !loading && posts.length > 0) {
+    if (
+      savedScrollPosition &&
+      savedPostId &&
+      returningFromPostDetail === "true" &&
+      !loading &&
+      posts.length > 0
+    ) {
       const scrollPosition = parseInt(savedScrollPosition, 10);
-      
+
       // Scroll lại sau khi ScrollRestoration đã chạy (thường chạy sau useEffect)
       const timeoutId = setTimeout(() => {
         window.scrollTo({
           top: scrollPosition,
           behavior: "auto",
         });
-        
+
         // Scroll lại một lần nữa để chắc chắn
         setTimeout(() => {
           window.scrollTo({
             top: scrollPosition,
             behavior: "auto",
           });
-          
+
           // Xóa saved data sau khi đã khôi phục
           sessionStorage.removeItem("nearbyScrollPosition");
           sessionStorage.removeItem("nearbyPostId");
@@ -863,11 +890,11 @@ export function NearbyPage() {
 
       const reviews = response.data?.reviews || [];
       const mappedPosts = reviews.map(mapReviewToPostItem);
-      
+
       // Check if there are more posts to load
       // If we got fewer reviews than the limit, or if reviews array is empty, there are no more posts
       const hasMoreData = reviews.length > 0 && reviews.length >= (response.data?.limit || 20);
-      
+
       if (append) {
         setAllPosts((prevPosts) => {
           const newPosts = [...prevPosts, ...mappedPosts];
@@ -880,14 +907,12 @@ export function NearbyPage() {
         setHasMore(hasMoreData);
         setOffset(mappedPosts.length);
       }
-      
+
       return mappedPosts;
     } catch (err) {
       console.error("[NearbyPage] Failed to fetch reviews:", err);
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(
-        error.response?.data?.message || error.message || "Không thể tải danh sách review"
-      );
+      setError(error.response?.data?.message || error.message || "Không thể tải danh sách review");
       if (!append) {
         setAllPosts([]);
       }
@@ -939,13 +964,17 @@ export function NearbyPage() {
         // Extract price from priceRange string (e.g., "120,000 - 250,000 VNĐ")
         const priceMatch = post.priceRange.match(/(\d+(?:,\d+)*)/g);
         if (!priceMatch || priceMatch.length === 0) return false;
-        
+
         const minPrice = priceMatch[0]?.replace(/,/g, "") || "0";
         const maxPrice = priceMatch[1]?.replace(/,/g, "") || minPrice;
-        
-        const filterMin = filters.priceRange.min ? parseInt(filters.priceRange.min.replace(/,/g, "")) : 0;
-        const filterMax = filters.priceRange.max ? parseInt(filters.priceRange.max.replace(/,/g, "")) : Infinity;
-        
+
+        const filterMin = filters.priceRange.min
+          ? parseInt(filters.priceRange.min.replace(/,/g, ""))
+          : 0;
+        const filterMax = filters.priceRange.max
+          ? parseInt(filters.priceRange.max.replace(/,/g, ""))
+          : Infinity;
+
         return parseInt(minPrice) <= filterMax && parseInt(maxPrice) >= filterMin;
       });
     }
@@ -970,136 +999,142 @@ export function NearbyPage() {
       <Toaster position="top-center" />
       <div className="bg-gray-100 pb-12">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-8 sm:px-6 lg:flex-row lg:items-start lg:gap-8 lg:px-8">
-        {/* Sidebar filters */}
-        <aside className="w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
-            <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 text-sm">
-              <SlidersHorizontal className="h-4 w-4 text-gray-700" />
-            </span>
-            Bộ lọc địa điểm
-          </h2>
-          <div className="space-y-4 text-sm text-gray-700">
-            <div>
-              <p className="mb-2 font-semibold">Xu hướng</p>
-              <div className="space-y-1">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Đang hot
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Mới nhất
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Cũ nhất
-                </label>
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo danh mục</p>
-              <div className="space-y-1">
-                {["Lẩu", "Nướng", "Buffet", "Mì/miến", "Ăn nhẹ"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
+          {/* Sidebar filters */}
+          <aside className="w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64">
+            <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
+              <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 text-sm">
+                <SlidersHorizontal className="h-4 w-4 text-gray-700" />
+              </span>
+              Bộ lọc địa điểm
+            </h2>
+            <div className="space-y-4 text-sm text-gray-700">
+              <div>
+                <p className="mb-2 font-semibold">Xu hướng</p>
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" /> Đang hot
                   </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo dịch vụ</p>
-              <div className="space-y-1">
-                {["Wifi free", "Giữ xe free", "Quẹt thẻ", "Cho nhóm", "Tiệm"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" /> Mới nhất
                   </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo trạng thái</p>
-              <div className="space-y-1">
-                {["Đã kiểm duyệt", "Chưa kiểm duyệt"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" /> Cũ nhất
                   </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo khoảng giá</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Từ"
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Đến"
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
-                />
-              </div>
-              <button className="mt-3 w-full rounded bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-600">
-                Áp dụng
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <main className="flex-1 space-y-6">
-          {loading ? (
-            <div className="flex min-h-[300px] items-center justify-center">
-              <div className="border-primary-500 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            </div>
-          ) : error ? (
-            <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
-              {error}
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
-              <p className="text-gray-600">Chưa có review nào</p>
-            </div>
-          ) : (
-            <>
-              {posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  initialVoteStatus={voteStatusMap[post.id] ?? null}
-                  onVoteUpdate={(postId, upvotes, downvotes) => {
-                    setPosts((prevPosts) =>
-                      prevPosts.map((p) =>
-                        p.id === postId
-                          ? {
-                              ...p,
-                              stats: {
-                                ...p.stats,
-                                upvotes,
-                                downvotes,
-                              },
-                            }
-                          : p
-                      )
-                    );
-                  }}
-                />
-              ))}
-              {hasMore && (
-                <div className="flex justify-center py-6">
-                  <button
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                    className="rounded-lg bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingMore ? "Đang tải..." : "Xem thêm bài review"}
-                  </button>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+              <div>
+                <p className="mb-2 font-semibold">Theo danh mục</p>
+                <div className="space-y-1">
+                  {["Lẩu", "Nướng", "Buffet", "Mì/miến", "Ăn nhẹ"].map((item) => (
+                    <label
+                      key={item}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="checkbox" /> {item}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 font-semibold">Theo dịch vụ</p>
+                <div className="space-y-1">
+                  {["Wifi free", "Giữ xe free", "Quẹt thẻ", "Cho nhóm", "Tiệm"].map((item) => (
+                    <label
+                      key={item}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="checkbox" /> {item}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 font-semibold">Theo trạng thái</p>
+                <div className="space-y-1">
+                  {["Đã kiểm duyệt", "Chưa kiểm duyệt"].map((item) => (
+                    <label
+                      key={item}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="checkbox" /> {item}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 font-semibold">Theo khoảng giá</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Từ"
+                    className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Đến"
+                    className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
+                  />
+                </div>
+                <button className="mt-3 w-full rounded bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-600">
+                  Áp dụng
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main content */}
+          <main className="flex-1 space-y-6">
+            {loading ? (
+              <div className="flex min-h-[300px] items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+              </div>
+            ) : error ? (
+              <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>
+            ) : posts.length === 0 ? (
+              <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
+                <p className="text-gray-600">Chưa có review nào</p>
+              </div>
+            ) : (
+              <>
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    initialVoteStatus={voteStatusMap[post.id] ?? null}
+                    onVoteUpdate={(postId, upvotes, downvotes) => {
+                      setPosts((prevPosts) =>
+                        prevPosts.map((p) =>
+                          p.id === postId
+                            ? {
+                                ...p,
+                                stats: {
+                                  ...p.stats,
+                                  upvotes,
+                                  downvotes,
+                                },
+                              }
+                            : p
+                        )
+                      );
+                    }}
+                  />
+                ))}
+                {hasMore && (
+                  <div className="flex justify-center py-6">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="rounded-lg bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {loadingMore ? "Đang tải..." : "Xem thêm bài review"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </main>
         </div>
       </div>
     </>
   );
 }
-

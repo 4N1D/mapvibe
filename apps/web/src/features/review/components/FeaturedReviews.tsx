@@ -49,7 +49,10 @@ export function FeaturedReviews() {
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <ReviewCard key={i} loading />
+              <ReviewCard
+                key={i}
+                loading
+              />
             ))}
           </div>
         </div>
@@ -87,9 +90,7 @@ export function FeaturedReviews() {
               />
             ))
           ) : (
-            <p className="col-span-full text-center text-gray-500">
-              Hiện chưa có review nào
-            </p>
+            <p className="col-span-full text-center text-gray-500">Hiện chưa có review nào</p>
           )}
         </div>
       </div>

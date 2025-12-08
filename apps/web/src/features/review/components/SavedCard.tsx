@@ -28,7 +28,11 @@ export function SavedCard({ data, formatDate }: SavedCardProps) {
       {/* Image */}
       <div className="group relative h-48 bg-gray-200">
         {data.cover_url ? (
-          <img src={data.cover_url} alt={data.title} className="h-full w-full object-cover" />
+          <img
+            src={data.cover_url}
+            alt={data.title}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-gray-400">
             <svg
@@ -66,18 +70,18 @@ export function SavedCard({ data, formatDate }: SavedCardProps) {
             aria-label={data.bookmarked ? "Bỏ lưu" : "Lưu bài viết"}
           >
             <Bookmark
-            className={`h-5 w-5 transition-colors duration-200 ${
-              data.bookmarked ? "text-yellow-300 fill-yellow-300" : "text-white"
-            }`}
+              className={`h-5 w-5 transition-colors duration-200 ${
+                data.bookmarked ? "fill-yellow-300 text-yellow-300" : "text-white"
+              }`}
             />
           </button>
         )}
       </div>
 
       <CardContent className="space-y-3 p-4">
-        <h3 className="text-base font-semibold text-gray-900 line-clamp-1">{data.title}</h3>
+        <h3 className="line-clamp-1 text-base font-semibold text-gray-900">{data.title}</h3>
         {data.description && (
-          <p className="text-sm text-gray-600 line-clamp-2">{data.description}</p>
+          <p className="line-clamp-2 text-sm text-gray-600">{data.description}</p>
         )}
 
         <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-xs text-gray-500">
@@ -97,4 +101,3 @@ export function SavedCard({ data, formatDate }: SavedCardProps) {
     </Card>
   );
 }
-

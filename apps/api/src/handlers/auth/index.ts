@@ -1,2 +1,2 @@
-export { handleCognitoTrigger } from './cognitoTrigger';
-export type { CognitoTriggerEvent } from './cognitoTrigger';
+export { handleCognitoTrigger } from "./cognitoTrigger";
+export type { CognitoTriggerEvent } from "./cognitoTrigger";

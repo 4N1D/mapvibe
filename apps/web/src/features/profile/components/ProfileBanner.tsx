@@ -195,11 +195,20 @@ interface StatsSectionProps {
 function StatsSection({ stats }: StatsSectionProps) {
   return (
     <div className="flex items-center gap-6">
-      <StatItem label="Nhận xét" value={stats?.comment_count ?? 0} />
+      <StatItem
+        label="Nhận xét"
+        value={stats?.comment_count ?? 0}
+      />
       <div className="h-12 w-px bg-white/20"></div>
-      <StatItem label="Ảnh" value={stats?.photo_count ?? 0} />
+      <StatItem
+        label="Ảnh"
+        value={stats?.photo_count ?? 0}
+      />
       <div className="h-12 w-px bg-white/20"></div>
-      <StatItem label="Bài đăng" value={stats?.review_count ?? 0} />
+      <StatItem
+        label="Bài đăng"
+        value={stats?.review_count ?? 0}
+      />
     </div>
   );
 }

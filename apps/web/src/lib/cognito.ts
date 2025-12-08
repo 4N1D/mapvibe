@@ -153,10 +153,7 @@ export const signInWithGoogle = async (): Promise<void> => {
 /**
  * Change password for authenticated user
  */
-export const changePassword = async (
-  oldPassword: string,
-  newPassword: string
-): Promise<void> => {
+export const changePassword = async (oldPassword: string, newPassword: string): Promise<void> => {
   await updatePassword({
     oldPassword,
     newPassword,
@@ -167,7 +164,9 @@ export const changePassword = async (
  * Request password reset - sends verification code to email
  * Returns the next step info from Cognito
  */
-export const forgotPassword = async (email: string): Promise<{ nextStep: string; codeDeliveryDetails?: unknown }> => {
+export const forgotPassword = async (
+  email: string
+): Promise<{ nextStep: string; codeDeliveryDetails?: unknown }> => {
   const result = await amplifyResetPassword({
     username: email,
   });

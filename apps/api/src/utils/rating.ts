@@ -1,5 +1,5 @@
-import { getDb } from '../services/db';
-import { sendEmbeddingJob } from '../services/sqs';
+import { getDb } from "../services/db";
+import { sendEmbeddingJob } from "../services/sqs";
 
 /**
  * Recalculates and updates the average ratings for a restaurant
@@ -11,17 +11,17 @@ export async function recalculateRestaurantRatings(restaurantId: string): Promis
 
   // Calculate average ratings from all reviews
   const avgResult = await db
-    .selectFrom('restaurant_reviews')
+    .selectFrom("restaurant_reviews")
     .select((eb) => [
-      eb.fn.avg('rating_service').as('avg_service'),
-      eb.fn.avg('rating_location').as('avg_location'),
-      eb.fn.avg('rating_price').as('avg_price'),
-      eb.fn.avg('rating_quality').as('avg_quality'),
-      eb.fn.avg('rating_ambiance').as('avg_ambiance'),
-      eb.fn.avg('rating_overall').as('avg_overall'),
-      eb.fn.count('id').as('review_count'),
+      eb.fn.avg("rating_service").as("avg_service"),
+      eb.fn.avg("rating_location").as("avg_location"),
+      eb.fn.avg("rating_price").as("avg_price"),
+      eb.fn.avg("rating_quality").as("avg_quality"),
+      eb.fn.avg("rating_ambiance").as("avg_ambiance"),
+      eb.fn.avg("rating_overall").as("avg_overall"),
+      eb.fn.count("id").as("review_count"),
     ])
-    .where('restaurant_id', '=', restaurantId)
+    .where("restaurant_id", "=", restaurantId)
     .executeTakeFirst();
 
   if (!avgResult) {
@@ -30,7 +30,7 @@ export async function recalculateRestaurantRatings(restaurantId: string): Promis
 
   // Update restaurant with new average ratings
   await db
-    .updateTable('restaurants')
+    .updateTable("restaurants")
     .set({
       rating_service: avgResult.avg_service ? Number(avgResult.avg_service) : null,
       rating_location: avgResult.avg_location ? Number(avgResult.avg_location) : null,
@@ -41,10 +41,12 @@ export async function recalculateRestaurantRatings(restaurantId: string): Promis
       review_count: Number(avgResult.review_count),
       updated_at: new Date(),
     })
-    .where('id', '=', restaurantId)
+    .where("id", "=", restaurantId)
     .execute();
 
-  console.log(`[rating] Recalculated ratings for restaurant ${restaurantId}: overall=${avgResult.avg_overall}`);
+  console.log(
+    `[rating] Recalculated ratings for restaurant ${restaurantId}: overall=${avgResult.avg_overall}`
+  );
 
   // Gửi message vào SQS để trigger Lambda Embedding khi rating thay đổi
   // Không await để không block flow

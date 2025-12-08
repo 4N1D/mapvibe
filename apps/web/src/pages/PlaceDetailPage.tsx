@@ -3,7 +3,15 @@ import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/axios";
 import { Restaurant } from "@mapvibe/types";
 import { ArrowLeft } from "lucide-react";
-import { CommentsTab, ImageGalleryPreview, IntroductionTab, MenuTab, PhotosTab, RestaurantInfo, ReviewsTab } from "@/features/place";
+import {
+  CommentsTab,
+  ImageGalleryPreview,
+  IntroductionTab,
+  MenuTab,
+  PhotosTab,
+  RestaurantInfo,
+  ReviewsTab,
+} from "@/features/place";
 
 export function PlaceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -33,7 +41,7 @@ export function PlaceDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="border-primary-500 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
     );
   }
@@ -150,7 +158,12 @@ export function PlaceDetailPage() {
         );
 
       case "binh-luan":
-        return <CommentsTab restaurantId={restaurant.id} slug={slug} />
+        return (
+          <CommentsTab
+            restaurantId={restaurant.id}
+            slug={slug}
+          />
+        );
 
       case "nhan-xet":
         return <ReviewsTab restaurantId={restaurant.id} />;
@@ -171,7 +184,7 @@ export function PlaceDetailPage() {
       {/* Back button */}
       <Link
         to="/"
-        className="hover:text-primary-500 mb-4 inline-flex items-center gap-2 text-gray-600"
+        className="mb-4 inline-flex items-center gap-2 text-gray-600 hover:text-primary-500"
       >
         <ArrowLeft className="h-4 w-4" />
         Quay lại
@@ -240,7 +253,7 @@ export function PlaceDetailPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium ${
                 activeTab === tab.id
-                  ? "border-primary-500 text-primary-500 border-b-2"
+                  ? "border-b-2 border-primary-500 text-primary-500"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >

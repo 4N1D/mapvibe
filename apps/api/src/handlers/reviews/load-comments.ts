@@ -1,6 +1,6 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, notFound, badRequest, error } from "../../middlewares/response";
 
 interface CommentReply {
   id: string;
@@ -34,53 +34,53 @@ export const handler: Handler = {
       const reviewId = event.pathParameters?.reviewId;
 
       if (!reviewId) {
-        return badRequest('Review ID is required');
+        return badRequest("Review ID is required");
       }
 
       // Verify review exists
       const review = await db
-        .selectFrom('review_posts')
-        .select(['id'])
-        .where('id', '=', reviewId)
+        .selectFrom("review_posts")
+        .select(["id"])
+        .where("id", "=", reviewId)
         .executeTakeFirst();
 
       if (!review) {
-        return notFound('Review not found');
+        return notFound("Review not found");
       }
 
       const params = event.queryStringParameters || {};
-      const page = Math.max(parseInt(params.page || '1'), 1);
-      const limit = Math.min(Math.max(parseInt(params.limit || '10'), 1), 100);
+      const page = Math.max(parseInt(params.page || "1"), 1);
+      const limit = Math.min(Math.max(parseInt(params.limit || "10"), 1), 100);
       const offset = (page - 1) * limit;
 
       // Fetch top-level comments (parent_comment_id is null)
       const topLevelComments = await db
-        .selectFrom('comments')
-        .innerJoin('users', 'users.id', 'comments.author_id')
+        .selectFrom("comments")
+        .innerJoin("users", "users.id", "comments.author_id")
         .select([
-          'comments.id',
-          'comments.text as content',
-          'comments.like_count',
-          'comments.created_at',
-          'users.id as author_id',
-          'users.display_name as author_name',
-          'users.avatar as author_avatar',
+          "comments.id",
+          "comments.text as content",
+          "comments.like_count",
+          "comments.created_at",
+          "users.id as author_id",
+          "users.display_name as author_name",
+          "users.avatar as author_avatar",
         ])
-        .where('comments.review_post_id', '=', reviewId)
-        .where('comments.status', '=', 'published')
-        .where('comments.parent_comment_id', 'is', null)
-        .orderBy('comments.created_at', 'desc')
+        .where("comments.review_post_id", "=", reviewId)
+        .where("comments.status", "=", "published")
+        .where("comments.parent_comment_id", "is", null)
+        .orderBy("comments.created_at", "desc")
         .limit(limit)
         .offset(offset)
         .execute();
 
       // Get total count of top-level comments
       const countResult = await db
-        .selectFrom('comments')
-        .select((eb) => eb.fn.count('id').as('total'))
-        .where('review_post_id', '=', reviewId)
-        .where('status', '=', 'published')
-        .where('parent_comment_id', 'is', null)
+        .selectFrom("comments")
+        .select((eb) => eb.fn.count("id").as("total"))
+        .where("review_post_id", "=", reviewId)
+        .where("status", "=", "published")
+        .where("parent_comment_id", "is", null)
         .executeTakeFirst();
 
       const total = Number(countResult?.total || 0);
@@ -100,22 +100,22 @@ export const handler: Handler = {
       if (topLevelIds.length > 0) {
         // Fetch ALL replies for this review
         const allReplies = await db
-          .selectFrom('comments')
-          .innerJoin('users', 'users.id', 'comments.author_id')
+          .selectFrom("comments")
+          .innerJoin("users", "users.id", "comments.author_id")
           .select([
-            'comments.id',
-            'comments.text as content',
-            'comments.like_count',
-            'comments.created_at',
-            'comments.parent_comment_id',
-            'users.id as author_id',
-            'users.display_name as author_name',
-            'users.avatar as author_avatar',
+            "comments.id",
+            "comments.text as content",
+            "comments.like_count",
+            "comments.created_at",
+            "comments.parent_comment_id",
+            "users.id as author_id",
+            "users.display_name as author_name",
+            "users.avatar as author_avatar",
           ])
-          .where('comments.review_post_id', '=', reviewId)
-          .where('comments.status', '=', 'published')
-          .where('comments.parent_comment_id', 'is not', null)
-          .orderBy('comments.created_at', 'asc')
+          .where("comments.review_post_id", "=", reviewId)
+          .where("comments.status", "=", "published")
+          .where("comments.parent_comment_id", "is not", null)
+          .orderBy("comments.created_at", "asc")
           .execute();
 
         // Build author name map for all replies
@@ -184,7 +184,7 @@ export const handler: Handler = {
         comments,
       });
     } catch (err) {
-      console.error('[reviews/load-comments] Error:', err);
+      console.error("[reviews/load-comments] Error:", err);
       return error((err as Error).message);
     }
   },

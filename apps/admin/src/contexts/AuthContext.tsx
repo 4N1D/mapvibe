@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getCurrentUser, signOut, fetchAuthSession, AuthUser } from 'aws-amplify/auth';
-import { Hub } from 'aws-amplify/utils';
-import { apiClient } from '../lib/api';
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { getCurrentUser, signOut, fetchAuthSession, AuthUser } from "aws-amplify/auth";
+import { Hub } from "aws-amplify/utils";
+import { apiClient } from "../lib/api";
 
 interface User {
   id: string;
@@ -27,9 +27,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (userId: string, email: string | undefined, roles: string[]) => {
     try {
-      const response = await apiClient.get('/users/me');
+      const response = await apiClient.get("/users/me");
       const profile = response.data.user;
-      
+
       setUser({
         id: userId,
         email: profile?.email || email,
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles: roles,
       });
     } catch (err) {
-      console.error('Failed to fetch user profile:', err);
+      console.error("Failed to fetch user profile:", err);
       // Fallback to basic user info
       setUser({
         id: userId,
@@ -53,9 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser: AuthUser = await getCurrentUser();
       const session = await fetchAuthSession();
       const idToken = session.tokens?.idToken;
-      
-      const roles = idToken?.payload['custom:roles'] as string | undefined;
-      const parsedRoles = roles ? JSON.parse(roles) : ['user'];
+
+      const roles = idToken?.payload["custom:roles"] as string | undefined;
+      const parsedRoles = roles ? JSON.parse(roles) : ["user"];
       const email = idToken?.payload.email as string | undefined;
 
       // Set basic user info first (for quick render)
@@ -83,12 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkUser();
 
-    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+    const unsubscribe = Hub.listen("auth", ({ payload }) => {
       switch (payload.event) {
-        case 'signedIn':
+        case "signedIn":
           checkUser();
           break;
-        case 'signedOut':
+        case "signedOut":
           setUser(null);
           break;
       }
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const isAdmin = user?.roles?.includes('admin') || false;
+  const isAdmin = user?.roles?.includes("admin") || false;
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isAdmin, signOut: handleSignOut, refreshUser }}>
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }

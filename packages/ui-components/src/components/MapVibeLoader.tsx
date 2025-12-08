@@ -59,12 +59,16 @@ export function MapVibeLoader({
           {[0, 72, 144, 216, 288].map((deg, i) => (
             <motion.div
               key={i}
-              className="absolute left-1/2 top-0 -ml-1.5 text-orange-400"
+              className="absolute top-0 left-1/2 -ml-1.5 text-orange-400"
               style={{ transform: `rotate(${deg}deg) translateY(-4px)` }}
               animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
             >
-              <svg className={config.pin} fill="currentColor" viewBox="0 0 24 24">
+              <svg
+                className={config.pin}
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
               </svg>
             </motion.div>

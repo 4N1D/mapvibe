@@ -9,7 +9,7 @@ async function up(db) {
     ALTER TABLE review_posts 
     DROP CONSTRAINT IF EXISTS check_text_length
   `.execute(db);
-  
+
   await sql`
     ALTER TABLE review_posts 
     ADD CONSTRAINT check_text_length CHECK (char_length(text) >= 300) NOT VALID
@@ -21,15 +21,19 @@ async function up(db) {
     ALTER TABLE restaurant_reviews 
     DROP CONSTRAINT IF EXISTS check_review_text_length
   `.execute(db);
-  
+
   await sql`
     ALTER TABLE restaurant_reviews 
     ADD CONSTRAINT check_review_text_length CHECK (char_length(text) >= 300) NOT VALID
   `.execute(db);
-  console.log("  ✓ Updated restaurant_reviews constraint to >= 300 chars (NOT VALID for existing rows)");
+  console.log(
+    "  ✓ Updated restaurant_reviews constraint to >= 300 chars (NOT VALID for existing rows)"
+  );
 
   console.log("Migration completed successfully");
-  console.log("Note: Existing rows with text < 300 chars are preserved. New rows must have >= 300 chars.");
+  console.log(
+    "Note: Existing rows with text < 300 chars are preserved. New rows must have >= 300 chars."
+  );
 }
 
 async function down(db) {
@@ -40,7 +44,7 @@ async function down(db) {
     ALTER TABLE review_posts 
     DROP CONSTRAINT IF EXISTS check_text_length
   `.execute(db);
-  
+
   await sql`
     ALTER TABLE review_posts 
     ADD CONSTRAINT check_text_length CHECK (char_length(text) >= 100)
@@ -51,7 +55,7 @@ async function down(db) {
     ALTER TABLE restaurant_reviews 
     DROP CONSTRAINT IF EXISTS check_review_text_length
   `.execute(db);
-  
+
   await sql`
     ALTER TABLE restaurant_reviews 
     ADD CONSTRAINT check_review_text_length CHECK (char_length(text) >= 100)

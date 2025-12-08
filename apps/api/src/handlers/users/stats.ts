@@ -1,8 +1,8 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, unauthorized, error } from '../../middlewares/response';
-import { getUserIdFromEvent } from '@/utils/auth';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, unauthorized, error } from "../../middlewares/response";
+import { getUserIdFromEvent } from "@/utils/auth";
+import { sql } from "kysely";
 
 // GET /users/me/stats - Get current user's aggregated statistics
 export const handler: Handler = {
@@ -11,7 +11,7 @@ export const handler: Handler = {
       const userId = getUserIdFromEvent(event);
 
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const db = await getDb();
@@ -47,7 +47,7 @@ export const handler: Handler = {
         saved_count: Number(stats?.saved_count || 0),
       });
     } catch (err) {
-      console.error('[users/me/stats] Error:', err);
+      console.error("[users/me/stats] Error:", err);
       return error((err as Error).message);
     }
   },

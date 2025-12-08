@@ -1,8 +1,8 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, unauthorized, error } from '../../middlewares/response';
-import { getUserIdFromEvent } from '@/utils/auth';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, unauthorized, error } from "../../middlewares/response";
+import { getUserIdFromEvent } from "@/utils/auth";
+import { sql } from "kysely";
 
 // GET /users/me/reviews - Get current user's reviews (both review_posts and restaurant_reviews)
 export const handler: Handler = {
@@ -11,14 +11,14 @@ export const handler: Handler = {
       const userId = getUserIdFromEvent(event);
 
       if (!userId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       const db = await getDb();
 
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
       const type = params.type; // 'review_post' or 'restaurant_review'
 
       // Union query to get both types of reviews
@@ -47,7 +47,7 @@ export const handler: Handler = {
           FROM review_posts rp
           LEFT JOIN restaurants r ON r.id = rp.restaurant_id
           WHERE rp.author_id = ${userId}
-          ${type === 'review_post' ? sql`` : type === 'restaurant_review' ? sql`AND 1=0` : sql``}
+          ${type === "review_post" ? sql`` : type === "restaurant_review" ? sql`AND 1=0` : sql``}
         )
         UNION ALL
         (
@@ -74,7 +74,7 @@ export const handler: Handler = {
           FROM restaurant_reviews rr
           LEFT JOIN restaurants r ON r.id = rr.restaurant_id
           WHERE rr.author_id = ${userId}
-          ${type === 'restaurant_review' ? sql`` : type === 'review_post' ? sql`AND 1=0` : sql``}
+          ${type === "restaurant_review" ? sql`` : type === "review_post" ? sql`AND 1=0` : sql``}
         )
         ORDER BY created_at DESC
         LIMIT ${limit}
@@ -93,7 +93,11 @@ export const handler: Handler = {
       `;
 
       const countResult = await countQuery.execute(db);
-      const counts = countResult.rows[0] as { total: string; review_post_count: string; restaurant_review_count: string };
+      const counts = countResult.rows[0] as {
+        total: string;
+        review_post_count: string;
+        restaurant_review_count: string;
+      };
 
       return success({
         reviews: result.rows,
@@ -104,7 +108,7 @@ export const handler: Handler = {
         offset,
       });
     } catch (err) {
-      console.error('[users/me/reviews] Error:', err);
+      console.error("[users/me/reviews] Error:", err);
       return error((err as Error).message);
     }
   },

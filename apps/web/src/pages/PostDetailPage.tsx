@@ -13,7 +13,15 @@ import {
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
-import { CommentsTab, PhotosTab, MenuTab, DirectionSidebar, ServicesList, CuisineType, Cuisine } from "@/features/place";
+import {
+  CommentsTab,
+  PhotosTab,
+  MenuTab,
+  DirectionSidebar,
+  ServicesList,
+  CuisineType,
+  Cuisine,
+} from "@/features/place";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
@@ -143,17 +151,17 @@ const formatPriceRange = (min?: number | null, max?: number | null): string => {
 // Helper function to format opening hours
 const formatOpeningHours = (hours?: Record<string, string> | null): string => {
   if (!hours) return "Chưa có thông tin";
-  
+
   // Get all unique hour ranges
   const hourRanges = Object.values(hours).filter(Boolean);
   if (hourRanges.length === 0) return "Chưa có thông tin";
-  
+
   // Count frequency of each hour range
   const hourCount: Record<string, number> = {};
   hourRanges.forEach((range) => {
     hourCount[range] = (hourCount[range] || 0) + 1;
   });
-  
+
   // Find the most common hour range
   let mostCommonRange = "";
   let maxCount = 0;
@@ -163,19 +171,19 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
       mostCommonRange = range;
     }
   });
-  
+
   // If all days have the same hours, show just the hours
   if (maxCount === hourRanges.length) {
     return mostCommonRange;
   }
-  
+
   // If most days have the same hours, show it with note
   const totalDays = Object.keys(hours).length;
   if (maxCount >= totalDays * 0.7) {
     // If 70% or more days have the same hours, show it
     return mostCommonRange;
   }
-  
+
   // Otherwise, show the most common range with a note
   return mostCommonRange || hourRanges[0];
 };
@@ -183,25 +191,31 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
 // Helper function to generate slug from location name or use id
 const generateSlug = (locationName?: string, id?: string): string => {
   if (locationName) {
-    return locationName
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || id || "";
+    return (
+      locationName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") ||
+      id ||
+      ""
+    );
   }
   return id || "";
 };
 
 // Helper function to extract images from photos
-const extractImages = (photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] }): string[] => {
+const extractImages = (
+  photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] }
+): string[] => {
   if (!photos) return [];
-  
+
   // If photos is an array
   if (Array.isArray(photos)) {
     return photos.map((photo) => photo.url);
   }
-  
+
   // If photos is an object with general, food, menu
   const allPhotos: ReviewPhoto[] = [
     ...(photos.general || []),
@@ -212,12 +226,14 @@ const extractImages = (photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?
 };
 
 // Helper function to extract categories from cuisine types
-const extractCategories = (cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null): string[] => {
+const extractCategories = (
+  cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null
+): string[] => {
   if (!cuisineTypes) return [];
-  
+
   if (Array.isArray(cuisineTypes)) {
     if (cuisineTypes.length === 0) return [];
-    
+
     // Check if first item is string or object
     if (typeof cuisineTypes[0] === "string") {
       return cuisineTypes as string[];
@@ -225,17 +241,19 @@ const extractCategories = (cuisineTypes?: string[] | Array<{ name: string; descr
       return (cuisineTypes as Array<{ name: string }>).map((item) => item.name);
     }
   }
-  
+
   return [];
 };
 
 // Helper function to extract cuisine types
-const extractCuisineTypes = (cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null): Cuisine[] => {
+const extractCuisineTypes = (
+  cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null
+): Cuisine[] => {
   if (!cuisineTypes) return [];
-  
+
   if (Array.isArray(cuisineTypes)) {
     if (cuisineTypes.length === 0) return [];
-    
+
     // Check if first item is string or object
     if (typeof cuisineTypes[0] === "string") {
       return (cuisineTypes as string[]).map((name) => ({ name, description: "" }));
@@ -246,7 +264,7 @@ const extractCuisineTypes = (cuisineTypes?: string[] | Array<{ name: string; des
       }));
     }
   }
-  
+
   return [];
 };
 
@@ -256,14 +274,16 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
   const images = extractImages(review.photos);
   const categories = extractCategories(review.location_cuisine_types);
   const cuisineTypes = extractCuisineTypes(review.location_cuisine_types);
-  
+
   // Determine if location is open (simplified - you might want to add actual logic)
   const isOpen = true; // TODO: Add logic to check if location is currently open based on opening_hours
-  
+
   return {
     id: review.id,
     slug,
-    restaurantId: review.location_restaurant_id ? parseInt(review.location_restaurant_id.replace("R_", ""), 16) || 0 : 0,
+    restaurantId: review.location_restaurant_id
+      ? parseInt(review.location_restaurant_id.replace("R_", ""), 16) || 0
+      : 0,
     author: review.author_name,
     authorAvatar: review.author_avatar || undefined,
     userRank: "Hạng đồng", // Default rank
@@ -283,9 +303,12 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       comments: review.comment_count,
       shares: review.share_count,
     },
-    images: images.length > 0 ? images : [
-      "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
-    ],
+    images:
+      images.length > 0
+        ? images
+        : [
+            "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
+          ],
     lat: review.location_geo_lat ?? undefined,
     lng: review.location_geo_lng ?? undefined,
     features: review.features || [],
@@ -327,7 +350,7 @@ export function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  
+
   // Vote states
   const [localUpvotes, setLocalUpvotes] = useState(0);
   const [localDownvotes, setLocalDownvotes] = useState(0);
@@ -348,14 +371,14 @@ export function PostDetailPage() {
           const headerOffset = 80;
           const elementPosition = tabContent.getBoundingClientRect().top;
           const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-          
+
           window.scrollTo({
             top: offsetPosition,
-            behavior: "smooth"
+            behavior: "smooth",
           });
         }
       };
-      
+
       // Try multiple times to ensure DOM is ready
       setTimeout(scrollToComments, 300);
       setTimeout(scrollToComments, 600);
@@ -383,7 +406,7 @@ export function PostDetailPage() {
         });
 
         const reviews = response.data?.reviews || [];
-        
+
         // Find review by slug or ID
         const foundReview = reviews.find((review) => {
           const reviewSlug = generateSlug(review.location_name, review.id);
@@ -402,9 +425,7 @@ export function PostDetailPage() {
       } catch (err) {
         console.error("[PostDetailPage] Failed to fetch review:", err);
         const error = err as { response?: { data?: { message?: string } }; message?: string };
-        setError(
-          error.response?.data?.message || error.message || "Không thể tải bài review"
-        );
+        setError(error.response?.data?.message || error.message || "Không thể tải bài review");
       } finally {
         setLoading(false);
       }
@@ -447,7 +468,7 @@ export function PostDetailPage() {
               created_at: string;
             }>;
           }>("/users/me/votes");
-          
+
           // Find vote for current post
           const vote = response.data.votes.find((v) => v.review_post_id === post.id);
           if (vote) {
@@ -563,7 +584,7 @@ export function PostDetailPage() {
       // Update with actual counts from server (in case of race conditions)
       const actualUpvotes = response.data.review_post.upvote_count;
       const actualDownvotes = response.data.review_post.downvote_count;
-      
+
       setLocalUpvotes(actualUpvotes);
       setLocalDownvotes(actualDownvotes);
 
@@ -586,14 +607,16 @@ export function PostDetailPage() {
       });
     } catch (err) {
       console.error("[PostDetailPage] Failed to vote:", err);
-      
+
       // Rollback optimistic update on error
       setLocalUpvotes(previousUpvotes);
       setLocalDownvotes(previousDownvotes);
       setVoteStatus(previousStatus);
-      
+
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại.");
+      toast.error(
+        error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại."
+      );
     } finally {
       setIsVoting(false);
     }
@@ -601,7 +624,7 @@ export function PostDetailPage() {
 
   const handleShare = async () => {
     if (!post) return;
-    
+
     const shareUrl = `${window.location.origin}/post/${post.slug}`;
     const plainDescription = stripHtml(post.description);
     const shareText = `${post.title} - ${plainDescription.substring(0, 100)}...`;
@@ -641,7 +664,10 @@ export function PostDetailPage() {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
         <p className="text-lg text-gray-600">{error || "Không tìm thấy bài đăng"}</p>
-        <Link to="/nearby" className="text-primary-500 hover:underline">
+        <Link
+          to="/nearby"
+          className="text-primary-500 hover:underline"
+        >
           ← Quay về danh sách
         </Link>
       </div>
@@ -759,11 +785,13 @@ export function PostDetailPage() {
                       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
                       window.scrollTo({
                         top: offsetPosition,
-                        behavior: "smooth"
+                        behavior: "smooth",
                       });
                     } else {
                       // Fallback: scroll to tab content
-                      document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
+                      document
+                        .getElementById("tab-content")
+                        ?.scrollIntoView({ behavior: "smooth" });
                     }
                   }, 100);
                 }}
@@ -810,7 +838,7 @@ export function PostDetailPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium ${
                 activeTab === tab.id
-                  ? "border-primary-500 text-primary-500 border-b-2"
+                  ? "border-b-2 border-primary-500 text-primary-500"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -829,16 +857,16 @@ export function PostDetailPage() {
               {post.features && post.features.length > 0 && (
                 <ServicesList services={post.features.map(mapFeatureToLabel)} />
               )}
-              
+
               {/* Cuisine Types Panel - Display location services */}
               {post.cuisineTypes && post.cuisineTypes.length > 0 && (
                 <CuisineType cuisineTypes={post.cuisineTypes} />
               )}
-              
+
               {/* Introduction Panel */}
               <div className="rounded-xl bg-white p-6 shadow-sm">
                 {/* Author Section - Above title */}
-                <div className="mb-4 flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="mb-4 flex items-center gap-3 border-b border-gray-100 pb-4">
                   {post.authorAvatar ? (
                     <img
                       src={post.authorAvatar}
@@ -866,27 +894,36 @@ export function PostDetailPage() {
                     <span className="text-sm text-gray-500">{post.timeAgo}</span>
                   </div>
                 </div>
-                
+
                 {/* Title - Below author, above content */}
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Giới thiệu</h3>
-                
+
                 {/* Content */}
-                <div 
-                  className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
+                <div
+                  className="prose prose-sm prose-headings:text-gray-900 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline max-w-none text-gray-700"
                   dangerouslySetInnerHTML={{ __html: post.description }}
                 />
-                
+
                 {/* Action Buttons - Below content */}
-                <div id="vote-section" className="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4">
+                <div
+                  id="vote-section"
+                  className="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4"
+                >
                   <motion.button
                     onClick={() => handleVote("upvote")}
                     disabled={!isAuthenticated || isVoting}
-                    className={`flex items-center justify-center gap-1 rounded-full px-2 h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`flex h-[28px] items-center justify-center gap-1 rounded-full px-2 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                       voteStatus === "upvoted"
                         ? "bg-green-100 text-green-700 hover:bg-green-200"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
-                    title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "upvoted" ? "Bỏ upvote" : "Upvote"}
+                    title={
+                      !isAuthenticated
+                        ? "Vui lòng đăng nhập để vote"
+                        : voteStatus === "upvoted"
+                          ? "Bỏ upvote"
+                          : "Upvote"
+                    }
                     whileTap={{ scale: 0.95 }}
                     animate={
                       voteAnimation === "upvote"
@@ -908,12 +945,18 @@ export function PostDetailPage() {
                   <motion.button
                     onClick={() => handleVote("downvote")}
                     disabled={!isAuthenticated || isVoting}
-                    className={`flex items-center justify-center gap-1 rounded-full px-2 py-1 min-h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`flex min-h-[28px] items-center justify-center gap-1 rounded-full px-2 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                       voteStatus === "downvoted"
                         ? "bg-red-100 text-red-700 hover:bg-red-200"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
-                    title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "downvoted" ? "Bỏ downvote" : "Downvote"}
+                    title={
+                      !isAuthenticated
+                        ? "Vui lòng đăng nhập để vote"
+                        : voteStatus === "downvoted"
+                          ? "Bỏ downvote"
+                          : "Downvote"
+                    }
                     whileTap={{ scale: 0.95 }}
                     animate={
                       voteAnimation === "downvote"
@@ -936,17 +979,19 @@ export function PostDetailPage() {
                     onClick={() => {
                       setActiveTab("binh-luan");
                       setTimeout(() => {
-                        document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
+                        document
+                          .getElementById("tab-content")
+                          ?.scrollIntoView({ behavior: "smooth" });
                       }, 100);
                     }}
-                    className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+                    className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
                   >
                     <MessageCircle className="h-4 w-4" />
                     {post.stats.comments}
                   </button>
                   <button
                     onClick={handleShare}
-                    className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+                    className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
                     title="Chia sẻ"
                   >
                     <Share2 className="h-4 w-4" />
@@ -975,11 +1020,15 @@ export function PostDetailPage() {
 
         {activeTab === "binh-luan" && <CommentsTab reviewId={post.id} />}
 
-        {activeTab === "anh" && <PhotosTab restaurantId={post.restaurantId} showFilters={false} />}
+        {activeTab === "anh" && (
+          <PhotosTab
+            restaurantId={post.restaurantId}
+            showFilters={false}
+          />
+        )}
 
         {activeTab === "thuc-don" && <MenuTab restaurantId={post.restaurantId} />}
       </section>
     </div>
   );
 }
-

@@ -182,11 +182,11 @@ export interface CommentsResponse {
 // Restaurant Review Types (for ReviewsTab)
 // ============================================
 export interface ReviewRatings {
-  quality: number;    // Chất lượng (1-10)
-  service: number;    // Dịch vụ (1-10)
-  location: number;   // Vị trí (1-10)
-  price: number;      // Giá cả (1-10)
-  ambiance: number;   // Không gian (1-10)
+  quality: number; // Chất lượng (1-10)
+  service: number; // Dịch vụ (1-10)
+  location: number; // Vị trí (1-10)
+  price: number; // Giá cả (1-10)
+  ambiance: number; // Không gian (1-10)
 }
 
 export interface RestaurantReview {
@@ -197,7 +197,7 @@ export interface RestaurantReview {
   restaurant_id: number;
   content: string;
   ratings: ReviewRatings;
-  overall_rating: number;  // Average of all ratings
+  overall_rating: number; // Average of all ratings
   photos: ReviewPhoto[];
   like_count: number;
   comment_count: number;

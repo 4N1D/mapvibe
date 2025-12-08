@@ -1,8 +1,8 @@
-import { sql } from 'kysely';
-import { getDb } from '@/services/db';
-import { getUserIdFromEvent } from '@/utils/auth';
-import { success, badRequest, notFound, error, unauthorized } from '@/middlewares/response';
-import { Handler, APIGatewayResponse, APIGatewayEvent } from '@/types';
+import { sql } from "kysely";
+import { getDb } from "@/services/db";
+import { getUserIdFromEvent } from "@/utils/auth";
+import { success, badRequest, notFound, error, unauthorized } from "@/middlewares/response";
+import { Handler, APIGatewayResponse, APIGatewayEvent } from "@/types";
 
 // GET /admin/reports - List all reports
 export const listReportsHandler: Handler = {
@@ -10,14 +10,14 @@ export const listReportsHandler: Handler = {
     try {
       const db = await getDb();
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
       const status = params.status; // pending, reviewing, resolved, dismissed
       const targetType = params.target_type; // comment, review, user, photo
       const reason = params.reason; // spam, inappropriate, harassment, misinformation, other
 
       let whereClause = sql`WHERE 1=1`;
-      
+
       if (status) {
         whereClause = sql`${whereClause} AND r.status = ${status}`;
       }
@@ -102,14 +102,14 @@ export const listReportsHandler: Handler = {
       `.execute(db);
 
       const statusCountMap: Record<string, number> = {};
-      for (const row of statusCounts.rows as any[]) {
+      for (const row of statusCounts.rows as { status: string; count: string }[]) {
         statusCountMap[row.status] = parseInt(row.count);
       }
 
       return success({
         reports: reports.rows,
         pagination: {
-          total: parseInt((countResult.rows[0] as any).total),
+          total: parseInt(String((countResult.rows[0] as { total: string }).total)),
           limit,
           offset,
         },
@@ -118,10 +118,10 @@ export const listReportsHandler: Handler = {
           reviewing: statusCountMap.reviewing || 0,
           resolved: statusCountMap.resolved || 0,
           dismissed: statusCountMap.dismissed || 0,
-        }
+        },
       });
     } catch (err) {
-      console.error('[admin/reports/list] Error:', err);
+      console.error("[admin/reports/list] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -136,44 +136,44 @@ export const updateReportHandler: Handler = {
       const reportId = event.pathParameters?.id;
 
       if (!adminUserId) {
-        return unauthorized('Authentication required');
+        return unauthorized("Authentication required");
       }
 
       if (!reportId) {
-        return badRequest('Report ID is required');
+        return badRequest("Report ID is required");
       }
 
       let body: {
         status?: string;
         admin_notes?: string;
-        action?: 'hide_content' | 'delete_content' | 'ban_user';
+        action?: "hide_content" | "delete_content" | "ban_user";
       };
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { status, admin_notes, action } = body;
 
       // Verify report exists
       const report = await db
-        .selectFrom('reports')
-        .select(['id', 'target_type', 'target_id', 'status'])
-        .where('id', '=', parseInt(reportId))
+        .selectFrom("reports")
+        .select(["id", "target_type", "target_id", "status"])
+        .where("id", "=", parseInt(reportId))
         .executeTakeFirst();
 
       if (!report) {
-        return notFound('Report not found');
+        return notFound("Report not found");
       }
 
       // Update report
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         reviewed_by: adminUserId,
         reviewed_at: new Date(),
       };
 
-      if (status && ['pending', 'reviewing', 'resolved', 'dismissed'].includes(status)) {
+      if (status && ["pending", "reviewing", "resolved", "dismissed"].includes(status)) {
         updateData.status = status;
       }
 
@@ -182,65 +182,65 @@ export const updateReportHandler: Handler = {
       }
 
       await db
-        .updateTable('reports')
+        .updateTable("reports")
         .set(updateData)
-        .where('id', '=', parseInt(reportId))
+        .where("id", "=", parseInt(reportId))
         .execute();
 
       // Perform action on target content
-      if (action && status === 'resolved') {
-        if (action === 'hide_content') {
-          if (report.target_type === 'comment') {
+      if (action && status === "resolved") {
+        if (action === "hide_content") {
+          if (report.target_type === "comment") {
             await db
-              .updateTable('comments')
-              .set({ status: 'hidden' })
-              .where('id', '=', report.target_id)
+              .updateTable("comments")
+              .set({ status: "hidden" })
+              .where("id", "=", report.target_id)
               .execute();
-          } else if (report.target_type === 'review') {
+          } else if (report.target_type === "review") {
             await db
-              .updateTable('review_posts')
-              .set({ status: 'hidden' })
-              .where('id', '=', report.target_id)
-              .execute();
-          }
-        } else if (action === 'delete_content') {
-          if (report.target_type === 'comment') {
-            await db
-              .updateTable('comments')
-              .set({ status: 'deleted' })
-              .where('id', '=', report.target_id)
-              .execute();
-          } else if (report.target_type === 'review') {
-            await db
-              .updateTable('review_posts')
-              .set({ status: 'deleted' })
-              .where('id', '=', report.target_id)
+              .updateTable("review_posts")
+              .set({ status: "hidden" })
+              .where("id", "=", report.target_id)
               .execute();
           }
-        } else if (action === 'ban_user') {
+        } else if (action === "delete_content") {
+          if (report.target_type === "comment") {
+            await db
+              .updateTable("comments")
+              .set({ status: "deleted" })
+              .where("id", "=", report.target_id)
+              .execute();
+          } else if (report.target_type === "review") {
+            await db
+              .updateTable("review_posts")
+              .set({ status: "deleted" })
+              .where("id", "=", report.target_id)
+              .execute();
+          }
+        } else if (action === "ban_user") {
           // Get the author of the content
           let authorId: string | null = null;
-          if (report.target_type === 'comment') {
+          if (report.target_type === "comment") {
             const comment = await db
-              .selectFrom('comments')
-              .select(['author_id'])
-              .where('id', '=', report.target_id)
+              .selectFrom("comments")
+              .select(["author_id"])
+              .where("id", "=", report.target_id)
               .executeTakeFirst();
             authorId = comment?.author_id || null;
-          } else if (report.target_type === 'review') {
+          } else if (report.target_type === "review") {
             const review = await db
-              .selectFrom('review_posts')
-              .select(['author_id'])
-              .where('id', '=', report.target_id)
+              .selectFrom("review_posts")
+              .select(["author_id"])
+              .where("id", "=", report.target_id)
               .executeTakeFirst();
             authorId = review?.author_id || null;
           }
 
           if (authorId) {
             await db
-              .updateTable('users')
-              .set({ account_status: 'banned' })
-              .where('id', '=', authorId)
+              .updateTable("users")
+              .set({ account_status: "banned" })
+              .where("id", "=", authorId)
               .execute();
           }
         }
@@ -248,10 +248,10 @@ export const updateReportHandler: Handler = {
 
       return success({
         success: true,
-        message: 'Report updated successfully',
+        message: "Report updated successfully",
       });
     } catch (err) {
-      console.error('[admin/reports/update] Error:', err);
+      console.error("[admin/reports/update] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -265,7 +265,7 @@ export const getReportHandler: Handler = {
       const reportId = event.pathParameters?.id;
 
       if (!reportId) {
-        return badRequest('Report ID is required');
+        return badRequest("Report ID is required");
       }
 
       const report = await sql`
@@ -281,14 +281,18 @@ export const getReportHandler: Handler = {
       `.execute(db);
 
       if (report.rows.length === 0) {
-        return notFound('Report not found');
+        return notFound("Report not found");
       }
 
-      const reportData = report.rows[0] as any;
+      const reportData = report.rows[0] as {
+        target_type: string;
+        target_id: string;
+        [key: string]: unknown;
+      };
 
       // Get target content
       let targetContent = null;
-      if (reportData.target_type === 'comment') {
+      if (reportData.target_type === "comment") {
         const result = await sql`
           SELECT c.*, u.display_name as author_name, u.avatar as author_avatar
           FROM comments c
@@ -296,7 +300,7 @@ export const getReportHandler: Handler = {
           WHERE c.id = ${reportData.target_id}
         `.execute(db);
         targetContent = result.rows[0] || null;
-      } else if (reportData.target_type === 'review') {
+      } else if (reportData.target_type === "review") {
         const result = await sql`
           SELECT rp.*, u.display_name as author_name, u.avatar as author_avatar
           FROM review_posts rp
@@ -324,7 +328,7 @@ export const getReportHandler: Handler = {
         related_reports: relatedReports.rows,
       });
     } catch (err) {
-      console.error('[admin/reports/get] Error:', err);
+      console.error("[admin/reports/get] Error:", err);
       return error((err as Error).message);
     }
   },

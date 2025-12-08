@@ -31,9 +31,9 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
     placeholderData: (prev) => prev,
   });
 
-  const reviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+  const reviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
 
-  if (data && localReviews.length === 0 && hasMore !== (data.page < data.total_pages)) {
+  if (data && localReviews.length === 0 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
@@ -42,7 +42,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
       setLoadingMore(true);
       const nextPage = page + 1;
       const response = await fetchReviews(restaurantId, nextPage);
-      const currentReviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+      const currentReviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
       setLocalReviews([...currentReviews, ...response.reviews]);
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
@@ -63,9 +63,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
 
       const ratingValues = Object.values(submitData.ratings).filter((r) => r > 0);
       const overallRating =
-        ratingValues.length > 0
-          ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
-          : 0;
+        ratingValues.length > 0 ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length : 0;
 
       const payload = {
         restaurant_id: restaurantId,
@@ -75,7 +73,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
       };
 
       const response = await apiClient.post<RestaurantReview>("/reviews", payload);
-      const currentReviews = localReviews.length > 0 ? localReviews : (data?.reviews || []);
+      const currentReviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
       setLocalReviews([response.data, ...currentReviews]);
     } catch (error) {
       console.error("Failed to submit review:", error);
@@ -87,7 +85,10 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
 
   return (
     <div className="space-y-6">
-      <ReviewForm onSubmit={handleSubmit} loading={submitting} />
+      <ReviewForm
+        onSubmit={handleSubmit}
+        loading={submitting}
+      />
 
       <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
         {reviews.length === 0 ? (
@@ -96,7 +97,11 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
           </p>
         ) : (
           reviews.map((review) => (
-            <ReviewItem key={review.id} review={review} formatTime={formatRelativeTime} />
+            <ReviewItem
+              key={review.id}
+              review={review}
+              formatTime={formatRelativeTime}
+            />
           ))
         )}
 

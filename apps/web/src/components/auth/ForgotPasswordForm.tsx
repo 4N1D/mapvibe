@@ -32,11 +32,11 @@ export const ForgotPasswordForm = ({ onSuccess, onBack }: ForgotPasswordFormProp
       console.log("[ForgotPassword] Sending code to:", email);
       const result = await forgotPassword(email);
       console.log("[ForgotPassword] Result:", result);
-      
+
       // Extract delivery info if available
       if (result.codeDeliveryDetails) {
-        const details = result.codeDeliveryDetails as { 
-          destination?: string; 
+        const details = result.codeDeliveryDetails as {
+          destination?: string;
           deliveryMedium?: string;
           attributeName?: string;
         };
@@ -51,7 +51,9 @@ export const ForgotPasswordForm = ({ onSuccess, onBack }: ForgotPasswordFormProp
       if (error.name === "UserNotFoundException") {
         setError("Email không tồn tại trong hệ thống");
       } else if (error.name === "LimitExceededException") {
-        setError("Bạn đã yêu cầu quá nhiều lần. Vui lòng kiểm tra email (kể cả Spam/Junk) hoặc đợi 15-30 phút rồi thử lại.");
+        setError(
+          "Bạn đã yêu cầu quá nhiều lần. Vui lòng kiểm tra email (kể cả Spam/Junk) hoặc đợi 15-30 phút rồi thử lại."
+        );
       } else if (error.name === "InvalidParameterException") {
         setError("Email chưa được xác thực. Vui lòng đăng ký lại hoặc liên hệ hỗ trợ.");
       } else {
@@ -129,15 +131,17 @@ export const ForgotPasswordForm = ({ onSuccess, onBack }: ForgotPasswordFormProp
         <div className="space-y-2 text-sm text-gray-600">
           <p>Nhập email của bạn và chúng tôi sẽ gửi mã xác nhận để đặt lại mật khẩu.</p>
           <p className="rounded bg-yellow-50 p-2 text-xs text-yellow-700">
-            <strong>Lưu ý:</strong> Email có thể vào thư mục Spam/Junk. Vui lòng kiểm tra trước khi nhấn gửi lại.
+            <strong>Lưu ý:</strong> Email có thể vào thư mục Spam/Junk. Vui lòng kiểm tra trước khi
+            nhấn gửi lại.
           </p>
         </div>
 
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
-        )}
+        {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-        <form onSubmit={handleSendCode} className="space-y-4">
+        <form
+          onSubmit={handleSendCode}
+          className="space-y-4"
+        >
           <Input
             label="Email"
             type="email"
@@ -173,19 +177,19 @@ export const ForgotPasswordForm = ({ onSuccess, onBack }: ForgotPasswordFormProp
 
       <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
         <p>
-          Mã xác nhận đã được gửi đến{" "}
-          <span className="font-medium">{deliveryInfo || email}</span>
+          Mã xác nhận đã được gửi đến <span className="font-medium">{deliveryInfo || email}</span>
         </p>
         <p className="mt-1 text-xs text-blue-600">
           Lưu ý: Email có thể mất 1-2 phút để đến. Vui lòng kiểm tra cả thư mục Spam/Junk.
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-      <form onSubmit={handleResetPassword} className="space-y-4">
+      <form
+        onSubmit={handleResetPassword}
+        className="space-y-4"
+      >
         <Input
           label="Mã xác nhận"
           type="text"

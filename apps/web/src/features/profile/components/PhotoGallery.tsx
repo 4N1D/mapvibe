@@ -18,9 +18,7 @@ export function PhotoGallery({ photos, loading, error }: PhotoGalleryProps) {
   }
 
   if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>
-    );
+    return <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>;
   }
 
   if (photos.length === 0) {
@@ -35,7 +33,10 @@ export function PhotoGallery({ photos, loading, error }: PhotoGalleryProps) {
   return (
     <div className="space-y-6">
       {photos.map((group) => (
-        <div key={group.date} className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
+        <div
+          key={group.date}
+          className="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200"
+        >
           <p className="mb-4 text-sm font-semibold text-gray-800">
             {formatDateDisplay(group.date)}
           </p>

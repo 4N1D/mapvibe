@@ -203,7 +203,7 @@ if (typeof window !== "undefined") {
           referrer: a.referrer || document.referrer,
         })),
       });
-      
+
       const apiUrl = import.meta.env.VITE_API_URL;
       navigator.sendBeacon(`${apiUrl}/activities/batch`, data);
     }

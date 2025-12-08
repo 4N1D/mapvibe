@@ -57,11 +57,7 @@ export async function getPresignedUploadUrl(
   };
 }
 
-export function generatePhotoKey(
-  userId: string,
-  photoType: string,
-  extension: string
-): string {
+export function generatePhotoKey(userId: string, photoType: string, extension: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return `${photoType}/${userId}/${timestamp}-${random}.${extension}`;

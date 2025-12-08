@@ -11,13 +11,13 @@ interface UseUserPhotosReturn {
 
 function buildPhotoGroups(items: PhotoItem[]): PhotoGroup[] {
   const groups: Record<string, PhotoItem[]> = {};
-  
+
   items.forEach((item) => {
     const key = new Date(item.created_at || new Date()).toISOString().split("T")[0];
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
   });
-  
+
   return Object.entries(groups)
     .sort(([a], [b]) => (a < b ? 1 : -1))
     .map(([date, items]) => ({ date, items }));

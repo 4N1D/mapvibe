@@ -45,7 +45,7 @@ export function CommentItem({
       const response = await apiClient.post<{ liked: boolean; like_count: number }>(
         `/reviews/comments/${comment.id}/like`
       );
-      
+
       // Update with actual response from server
       setLiked(response.data.liked);
       setLikeCount(response.data.like_count);
@@ -91,13 +91,15 @@ export function CommentItem({
 
         <div className="flex-1">
           <div className="mb-1">
-            <span className="font-semibold text-gray-900">{comment.author_name || "Người dùng"}</span>
+            <span className="font-semibold text-gray-900">
+              {comment.author_name || "Người dùng"}
+            </span>
             <span className="ml-2 text-sm text-gray-400">{formatTime(comment.created_at)}</span>
           </div>
 
           <p className="mb-2 text-gray-700">
             {comment.reply_to_name && (
-              <span className="text-primary-500 mr-1 font-semibold">@{comment.reply_to_name}</span>
+              <span className="mr-1 font-semibold text-primary-500">@{comment.reply_to_name}</span>
             )}
             {comment.content}
           </p>
@@ -112,8 +114,10 @@ export function CommentItem({
             </button>
 
             <button
-              onClick={() => onReply(comment.id, comment.author_name || "Người dùng", rootParentId || comment.id)}
-              className="hover:text-primary-500 flex items-center gap-1 transition"
+              onClick={() =>
+                onReply(comment.id, comment.author_name || "Người dùng", rootParentId || comment.id)
+              }
+              className="flex items-center gap-1 transition hover:text-primary-500"
             >
               <MessageCircle className="h-4 w-4" />
               <span>{depth === 0 ? comment.replies?.length || 0 : ""}</span>

@@ -2,7 +2,7 @@
 export interface JWTClaims {
   sub?: string;
   email?: string;
-  'cognito:username'?: string;
+  "cognito:username"?: string;
   [key: string]: string | undefined;
 }
 

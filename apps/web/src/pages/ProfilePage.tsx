@@ -23,14 +23,33 @@ import {
 export function ProfilePage() {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading, updateUserAvatar, user } = useAuth();
-  
+
   // Profile hooks
-  const { profile, loading: profileLoading, updateProfile, updating, setAvatarUrl, setBackgroundUrl } = useProfile();
+  const {
+    profile,
+    loading: profileLoading,
+    updateProfile,
+    updating,
+    setAvatarUrl,
+    setBackgroundUrl,
+  } = useProfile();
   const { stats } = useProfileStats();
   const { photos, loading: photosLoading, error: photosError } = useUserPhotos();
-  const { reviews, loading: reviewsLoading, error: reviewsError, hasMore: hasMoreReviews, loadMore: loadMoreReviews } = useUserReviews();
-  const { saved, loading: savedLoading, error: savedError, hasMore: hasMoreSaved, loadMore: loadMoreSaved } = useUserSaved();
-  
+  const {
+    reviews,
+    loading: reviewsLoading,
+    error: reviewsError,
+    hasMore: hasMoreReviews,
+    loadMore: loadMoreReviews,
+  } = useUserReviews();
+  const {
+    saved,
+    loading: savedLoading,
+    error: savedError,
+    hasMore: hasMoreSaved,
+    loadMore: loadMoreSaved,
+  } = useUserSaved();
+
   // UI state
   const [activeMenu, setActiveMenu] = useState<ProfileMenuItem>("thong-tin");
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -232,7 +251,10 @@ export function ProfilePage() {
       </div>
 
       {/* Toast Notification */}
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast
+        toast={toast}
+        onClose={() => setToast(null)}
+      />
     </>
   );
 }

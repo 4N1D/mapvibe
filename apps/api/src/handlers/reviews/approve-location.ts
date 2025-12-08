@@ -1,9 +1,9 @@
-import crypto from 'crypto';
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, badRequest, notFound, error } from '../../middlewares/response';
-import { sql } from 'kysely';
-import { sendEmbeddingJob } from '../../services/sqs';
+import crypto from "crypto";
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, badRequest, notFound, error } from "../../middlewares/response";
+import { sql } from "kysely";
+import { sendEmbeddingJob } from "../../services/sqs";
 
 interface ApproveLocationBody {
   location_address_id: string;
@@ -17,41 +17,44 @@ export const handler: Handler = {
 
       let body: ApproveLocationBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const { location_address_id, admin_id } = body;
 
       if (!location_address_id) {
-        return badRequest('location_address_id is required');
+        return badRequest("location_address_id is required");
       }
 
       // Fetch the location_address (pending or not yet approved)
       const location = await db
-        .selectFrom('location_addresses')
+        .selectFrom("location_addresses")
         .selectAll()
-        .where('id', '=', location_address_id)
+        .where("id", "=", location_address_id)
         .executeTakeFirst();
 
       if (!location) {
-        return notFound('Location not found');
+        return notFound("Location not found");
       }
 
-      if (location.status === 'approved') {
-        return badRequest('Location is already approved');
+      if (location.status === "approved") {
+        return badRequest("Location is already approved");
       }
 
       const restaurantId = crypto.randomUUID();
 
       // Generate slug from restaurant name
-      const slug = String(location.restaurant_name || 'unnamed')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-        .substring(0, 100) + '-' + restaurantId.substring(0, 8);
+      const slug =
+        String(location.restaurant_name || "unnamed")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "")
+          .substring(0, 100) +
+        "-" +
+        restaurantId.substring(0, 8);
 
       // Execute promotion transaction
       await db.transaction().execute(async (trx) => {
@@ -124,11 +127,11 @@ export const handler: Handler = {
       // Gửi message vào SQS để trigger Lambda Embedding
       // Không await để không block response
       sendEmbeddingJob(restaurantId).catch((err) => {
-        console.error('[reviews/approve-location] Failed to send embedding job:', err);
+        console.error("[reviews/approve-location] Failed to send embedding job:", err);
       });
 
       return success({
-        message: 'Location approved and promoted to restaurant successfully',
+        message: "Location approved and promoted to restaurant successfully",
         restaurant: {
           id: restaurantId,
           name: location.restaurant_name,
@@ -146,11 +149,11 @@ export const handler: Handler = {
         },
         location_address: {
           id: location_address_id,
-          status: 'approved',
+          status: "approved",
         },
       });
     } catch (err) {
-      console.error('[reviews/approve-location] Error:', err);
+      console.error("[reviews/approve-location] Error:", err);
       return error((err as Error).message);
     }
   },

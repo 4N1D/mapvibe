@@ -4,20 +4,20 @@ import { getDb } from "@/services/db";
 export function getClientIp(event: APIGatewayEvent): string | null {
   // Try various headers in order of reliability
   const headers = event.headers || {};
-  
+
   // CloudFront / API Gateway
   const sourceIp = event.requestContext?.identity?.sourceIp;
   if (sourceIp) return sourceIp;
-  
+
   // X-Forwarded-For header (first IP is the client)
-  const xff = headers['X-Forwarded-For'] || headers['x-forwarded-for'];
+  const xff = headers["X-Forwarded-For"] || headers["x-forwarded-for"];
   if (xff) {
-    const ips = xff.split(',').map((ip: string) => ip.trim());
+    const ips = xff.split(",").map((ip: string) => ip.trim());
     return ips[0] || null;
   }
-  
+
   // Other common headers
-  return headers['X-Real-IP'] || headers['x-real-ip'] || null;
+  return headers["X-Real-IP"] || headers["x-real-ip"] || null;
 }
 
 export function getUserIdFromEvent(event: APIGatewayEvent): string | null {
@@ -31,7 +31,7 @@ export function getUserIdFromEvent(event: APIGatewayEvent): string | null {
     return authorizer.claims.sub;
   }
 
-  const authHeader = event.headers?.['x-user-id'];
+  const authHeader = event.headers?.["x-user-id"];
   if (authHeader) {
     return authHeader;
   }
@@ -40,7 +40,7 @@ export function getUserIdFromEvent(event: APIGatewayEvent): string | null {
   const token = getTokenFromHeader(event);
   if (token) {
     const decoded = decodeJwtPayload(token);
-    if (decoded?.sub) {
+    if (decoded?.sub && typeof decoded.sub === "string") {
       return decoded.sub;
     }
   }
@@ -52,21 +52,21 @@ export function getUserIdFromEvent(event: APIGatewayEvent): string | null {
 function getTokenFromHeader(event: APIGatewayEvent): string | null {
   const authHeader = event.headers?.Authorization || event.headers?.authorization;
   if (!authHeader) return null;
-  
-  if (authHeader.startsWith('Bearer ')) {
+
+  if (authHeader.startsWith("Bearer ")) {
     return authHeader.substring(7);
   }
   return authHeader;
 }
 
 // Decode JWT payload without verification (for extracting user info)
-function decodeJwtPayload(token: string): Record<string, any> | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const parts = token.split('.');
+    const parts = token.split(".");
     if (parts.length !== 3) return null;
-    
+
     const payload = parts[1];
-    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
+    const decoded = Buffer.from(payload, "base64").toString("utf-8");
     return JSON.parse(decoded);
   } catch {
     return null;
@@ -89,7 +89,7 @@ export function getEmailFromEvent(event: APIGatewayEvent): string | null {
 
 export async function isUserAdmin(userId: string): Promise<boolean> {
   const db = await getDb();
-  
+
   const user = await db
     .selectFrom("users")
     .select("roles")

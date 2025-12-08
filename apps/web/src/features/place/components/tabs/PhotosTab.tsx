@@ -44,10 +44,10 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
     },
   });
 
-  const photos = page === 1 ? (data?.photos || []) : allPhotos;
+  const photos = page === 1 ? data?.photos || [] : allPhotos;
   const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, comment: 0 };
 
-  if (data && page === 1 && hasMore !== (data.page < data.total_pages)) {
+  if (data && page === 1 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
@@ -56,7 +56,11 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
       setLoadingMore(true);
       const nextPage = page + 1;
       const response = await fetchPhotos(restaurantId, category, nextPage);
-      setAllPhotos(page === 1 ? [...(data?.photos || []), ...response.photos] : [...allPhotos, ...response.photos]);
+      setAllPhotos(
+        page === 1
+          ? [...(data?.photos || []), ...response.photos]
+          : [...allPhotos, ...response.photos]
+      );
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
@@ -95,7 +99,9 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
         </div>
       )}
 
-      <div className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}>
+      <div
+        className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}
+      >
         {photos.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Chưa có ảnh nào trong danh mục này.</p>
         ) : (

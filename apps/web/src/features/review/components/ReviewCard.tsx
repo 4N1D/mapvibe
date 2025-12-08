@@ -15,12 +15,11 @@ interface ReviewCardProps {
 export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
   if (loading) {
     return (
-      <Card className="h-full flex flex-col overflow-hidden">
+      <Card className="flex h-full flex-col overflow-hidden">
         {/* Image skeleton */}
         <Skeleton className="h-48 w-full rounded-none" />
 
         <CardContent className="flex flex-1 flex-col p-4">
-
           {/* Text skeleton */}
           <SkeletonText lines={3} />
 
@@ -74,7 +73,7 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
   };
 
   return (
-    <Card className="h-full flex flex-col cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
+    <Card className="flex h-full cursor-pointer flex-col overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
       {/* Image */}
       <div className="relative h-48 bg-gray-200">
         {data.photos.length > 0 ? (
@@ -140,7 +139,9 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
               </div>
             )}
             <div>
-              <p className="text-xs font-medium text-gray-900">{data.author_name || data.author_id}</p>
+              <p className="text-xs font-medium text-gray-900">
+                {data.author_name || data.author_id}
+              </p>
               <p className="text-xs text-gray-500">
                 {formatTime ? formatTime(data.created_at) : data.created_at}
               </p>

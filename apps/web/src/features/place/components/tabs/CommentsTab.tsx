@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Comment, CommentsResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
@@ -30,8 +30,13 @@ const fetchComments = async (slug?: string, reviewId?: string, page: number = 1)
   throw new Error("Either slug or reviewId must be provided");
 };
 
+interface LikedCommentsResponse {
+  review_id: string;
+  liked_comment_ids: string[];
+}
+
 export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +47,7 @@ export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) 
   } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [likedCommentIds, setLikedCommentIds] = useState<Set<string>>(new Set());
 
   const queryKey = reviewId
     ? ["comments", "review", reviewId]
@@ -160,6 +166,53 @@ export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) 
     setReplyingTo({ id: commentId, name: authorName, rootParentId });
   };
 
+  // Fetch liked comments when reviewId is available and user is authenticated
+  useEffect(() => {
+    const fetchLikedComments = async () => {
+      if (!reviewId) {
+        // Reset liked comments if no reviewId
+        setLikedCommentIds(new Set());
+        return;
+      }
+
+      if (!isAuthenticated) {
+        // Reset liked comments if not authenticated
+        setLikedCommentIds(new Set());
+        return;
+      }
+
+      try {
+        console.log(`[CommentsTab] Fetching liked comments for review: ${reviewId}`);
+        const response = await apiClient.get<LikedCommentsResponse>(
+          `/reviews/${reviewId}/liked-comments`
+        );
+        
+        console.log("[CommentsTab] API Response:", response.data);
+        
+        // Always update likedCommentIds, even if array is empty
+        if (response.data && Array.isArray(response.data.liked_comment_ids)) {
+          const likedIds = response.data.liked_comment_ids;
+          console.log(`[CommentsTab] Setting ${likedIds.length} liked comment IDs:`, likedIds);
+          setLikedCommentIds(new Set(likedIds));
+        } else {
+          // If response format is unexpected, reset to empty
+          console.warn("[CommentsTab] Unexpected response format:", response.data);
+          setLikedCommentIds(new Set());
+        }
+      } catch (error: any) {
+        // Log error for debugging
+        console.error("[CommentsTab] Failed to fetch liked comments:", error);
+        if (error.response) {
+          console.error("[CommentsTab] Error response:", error.response.status, error.response.data);
+        }
+        // Reset to empty set on error
+        setLikedCommentIds(new Set());
+      }
+    };
+
+    fetchLikedComments();
+  }, [reviewId, isAuthenticated]);
+
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
       {!replyingTo && (
@@ -187,6 +240,19 @@ export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) 
               replyingToId={replyingTo?.id}
               submitting={submitting}
               formatTime={formatRelativeTime}
+              initialLiked={likedCommentIds.has(comment.id)}
+              isLiked={(commentId) => likedCommentIds.has(commentId)}
+              onLikeChange={(commentId, liked) => {
+                setLikedCommentIds((prev) => {
+                  const newSet = new Set(prev);
+                  if (liked) {
+                    newSet.add(commentId);
+                  } else {
+                    newSet.delete(commentId);
+                  }
+                  return newSet;
+                });
+              }}
             />
           ))
         )}

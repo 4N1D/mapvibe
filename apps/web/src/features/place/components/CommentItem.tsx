@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Heart, MessageCircle, Flag } from "lucide-react";
 import { Comment } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
@@ -16,6 +16,9 @@ interface CommentItemProps {
   formatTime: (date: string) => string;
   depth?: number;
   rootParentId?: string;
+  initialLiked?: boolean;
+  onLikeChange?: (commentId: string, liked: boolean) => void;
+  isLiked?: (commentId: string) => boolean;
 }
 
 export function CommentItem({
@@ -28,16 +31,36 @@ export function CommentItem({
   formatTime,
   depth = 0,
   rootParentId,
+  initialLiked = false,
+  onLikeChange,
+  isLiked,
 }: CommentItemProps) {
-  const [liked, setLiked] = useState(false);
+  // Calculate liked status from isLiked function or initialLiked prop
+  const computedLiked = isLiked ? isLiked(comment.id) : initialLiked;
+  const [liked, setLiked] = useState(computedLiked);
   const [likeCount, setLikeCount] = useState(comment.like_count);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const isOptimisticUpdateRef = useRef(false);
+
+  // Update liked state when computedLiked changes (from isLiked function or initialLiked)
+  // But skip if we're in the middle of an optimistic update
+  useEffect(() => {
+    if (!isOptimisticUpdateRef.current) {
+      setLiked((prevLiked) => {
+        if (prevLiked !== computedLiked) {
+          console.log(`[CommentItem] Updating liked status for comment ${comment.id}: ${prevLiked} -> ${computedLiked}`);
+        }
+        return computedLiked;
+      });
+    }
+  }, [computedLiked, comment.id]);
 
   const handleLike = async () => {
     // Optimistic update
     const wasLiked = liked;
     const prevCount = likeCount;
+    isOptimisticUpdateRef.current = true;
     setLiked(!wasLiked);
     setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
 
@@ -49,8 +72,19 @@ export function CommentItem({
       // Update with actual response from server
       setLiked(response.data.liked);
       setLikeCount(response.data.like_count);
+      
+      // Notify parent component about like change
+      if (onLikeChange) {
+        onLikeChange(comment.id, response.data.liked);
+      }
+      
+      // Reset optimistic update flag after a short delay to allow parent state to update
+      setTimeout(() => {
+        isOptimisticUpdateRef.current = false;
+      }, 100);
     } catch (error) {
       // Rollback on error
+      isOptimisticUpdateRef.current = false;
       setLiked(wasLiked);
       setLikeCount(prevCount);
       console.error("Failed to like comment:", error);
@@ -174,6 +208,9 @@ export function CommentItem({
               formatTime={formatTime}
               depth={depth + 1}
               rootParentId={rootParentId || comment.id}
+              initialLiked={isLiked ? isLiked(reply.id) : false}
+              onLikeChange={onLikeChange}
+              isLiked={isLiked}
             />
           ))}
         </div>

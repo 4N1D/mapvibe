@@ -382,7 +382,6 @@ interface LocationAddress {
   full_address?: string;
   street_address?: string;
   ward?: string;
-  city?: string;
   geo_lat?: number;
   geo_lng?: number;
   [key: string]: unknown;
@@ -489,17 +488,17 @@ export const updateLocationHandler: Handler = {
           slug: `${slug}-${Date.now()}`,
           address: (location as LocationAddress).full_address || (location as LocationAddress).street_address,
           ward: (location as LocationAddress).ward,
-          city: (location as LocationAddress).city,
           geo_lat: (location as LocationAddress).geo_lat,
           geo_lng: (location as LocationAddress).geo_lng,
           cuisine_types: cuisine_types ? JSON.stringify(cuisine_types) : null,
           price_min: price_min || null,
           price_max: price_max || null,
           opening_hours: opening_hours || null,
-          features: features ? JSON.stringify(features) : null,
+          features: features || null,
           description: description || null,
           status: "approved",
           created_by: userId,
+          created_from_location_id: locationId,
         } as Record<string, unknown>)
         .returningAll()
         .executeTakeFirst();

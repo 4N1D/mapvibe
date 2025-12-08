@@ -1,6 +1,6 @@
 import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
-import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
+import { success, badRequest, unauthorized, forbidden, notFound, error } from "../../middlewares/response";
 import { getUserIdFromEvent } from "@/utils/auth";
 
 // GET /users/me - Get current user profile
@@ -40,6 +40,11 @@ export const getMeHandler: Handler = {
 
       if (!user) {
         return notFound("User not found");
+      }
+
+      // Check if user is banned
+      if (user.account_status === "banned") {
+        return forbidden("Your account has been banned");
       }
 
       return success({ user });

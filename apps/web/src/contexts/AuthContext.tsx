@@ -114,11 +114,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
+    // Listen for user-banned event from axios interceptor
+    const handleUserBanned = async () => {
+      console.warn("[Auth] User banned - forcing logout");
+      await cognitoSignOut();
+      setUser(null);
+      alert("Tài khoản của bạn đã bị cấm. Vui lòng liên hệ quản trị viên.");
+    };
+    window.addEventListener("user-banned", handleUserBanned);
+
     // Initial auth check
     checkAuth();
 
     // Cleanup listener on unmount
-    return () => hubListenerCancelToken();
+    return () => {
+      hubListenerCancelToken();
+      window.removeEventListener("user-banned", handleUserBanned);
+    };
   }, [checkAuth]);
 
   /**

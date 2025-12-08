@@ -17,10 +17,15 @@ export default function UsersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: string }) => adminApi.updateUser(id, action),
+    mutationFn: ({ id, action, role }: { id: string; action: string; role?: string }) =>
+      adminApi.updateUser(id, action, undefined, role),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success(`Đã ${variables.action === "ban" ? "cấm" : "bỏ cấm"} người dùng`);
+      if (variables.action === "set_role") {
+        toast.success(`Đã ${variables.role === "admin" ? "phân quyền Admin" : "gỡ quyền Admin"}`);
+      } else {
+        toast.success(`Đã ${variables.action === "ban" ? "cấm" : "bỏ cấm"} người dùng`);
+      }
     },
     onError: () => {
       toast.error("Lỗi khi cập nhật người dùng");
@@ -40,6 +45,21 @@ export default function UsersPage() {
     });
     if (confirmed) {
       updateMutation.mutate({ id, action: "ban" });
+    }
+  };
+
+  const handleToggleAdmin = async (id: string, name: string, currentlyAdmin: boolean) => {
+    const newRole = currentlyAdmin ? "user" : "admin";
+    const confirmed = await confirm({
+      title: currentlyAdmin ? "Gỡ quyền Admin" : "Phân quyền Admin",
+      message: currentlyAdmin
+        ? `Gỡ quyền admin của "${name}"?`
+        : `Phân quyền admin cho "${name}"? Họ sẽ có toàn quyền quản trị.`,
+      confirmText: currentlyAdmin ? "Gỡ quyền" : "Phân quyền",
+      variant: currentlyAdmin ? "danger" : "info",
+    });
+    if (confirmed) {
+      updateMutation.mutate({ id, action: "set_role", role: newRole });
     }
   };
 
@@ -177,15 +197,33 @@ export default function UsersPage() {
                             </span>
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-center">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            <button
+                              onClick={() =>
+                                handleToggleAdmin(user.id as string, displayName, isAdmin)
+                              }
+                              disabled={updateMutation.isPending}
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                                 isAdmin
-                                  ? "bg-purple-100 text-purple-800"
-                                  : "bg-gray-100 text-gray-800"
+                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                               }`}
+                              title={isAdmin ? "Click để gỡ quyền Admin" : "Click để phân quyền Admin"}
                             >
                               {isAdmin ? "Quản trị" : "Thành viên"}
-                            </span>
+                              <svg
+                                className="h-3 w-3 opacity-50"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 9l4-4 4 4m0 6l-4 4-4-4"
+                                />
+                              </svg>
+                            </button>
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-center">
                             <StatusBadge status={(user.account_status as string) || "active"} />

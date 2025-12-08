@@ -42,7 +42,7 @@ apiClient.interceptors.response.use(
     console.log(`[${response.status}] ${response.config.url}`);
     return response;
   },
-  async (error: AxiosError) => {
+  async (error: AxiosError<{ error?: string }>) => {
     const originalRequest = error.config;
 
     console.error(`[${error.response?.status}] ${originalRequest?.url}`);
@@ -57,8 +57,14 @@ apiClient.interceptors.response.use(
           break;
 
         case 403:
-          // Forbidden
-          console.warn("Forbidden - không có quyền truy cập");
+          // Check if user is banned
+          if (error.response.data?.error?.includes("banned")) {
+            console.warn("User banned - logging out");
+            // Dispatch custom event to trigger logout
+            window.dispatchEvent(new CustomEvent("user-banned"));
+          } else {
+            console.warn("Forbidden - không có quyền truy cập");
+          }
           break;
 
         case 404:

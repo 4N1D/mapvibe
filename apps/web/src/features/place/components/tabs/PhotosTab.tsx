@@ -4,8 +4,9 @@ import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvi
 import { apiClient } from "@/lib/axios";
 
 interface PhotosTabProps {
-  restaurantId: number;
-  showFilters?: boolean; // Default true, set to false to hide filter buttons
+  restaurantId: string;
+  slug?: string;
+  showFilters?: boolean;
 }
 
 type DisplayCategory = Exclude<PhotoCategory, "menu">;
@@ -17,14 +18,47 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   comment: "Bình luận",
 };
 
-const fetchPhotos = async (restaurantId: number, category: string, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/photos/restaurant/${restaurantId}?page=${page}&limit=15&category=${category}`
-  );
-  return response.data;
+interface PhotosApiResponse {
+  restaurant_id: string;
+  photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+    photo_type: string;
+  }>;
+  counts: Record<string, number>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
+const fetchPhotos = async (slug: string, category: string, page: number) => {
+  const offset = (page - 1) * 15;
+  const type = category === "all" ? "" : category;
+  const url = `/restaurants/${slug}/photos?limit=15&offset=${offset}${type ? `&type=${type}` : ""}`;
+  const response = await apiClient.get<PhotosApiResponse>(url);
+  
+  // Transform API response to expected format
+  const data = response.data;
+  const photos = data.photos.map(p => ({
+    id: p.id,
+    url: p.s3_url,
+    thumbnail_url: p.s3_thumbnail_url,
+    category: p.photo_type as any,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination.total || photos.length) / 15),
+    category_counts: {
+      all: Object.values(data.counts || {}).reduce((a, b) => a + b, 0),
+      food: data.counts?.food || 0,
+      view: data.counts?.view || 0,
+      comment: data.counts?.other || 0,
+    },
+  };
 };
 
-export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) {
+export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabProps) {
   const [category, setCategory] = useState<DisplayCategory>("all");
   const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
@@ -32,9 +66,10 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
   const [loadingMore, setLoadingMore] = useState(false);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["photos", restaurantId, category],
-    queryFn: () => fetchPhotos(restaurantId, category, 1),
+    queryKey: ["photos", slug, category],
+    queryFn: () => fetchPhotos(slug!, category, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
     select: (data) => {
       if (showFilters) {
         const { menu: _, ...counts } = data.category_counts;
@@ -52,10 +87,11 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchPhotos(restaurantId, category, nextPage);
+      const response = await fetchPhotos(slug, category, nextPage);
       setAllPhotos(
         page === 1
           ? [...(data?.photos || []), ...response.photos]

@@ -8,25 +8,26 @@ import { CommentItem } from "../CommentItem";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface CommentsTabProps {
-  restaurantId?: number;
+  restaurantId?: string;
+  slug?: string;
   reviewId?: string;
 }
 
-const fetchComments = async (restaurantId?: number, reviewId?: string, page: number = 1) => {
+const fetchComments = async (slug?: string, reviewId?: string, page: number = 1) => {
   if (reviewId) {
     // Fetch comments for a specific review post
     const response = await apiClient.get<CommentsResponse>(
       `/reviews/${reviewId}/comments?page=${page}&limit=10`
     );
     return response.data;
-  } else if (restaurantId) {
+  } else if (slug) {
     // Fetch comments for a restaurant
     const response = await apiClient.get<CommentsResponse>(
-      `/comments/${restaurantId}?page=${page}&limit=10`
+      `/restaurants/${slug}/comments?page=${page}&limit=10`
     );
     return response.data;
   }
-  throw new Error("Either restaurantId or reviewId must be provided");
+  throw new Error("Either slug or reviewId must be provided");
 };
 
 interface LikedCommentsResponse {
@@ -50,13 +51,13 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
 
   const queryKey = reviewId
     ? ["comments", "review", reviewId]
-    : ["comments", "restaurant", restaurantId];
+    : ["comments", "restaurant", slug];
 
   const { data } = useQuery({
     queryKey,
-    queryFn: () => fetchComments(restaurantId, reviewId, 1),
+    queryFn: () => fetchComments(slug, reviewId, 1),
     placeholderData: (prev) => prev,
-    enabled: !!(restaurantId || reviewId),
+    enabled: !!(slug || reviewId),
   });
 
   const comments = localComments.length > 0 ? localComments : data?.comments || [];
@@ -69,7 +70,7 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchComments(restaurantId, reviewId, nextPage);
+      const response = await fetchComments(slug, reviewId, nextPage);
       const currentComments = localComments.length > 0 ? localComments : data?.comments || [];
       setLocalComments([...currentComments, ...response.comments]);
       setHasMore(response.page < response.total_pages);
@@ -89,23 +90,30 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
 
     try {
       setSubmitting(true);
-      const payload: any = {
-        author_id: user.sub,
-        text: content,
-      };
-
-      // Only include parent_comment_id for replies
-      if (replyingTo?.id) {
-        payload.parent_comment_id = replyingTo.id;
-      }
+      let endpoint: string;
+      let payload: any;
 
       if (reviewId) {
-        payload.review_post_id = reviewId;
-      } else if (restaurantId) {
-        payload.restaurant_id = restaurantId;
+        // For review post comments
+        endpoint = "/reviews/comment";
+        payload = {
+          author_id: user.sub,
+          text: content,
+          review_post_id: reviewId,
+          parent_comment_id: replyingTo?.id || null,
+        };
+      } else if (slug) {
+        // For restaurant comments - API expects slug and content
+        endpoint = "/restaurants/comments";
+        payload = {
+          slug,
+          content,
+          parent_id: replyingTo?.id || null,
+        };
+      } else {
+        throw new Error("Missing slug or reviewId");
       }
 
-      const endpoint = reviewId ? "/reviews/comment" : "/comments";
       const response = await apiClient.post<{ comment: any }>(endpoint, payload);
 
       // Extract comment from response (API returns { comment: ... })

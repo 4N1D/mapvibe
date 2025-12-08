@@ -99,7 +99,7 @@ function SavedCard({ item }: { item: SavedRestaurant }) {
           <div className="flex items-center gap-2">
             {item.rating_overall && (
               <span className="font-medium text-yellow-600">
-                ★ {item.rating_overall.toFixed(1)}
+                ★ {Number(item.rating_overall).toFixed(1)}
               </span>
             )}
             {item.review_count !== undefined && <span>({item.review_count} đánh giá)</span>}

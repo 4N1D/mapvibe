@@ -99,7 +99,7 @@ function ReviewCard({ review }: { review: UserReview }) {
           <div className="flex items-center gap-3">
             {review.rating_overall && (
               <span className="font-medium text-yellow-600">
-                ★ {review.rating_overall.toFixed(1)}
+                ★ {Number(review.rating_overall).toFixed(1)}
               </span>
             )}
             <span>{review.upvote_count} thích</span>

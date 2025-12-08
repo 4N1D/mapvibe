@@ -3,9 +3,10 @@ import { useMediaQuery } from "react-responsive";
 interface ImageGalleryPreviewProps {
   images?: string[];
   restaurantName?: string;
+  onViewMore?: () => void;
 }
 
-export function ImageGalleryPreview({ images, restaurantName }: ImageGalleryPreviewProps) {
+export function ImageGalleryPreview({ images, restaurantName, onViewMore }: ImageGalleryPreviewProps) {
   const isDesktop = useMediaQuery({ minWidth: 1024 });
   const transformClass = "transition-transform duration-300 hover:scale-110";
   if (!images?.length) return null;
@@ -49,9 +50,12 @@ export function ImageGalleryPreview({ images, restaurantName }: ImageGalleryPrev
         <img
           src={images[3]}
           alt=""
-          className={`${transformClass} blur-sm" h-full w-full object-cover`}
+          className={`${transformClass} h-full w-full object-cover blur-sm`}
         />
-        <button className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-medium text-white transition-colors hover:bg-black/50">
+        <button
+          onClick={onViewMore}
+          className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-medium text-white transition-colors hover:bg-black/50"
+        >
           Xem thêm
         </button>
       </div>

@@ -23,18 +23,27 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
     setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
 
     try {
-      await apiClient.post(`/reviews/${review.id}/like`);
+      await apiClient.post(`/restaurants/reviews/${review.id}/like`);
     } catch (error) {
       // Rollback on error
       setLiked(wasLiked);
       setLikeCount(prevCount);
       console.error("Failed to like review:", error);
+      toast.error("Không thể thích nhận xét. Vui lòng thử lại.");
     }
   };
 
   const handleReport = async (reason: string, details?: string) => {
-    console.log("Report submitted:", { reviewId: review.id, reason, details });
-    toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    try {
+      await apiClient.post(`/restaurants/reviews/${review.id}/report`, {
+        reason,
+        details,
+      });
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    } catch (error: any) {
+      const message = error.response?.data?.error || "Không thể gửi báo cáo";
+      toast.error(message);
+    }
   };
 
   return (
@@ -61,7 +70,7 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>{formatTime(review.created_at)}</span>
             <span className="flex items-center gap-0.5 font-medium text-yellow-500">
-              {review.overall_rating.toFixed(1)}
+              {Number(review.overall_rating || 0).toFixed(1)}
               <Star className="h-3.5 w-3.5 fill-current" />
             </span>
           </div>
@@ -70,25 +79,30 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
 
       <p className="mb-3 text-gray-700">{review.content}</p>
 
-      {review.photos.length > 0 && (
+      {review.photos && review.photos.length > 0 && (
         <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-          {review.photos.slice(0, 5).map((photo, index) => (
-            <div
-              key={index}
-              className="relative aspect-square overflow-hidden rounded-lg bg-gray-100"
-            >
-              <img
-                src={photo.url}
-                alt={photo.caption || `Ảnh ${index + 1}`}
-                className="h-full w-full object-cover transition hover:scale-105"
-              />
-              {index === 4 && review.photos.length > 5 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-bold text-white">
-                  +{review.photos.length - 5}
-                </div>
-              )}
-            </div>
-          ))}
+          {review.photos.slice(0, 5).map((photo, index) => {
+            // Handle both string URLs and object format
+            const photoUrl = typeof photo === 'string' ? photo : photo.url;
+            const photoCaption = typeof photo === 'string' ? `Ảnh ${index + 1}` : (photo.caption || `Ảnh ${index + 1}`);
+            return (
+              <div
+                key={index}
+                className="relative aspect-square overflow-hidden rounded-lg bg-gray-100"
+              >
+                <img
+                  src={photoUrl}
+                  alt={photoCaption}
+                  className="h-full w-full object-cover transition hover:scale-105"
+                />
+                {index === 4 && review.photos.length > 5 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-bold text-white">
+                    +{review.photos.length - 5}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

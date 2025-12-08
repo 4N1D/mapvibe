@@ -84,6 +84,12 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
     e.preventDefault();
     if (!content.trim() || loading) return;
 
+    // Validate minimum 50 characters (DB constraint for restaurant reviews)
+    if (content.trim().length < 50) {
+      toast.error(`Nhận xét phải có ít nhất 50 ký tự (hiện tại: ${content.trim().length})`);
+      return;
+    }
+
     const hasRating = Object.values(ratings).some((r) => r > 0);
     if (!hasRating) {
       toast.error("Vui lòng đánh giá ít nhất 1 tiêu chí");
@@ -122,66 +128,72 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <div className="flex-1">
           <div className="mb-3 flex gap-3">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200">
-              <div className="flex h-full w-full items-center justify-center bg-gray-300 text-sm font-medium text-gray-600">
+            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-200">
+              <div className="flex h-full w-full items-center justify-center bg-gray-300 text-xs font-medium text-gray-600">
                 {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
               </div>
             </div>
-            <input
-              type="text"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Viết nhận xét của bạn tại đây..."
-              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={!content.trim() || loading}
-              className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 lg:px-6"
-            >
-              {loading ? "..." : "Nhận xét"}
-            </button>
-          </div>
-
-          <div className="ml-13">
-            <label className="inline-flex cursor-pointer items-center gap-1 text-sm text-gray-500 hover:text-primary-500">
-              <ImagePlus className="h-4 w-4" />
-              <span>Tải hình ảnh lên</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                className="hidden"
-                disabled={loading || photos.length >= 5}
-              />
-            </label>
-
-            {photosPreviews.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {photosPreviews.map((src, index) => (
-                  <div
-                    key={index}
-                    className="group relative h-16 w-16"
-                  >
-                    <img
-                      src={src}
-                      alt={`Preview ${index + 1}`}
-                      className="h-full w-full rounded-lg object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+            <div className="flex-1">
+              <div className="relative">
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Viết nhận xét của bạn tại đây (tối thiểu 50 ký tự)..."
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  disabled={loading}
+                />
+                <span className={`absolute bottom-2 right-3 text-xs ${content.length < 50 ? 'text-gray-400' : 'text-green-500'}`}>
+                  {content.length}/50
+                </span>
               </div>
-            )}
+              <div className="mt-2 flex items-center justify-between">
+                <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-gray-500 hover:text-primary-500">
+                  <ImagePlus className="h-4 w-4" />
+                  <span>Tải ảnh</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                    disabled={loading}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={content.trim().length < 50 || loading}
+                  className="rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? "..." : "Gửi nhận xét"}
+                </button>
+              </div>
+            </div>
           </div>
+
+          {photosPreviews.length > 0 && (
+            <div className="ml-11 mt-2 flex flex-wrap gap-2">
+              {photosPreviews.map((src, index) => (
+                <div
+                  key={index}
+                  className="group relative h-14 w-14"
+                >
+                  <img
+                    src={src}
+                    alt={`Preview ${index + 1}`}
+                    className="h-full w-full rounded-lg object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(index)}
+                    className="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="lg:w-64">

@@ -4,26 +4,53 @@ import { RestaurantPhoto, RestaurantPhotosResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
 interface MenuTabProps {
-  restaurantId: number;
+  restaurantId: string;
+  slug?: string;
 }
 
-const fetchMenuPhotos = async (restaurantId: number, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/photos/restaurant/${restaurantId}?page=${page}&limit=12&category=menu`
+interface MenuApiResponse {
+  restaurant_id: string;
+  menu_photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+  }>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
+const fetchMenuPhotos = async (slug: string, page: number) => {
+  const offset = (page - 1) * 12;
+  const response = await apiClient.get<MenuApiResponse>(
+    `/restaurants/${slug}/menu?limit=12&offset=${offset}`
   );
-  return response.data;
+  
+  // Transform API response to expected format
+  const data = response.data;
+  const photos = (data.menu_photos || []).map(p => ({
+    id: p.id,
+    url: p.s3_url,
+    thumbnail_url: p.s3_thumbnail_url,
+    category: "menu" as const,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination?.total || photos.length) / 12),
+  };
 };
 
-export function MenuTab({ restaurantId }: MenuTabProps) {
+export function MenuTab({ restaurantId, slug }: MenuTabProps) {
   const [localPhotos, setLocalPhotos] = useState<RestaurantPhoto[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["menu-photos", restaurantId],
-    queryFn: () => fetchMenuPhotos(restaurantId, 1),
+    queryKey: ["menu-photos", slug],
+    queryFn: () => fetchMenuPhotos(slug!, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
   });
 
   const photos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
@@ -33,10 +60,11 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchMenuPhotos(restaurantId, nextPage);
+      const response = await fetchMenuPhotos(slug, nextPage);
       const currentPhotos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
       setLocalPhotos([...currentPhotos, ...response.photos]);
       setHasMore(response.page < response.total_pages);

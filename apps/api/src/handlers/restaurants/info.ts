@@ -36,6 +36,25 @@ export const handler: Handler = {
       // Extract image URLs
       const images = photos.map((p) => p.s3_url);
 
+      // Parse JSON fields if they are strings
+      let cuisineTypes = restaurant.cuisine_types;
+      if (typeof cuisineTypes === "string") {
+        try {
+          cuisineTypes = JSON.parse(cuisineTypes);
+        } catch {
+          cuisineTypes = null;
+        }
+      }
+
+      let features = restaurant.features;
+      if (typeof features === "string") {
+        try {
+          features = JSON.parse(features);
+        } catch {
+          features = null;
+        }
+      }
+
       return success({
         id: restaurant.id,
         name: restaurant.name_vi,
@@ -53,10 +72,11 @@ export const handler: Handler = {
         rating_service: restaurant.rating_service,
         rating_location: restaurant.rating_location,
         review_count: restaurant.review_count,
-        features: restaurant.features,
-        cuisine_types: restaurant.cuisine_types,
+        features: features,
+        cuisine_types: cuisineTypes,
         price_min: restaurant.price_min,
         price_max: restaurant.price_max,
+        description: restaurant.description,
         status: restaurant.status,
         images: images,
         created_at: restaurant.created_at,

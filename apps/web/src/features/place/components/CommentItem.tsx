@@ -61,12 +61,19 @@ export function CommentItem({
   const handleReport = async (reason: string, details?: string) => {
     try {
       setReportLoading(true);
-      // TODO: Call API to submit report
-      console.log("Report submitted:", { commentId: comment.id, reason, details });
+      await apiClient.post(`/restaurants/comments/${comment.id}/report`, {
+        reason,
+        details,
+      });
       toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
-    } catch (error) {
+      setIsReportModalOpen(false);
+    } catch (error: any) {
       console.error("Failed to submit report:", error);
-      toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
+      if (error.response?.status === 400 && error.response?.data?.message?.includes("already reported")) {
+        toast.error("Bạn đã báo cáo comment này rồi.");
+      } else {
+        toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
+      }
     } finally {
       setReportLoading(false);
     }

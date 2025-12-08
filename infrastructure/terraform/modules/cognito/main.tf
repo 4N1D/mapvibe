@@ -5,8 +5,6 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# NOTE: Lambda permission đã được di chuyển ra main.tf để tránh circular dependency
-
 resource "aws_cognito_user_pool" "main" {
   name = "${var.project_name}-users-${var.environment}"
 
@@ -63,16 +61,6 @@ resource "aws_cognito_user_pool" "main" {
 
   # MFA (optional for MVP)
   mfa_configuration = "OFF"
-
-  # Lambda Triggers (if provided)
-  dynamic "lambda_config" {
-    for_each = var.lambda_trigger_arn != "" ? [1] : []
-    content {
-      post_confirmation       = var.lambda_trigger_arn
-      post_authentication     = var.lambda_trigger_arn
-      pre_token_generation    = var.lambda_trigger_arn
-    }
-  }
 
   tags = {
     Name        = "${var.project_name}-users-${var.environment}"

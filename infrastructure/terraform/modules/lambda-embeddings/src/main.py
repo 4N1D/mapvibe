@@ -136,6 +136,21 @@ def get_restaurant_data(restaurant_id: str) -> Optional[Dict[str, Any]]:
                     logger.warning(f"⚠️ Restaurant {restaurant_id} not found")
                     return None
                 
+                # Parse JSON columns nếu cần
+                cuisine_types = restaurant_result[6]
+                if isinstance(cuisine_types, str):
+                    try:
+                        cuisine_types = json.loads(cuisine_types)
+                    except:
+                        pass  # Giữ nguyên string nếu không parse được
+                
+                features = restaurant_result[10]
+                if isinstance(features, str):
+                    try:
+                        features = json.loads(features)
+                    except:
+                        pass  # Giữ nguyên string nếu không parse được
+                
                 restaurant_data = {
                     'id': restaurant_result[0],
                     'name_vi': restaurant_result[1],
@@ -143,11 +158,11 @@ def get_restaurant_data(restaurant_id: str) -> Optional[Dict[str, Any]]:
                     'address': restaurant_result[3],
                     'description': restaurant_result[4],
                     'business_type': restaurant_result[5],
-                    'cuisine_types': restaurant_result[6],
+                    'cuisine_types': cuisine_types,
                     'price_min': restaurant_result[7],
                     'price_max': restaurant_result[8],
                     'opening_hours': restaurant_result[9],
-                    'features': restaurant_result[10]
+                    'features': features
                 }
                 
                 # Lấy menu từ photos (OCR đã xử lý)
@@ -219,12 +234,46 @@ def build_embedding_text(restaurant_data: Dict[str, Any]) -> str:
     cuisine_types = restaurant_data.get('cuisine_types')
     if cuisine_types:
         if isinstance(cuisine_types, list):
-            parts.append(f"Ẩm thực: {', '.join(cuisine_types)}")
+            # Xử lý trường hợp list chứa dict hoặc string
+            cuisine_names = []
+            for item in cuisine_types:
+                if isinstance(item, dict):
+                    # Nếu là dict, thử lấy 'name', 'value', hoặc giá trị đầu tiên
+                    name = item.get('name') or item.get('value') or item.get('label')
+                    if name:
+                        cuisine_names.append(str(name))
+                    elif len(item) > 0:
+                        # Lấy giá trị đầu tiên của dict
+                        cuisine_names.append(str(list(item.values())[0]))
+                elif isinstance(item, str):
+                    cuisine_names.append(item)
+                else:
+                    cuisine_names.append(str(item))
+            
+            if cuisine_names:
+                parts.append(f"Ẩm thực: {', '.join(cuisine_names)}")
         elif isinstance(cuisine_types, str):
             try:
                 parsed = json.loads(cuisine_types)
                 if isinstance(parsed, list):
-                    parts.append(f"Ẩm thực: {', '.join(parsed)}")
+                    # Xử lý tương tự như trên
+                    cuisine_names = []
+                    for item in parsed:
+                        if isinstance(item, dict):
+                            name = item.get('name') or item.get('value') or item.get('label')
+                            if name:
+                                cuisine_names.append(str(name))
+                            elif len(item) > 0:
+                                cuisine_names.append(str(list(item.values())[0]))
+                        elif isinstance(item, str):
+                            cuisine_names.append(item)
+                        else:
+                            cuisine_names.append(str(item))
+                    
+                    if cuisine_names:
+                        parts.append(f"Ẩm thực: {', '.join(cuisine_names)}")
+                    else:
+                        parts.append(f"Ẩm thực: {cuisine_types}")
                 else:
                     parts.append(f"Ẩm thực: {cuisine_types}")
             except:
@@ -234,7 +283,23 @@ def build_embedding_text(restaurant_data: Dict[str, Any]) -> str:
     if restaurant_data.get('features'):
         features = restaurant_data['features']
         if isinstance(features, list):
-            parts.append(f"Tiện ích: {', '.join(features)}")
+            # Xử lý trường hợp list chứa dict hoặc string
+            feature_names = []
+            for item in features:
+                if isinstance(item, dict):
+                    # Nếu là dict, thử lấy 'name', 'value', hoặc giá trị đầu tiên
+                    name = item.get('name') or item.get('value') or item.get('label')
+                    if name:
+                        feature_names.append(str(name))
+                    elif len(item) > 0:
+                        feature_names.append(str(list(item.values())[0]))
+                elif isinstance(item, str):
+                    feature_names.append(item)
+                else:
+                    feature_names.append(str(item))
+            
+            if feature_names:
+                parts.append(f"Tiện ích: {', '.join(feature_names)}")
         elif isinstance(features, str):
             parts.append(f"Tiện ích: {features}")
     

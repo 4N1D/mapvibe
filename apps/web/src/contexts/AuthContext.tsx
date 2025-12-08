@@ -10,6 +10,7 @@ import {
 } from "@/lib/cognito";
 import { Hub } from "aws-amplify/utils";
 import { apiClient } from "@/lib/axios";
+import { trackActivityImmediate } from "@/lib/activityTracker";
 
 /**
  * User type
@@ -19,6 +20,7 @@ export interface User {
   name?: string;
   sub: string; // Cognito user ID
   avatar?: string;
+  isOAuthUser?: boolean; // true if user signed up via Google/OAuth
 }
 
 /**
@@ -61,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: attributes.email || "",
             name: attributes.name || attributes.email || cognitoUser.username,
             sub: attributes.sub || cognitoUser.userId,
+            isOAuthUser: attributes.isOAuthUser === "true",
           };
 
           // Fetch user profile to get avatar
@@ -98,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         case "signedIn":
         case "signInWithRedirect":
           checkAuth();
+          trackActivityImmediate('login', { metadata: { method: 'google' } });
           break;
         case "signInWithRedirect_failure":
           console.error("[Auth] OAuth login failed:", payload.data);
@@ -122,6 +126,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await cognitoSignIn(email, password);
       await checkAuth();
+      // Track login activity
+      trackActivityImmediate('login', { metadata: { method: 'email' } });
     } catch (error: any) {
       // Handle "There is already a signed in user" error
       if (error.message?.includes("There is already a signed in user")) {
@@ -129,6 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           await cognitoSignIn(email, password);
           await checkAuth();
+          trackActivityImmediate('login', { metadata: { method: 'email' } });
           return;
         } catch (retryError: any) {
           throw new Error(retryError.message || "Đăng nhập thất bại");
@@ -145,6 +152,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       await cognitoSignUp(email, password, { name });
+      // Track register activity
+      trackActivityImmediate('register', { metadata: { method: 'email' } });
     } catch (error: any) {
       throw new Error(error.message || "Đăng ký thất bại");
     }
@@ -162,14 +171,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * Sign out
+   * Sign out - always clears local state even if API fails
    */
   const signOut = async () => {
+    // Track logout before signing out
+    trackActivityImmediate('logout');
     try {
       await cognitoSignOut();
-      setUser(null);
     } catch (error) {
       console.error("[Auth] Sign out failed:", error);
+    } finally {
+      // Always clear user state, even if Cognito signOut fails
+      // This ensures user is logged out on client side
+      setUser(null);
     }
   };
 

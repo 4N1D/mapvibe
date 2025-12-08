@@ -12,7 +12,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-        Error loading statistics. Please try again.
+        Lỗi khi tải thống kê. Vui lòng thử lại.
       </div>
     );
   }
@@ -24,8 +24,8 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Overview of your MapVibe admin panel</p>
+          <h1 className="text-2xl font-bold text-gray-900">Tổng quan</h1>
+          <p className="text-sm text-gray-500 mt-1">Thống kê tổng quan hệ thống MapVibe</p>
         </div>
         <div className="flex gap-3">
           <Link
@@ -35,7 +35,7 @@ export default function DashboardPage() {
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-            Review Pending
+            Duyệt bài
           </Link>
         </div>
       </div>
@@ -46,32 +46,32 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
-            title="Total Users"
+            title="Người dùng"
             value={stats.total_users || 0}
-            subtitle={`+${activity.new_users_7d || 0} this week`}
+            subtitle={`+${activity.new_users_7d || 0} tuần này`}
             icon={<UsersIcon />}
             color="blue"
             href="/users"
           />
           <StatCard
-            title="Total Places"
+            title="Địa điểm"
             value={stats.total_places || 0}
             icon={<PlacesIcon />}
             color="green"
             href="/places"
           />
           <StatCard
-            title="Total Reviews"
+            title="Bài viết"
             value={stats.total_reviews || 0}
-            subtitle={`+${activity.new_reviews_7d || 0} this week`}
+            subtitle={`+${activity.new_reviews_7d || 0} tuần này`}
             icon={<ReviewsIcon />}
             color="purple"
             href="/reviews"
           />
           <StatCard
-            title="Pending Locations"
+            title="Chờ duyệt"
             value={stats.pending_locations || 0}
-            subtitle="Needs review"
+            subtitle="Cần xem xét"
             icon={<PendingIcon />}
             color="orange"
             href="/locations/pending"
@@ -83,23 +83,23 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Summary (7 days)</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hoạt động 7 ngày qua</h2>
           <div className="grid grid-cols-3 gap-4">
             <ActivityCard 
               value={activity.new_users_7d || 0} 
-              label="New Users" 
+              label="Người dùng mới" 
               color="blue"
               trend={activity.new_users_7d > 0 ? 'up' : 'neutral'}
             />
             <ActivityCard 
               value={activity.new_reviews_7d || 0} 
-              label="New Reviews" 
+              label="Bài viết mới" 
               color="purple"
               trend={activity.new_reviews_7d > 0 ? 'up' : 'neutral'}
             />
             <ActivityCard 
               value={activity.new_photos_7d || 0} 
-              label="New Photos" 
+              label="Ảnh mới" 
               color="green"
               trend={activity.new_photos_7d > 0 ? 'up' : 'neutral'}
             />
@@ -107,23 +107,23 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Thao tác nhanh</h2>
           <div className="space-y-3">
             <QuickAction 
               href="/locations/pending" 
               icon={<CheckIcon />}
-              label="Review Pending Locations"
+              label="Duyệt địa điểm chờ"
               count={stats.pending_locations}
             />
             <QuickAction 
               href="/reviews?status=reported" 
               icon={<FlagIcon />}
-              label="Check Reported Reviews"
+              label="Xem bài viết bị báo cáo"
             />
             <QuickAction 
               href="/places" 
               icon={<SearchIcon />}
-              label="Search Places"
+              label="Tìm kiếm địa điểm"
             />
           </div>
         </div>

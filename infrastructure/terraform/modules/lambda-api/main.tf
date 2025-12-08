@@ -71,6 +71,14 @@ resource "aws_iam_role_policy" "lambda" {
           "sqs:SendMessage"
         ]
         Resource = var.sqs_embedding_queue_arn != "" ? var.sqs_embedding_queue_arn : "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminGetUser"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -99,6 +107,7 @@ resource "aws_lambda_function" "api" {
       S3_PHOTOS_BUCKET        = var.photos_bucket_name
       CLOUDFRONT_DOMAIN       = var.cloudfront_domain
       SQS_EMBEDDING_QUEUE_URL = var.sqs_embedding_queue_url
+      COGNITO_USER_POOL_ID    = var.cognito_user_pool_id
     }
   }
 

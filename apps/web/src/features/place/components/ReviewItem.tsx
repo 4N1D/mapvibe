@@ -3,6 +3,7 @@ import { Heart, Flag, Star } from "lucide-react";
 import { RestaurantReview } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 import { ReportModal } from "./ReportModal";
+import toast from "react-hot-toast";
 
 interface ReviewItemProps {
   review: RestaurantReview;
@@ -33,7 +34,7 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
 
   const handleReport = async (reason: string, details?: string) => {
     console.log("Report submitted:", { reviewId: review.id, reason, details });
-    alert("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
   };
 
   return (

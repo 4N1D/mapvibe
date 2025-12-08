@@ -4,6 +4,7 @@ import { Comment } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 import { CommentForm } from "./CommentForm";
 import { ReportModal } from "./ReportModal";
+import toast from "react-hot-toast";
 
 interface CommentItemProps {
   comment: Comment;
@@ -55,10 +56,10 @@ export function CommentItem({
       setReportLoading(true);
       // TODO: Call API to submit report
       console.log("Report submitted:", { commentId: comment.id, reason, details });
-      alert("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
     } catch (error) {
       console.error("Failed to submit report:", error);
-      alert("Không thể gửi báo cáo. Vui lòng thử lại.");
+      toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
     } finally {
       setReportLoading(false);
     }

@@ -22,7 +22,7 @@ import {
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading: authLoading, updateUserAvatar } = useAuth();
+  const { isAuthenticated, loading: authLoading, updateUserAvatar, user } = useAuth();
   
   // Profile hooks
   const { profile, loading: profileLoading, updateProfile, updating, setAvatarUrl, setBackgroundUrl } = useProfile();
@@ -138,6 +138,7 @@ export function ProfilePage() {
             onSave={handleSaveProfile}
             saving={updating}
             onToast={showToast}
+            isOAuthUser={user?.isOAuthUser}
           />
         );
 

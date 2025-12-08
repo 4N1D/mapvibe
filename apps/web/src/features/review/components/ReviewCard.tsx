@@ -3,6 +3,7 @@ import { Card, CardContent } from "@mapvibe/ui-components";
 import { Heart, MessageCircle, Share2 } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
+import toast from "react-hot-toast";
 
 interface ReviewCardProps {
   data?: HotReview;
@@ -64,10 +65,10 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
       // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl);
-        alert("Đã sao chép link vào clipboard!");
+        toast.success("Đã sao chép link vào clipboard!");
       } catch (err) {
         console.error("Failed to copy:", err);
-        alert("Không thể chia sẻ. Vui lòng thử lại.");
+        toast.error("Không thể chia sẻ. Vui lòng thử lại.");
       }
     }
   };

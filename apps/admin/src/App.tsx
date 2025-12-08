@@ -8,6 +8,9 @@ import ReviewsPage from './pages/ReviewsPage';
 import UsersPage from './pages/UsersPage';
 import PendingLocationsPage from './pages/PendingLocationsPage';
 import LocationDetailPage from './pages/LocationDetailPage';
+import ProfilePage from './pages/ProfilePage';
+import ReportsPage from './pages/ReportsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import AuthCallback from './pages/AuthCallback';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,6 +48,9 @@ export default function App() {
                 <Route path="/places" element={<PlacesPage />} />
                 <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

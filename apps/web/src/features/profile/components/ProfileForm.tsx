@@ -2,16 +2,51 @@ import { useState, useEffect } from "react";
 import { Input, Button } from "@mapvibe/ui-components";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { changePassword } from "@/lib/cognito";
+import { apiClient } from "@/lib/axios";
 import type { UserProfile, UpdateProfileData } from "../types";
+
+interface PasswordInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  show: boolean;
+  onToggleShow: () => void;
+}
+
+function PasswordInput({ label, value, onChange, placeholder, show, onToggleShow }: PasswordInputProps) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <div className="relative">
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        <button
+          type="button"
+          onClick={onToggleShow}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface ProfileFormProps {
   profile: UserProfile;
   onSave: (data: UpdateProfileData) => Promise<boolean>;
   saving: boolean;
   onToast?: (message: string, type: "success" | "error") => void;
+  isOAuthUser?: boolean;
 }
 
-export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormProps) {
+export function ProfileForm({ profile, onSave, saving, onToast, isOAuthUser }: ProfileFormProps) {
   const [formData, setFormData] = useState({
     display_name: "",
     email: "",
@@ -73,8 +108,8 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
   const handleChangePassword = async () => {
     setPasswordError(null);
 
-    // Validation
-    if (!passwordData.current_password) {
+    // Validation for regular users (need current password)
+    if (!isOAuthUser && !passwordData.current_password) {
       setPasswordError("Vui lòng nhập mật khẩu hiện tại");
       return;
     }
@@ -89,19 +124,40 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
       return;
     }
 
+    // Check password complexity
+    const hasUpperCase = /[A-Z]/.test(passwordData.new_password);
+    const hasLowerCase = /[a-z]/.test(passwordData.new_password);
+    const hasNumber = /[0-9]/.test(passwordData.new_password);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      setPasswordError("Mật khẩu phải có chữ hoa, chữ thường và số");
+      return;
+    }
+
     if (passwordData.new_password !== passwordData.confirm_password) {
       setPasswordError("Mật khẩu xác nhận không khớp");
       return;
     }
 
-    if (passwordData.current_password === passwordData.new_password) {
+    if (!isOAuthUser && passwordData.current_password === passwordData.new_password) {
       setPasswordError("Mật khẩu mới phải khác mật khẩu hiện tại");
       return;
     }
 
     try {
       setChangingPassword(true);
-      await changePassword(passwordData.current_password, passwordData.new_password);
+
+      if (isOAuthUser) {
+        // OAuth user: Call API to set password (no current password needed)
+        await apiClient.post("/users/me/set-password", {
+          password: passwordData.new_password,
+        });
+        onToast?.("Tạo mật khẩu thành công! Giờ bạn có thể đăng nhập bằng email và mật khẩu.", "success");
+      } else {
+        // Regular user: Change password via Cognito
+        await changePassword(passwordData.current_password, passwordData.new_password);
+        onToast?.("Đổi mật khẩu thành công!", "success");
+      }
       
       // Clear form on success
       setPasswordData({
@@ -109,14 +165,23 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
         new_password: "",
         confirm_password: "",
       });
-      
-      onToast?.("Đổi mật khẩu thành công!", "success");
     } catch (err) {
-      const error = err as { message?: string; name?: string };
+      const error = err as { message?: string; name?: string; response?: { data?: { error?: string } } };
       
-      // Handle specific Cognito errors
+      // Handle API errors for OAuth users
+      if (isOAuthUser) {
+        const apiError = error.response?.data?.error || error.message;
+        setPasswordError(apiError || "Có lỗi xảy ra khi tạo mật khẩu");
+        return;
+      }
+
+      // Handle specific Cognito errors for regular users
       if (error.name === "NotAuthorizedException") {
-        setPasswordError("Mật khẩu hiện tại không đúng");
+        if (error.message?.includes("Incorrect username or password")) {
+          setPasswordError("Mật khẩu hiện tại không đúng");
+        } else {
+          setPasswordError("Mật khẩu hiện tại không đúng");
+        }
       } else if (error.name === "InvalidPasswordException") {
         setPasswordError("Mật khẩu mới không đủ mạnh. Cần có chữ hoa, chữ thường, số và ký tự đặc biệt");
       } else if (error.name === "LimitExceededException") {
@@ -128,40 +193,6 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
       setChangingPassword(false);
     }
   };
-
-  const PasswordInput = ({
-    label,
-    value,
-    onChange,
-    placeholder,
-    showKey,
-  }: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    showKey: "current" | "new" | "confirm";
-  }) => (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
-      <div className="relative">
-        <input
-          type={showPasswords[showKey] ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <button
-          type="button"
-          onClick={() => setShowPasswords({ ...showPasswords, [showKey]: !showPasswords[showKey] })}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-        >
-          {showPasswords[showKey] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-8">
@@ -239,28 +270,40 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
 
       {/* Change Password Section */}
       <div>
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">Đổi mật khẩu</h3>
+        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+          {isOAuthUser ? "Tạo mật khẩu" : "Đổi mật khẩu"}
+        </h3>
+        {isOAuthUser && (
+          <p className="mb-4 text-sm text-gray-600">
+            Bạn đăng ký bằng Google. Tạo mật khẩu để có thể đăng nhập bằng email và mật khẩu.
+          </p>
+        )}
         <div className="max-w-md space-y-4">
+          {!isOAuthUser && (
+            <PasswordInput
+              label="Mật khẩu hiện tại"
+              value={passwordData.current_password}
+              onChange={(value) => setPasswordData({ ...passwordData, current_password: value })}
+              placeholder="Nhập mật khẩu hiện tại"
+              show={showPasswords.current}
+              onToggleShow={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+            />
+          )}
           <PasswordInput
-            label="Mật khẩu hiện tại"
-            value={passwordData.current_password}
-            onChange={(value) => setPasswordData({ ...passwordData, current_password: value })}
-            placeholder="Nhập mật khẩu hiện tại"
-            showKey="current"
-          />
-          <PasswordInput
-            label="Mật khẩu mới"
+            label={isOAuthUser ? "Mật khẩu" : "Mật khẩu mới"}
             value={passwordData.new_password}
             onChange={(value) => setPasswordData({ ...passwordData, new_password: value })}
-            placeholder="Nhập mật khẩu mới (ít nhất 8 ký tự)"
-            showKey="new"
+            placeholder="Nhập mật khẩu (ít nhất 8 ký tự, có chữ hoa, chữ thường, số)"
+            show={showPasswords.new}
+            onToggleShow={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
           />
           <PasswordInput
-            label="Xác nhận mật khẩu mới"
+            label="Xác nhận mật khẩu"
             value={passwordData.confirm_password}
             onChange={(value) => setPasswordData({ ...passwordData, confirm_password: value })}
-            placeholder="Nhập lại mật khẩu mới"
-            showKey="confirm"
+            placeholder="Nhập lại mật khẩu"
+            show={showPasswords.confirm}
+            onToggleShow={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
           />
 
           {passwordError && (
@@ -270,16 +313,16 @@ export function ProfileForm({ profile, onSave, saving, onToast }: ProfileFormPro
           <div className="flex justify-end">
             <Button
               onClick={handleChangePassword}
-              disabled={changingPassword || !passwordData.current_password || !passwordData.new_password}
+              disabled={changingPassword || (!isOAuthUser && !passwordData.current_password) || !passwordData.new_password}
               className="bg-gray-800 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {changingPassword ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Đang đổi...
+                  {isOAuthUser ? "Đang tạo..." : "Đang đổi..."}
                 </span>
               ) : (
-                "Đổi mật khẩu"
+                isOAuthUser ? "Tạo mật khẩu" : "Đổi mật khẩu"
               )}
             </Button>
           </div>

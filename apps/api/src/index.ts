@@ -38,6 +38,7 @@ import {
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
   updateBackgroundHandler,
+  setPasswordHandler,
 } from "./handlers/users";
 import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
@@ -70,7 +71,17 @@ import {
   adminListUsersHandler,
   adminGetUserHandler,
   adminUpdateUserHandler,
+  adminListReportsHandler,
+  adminGetReportHandler,
+  adminUpdateReportHandler,
+  adminListActivitiesHandler,
+  adminActivityStatsHandler,
+  adminUserActivitiesHandler,
 } from "./handlers/admin";
+import {
+  logActivityHandler,
+  batchLogActivityHandler,
+} from "./handlers/activities";
 
 
 // Route definitions
@@ -254,6 +265,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/background$/,
     paramNames: [],
     handler: updateBackgroundHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/set-password$/,
+    paramNames: [],
+    handler: setPasswordHandler,
   },
   {
     method: "GET",
@@ -441,6 +458,57 @@ const routes: RouteDefinition[] = [
     pattern: /^\/admin\/users\/([^/]+)$/,
     paramNames: ["id"],
     handler: adminUpdateUserHandler,
+  },
+  // Admin Reports routes
+  {
+    method: "GET",
+    pattern: /^\/admin\/reports$/,
+    paramNames: [],
+    handler: adminListReportsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/reports\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetReportHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/reports\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdateReportHandler,
+  },
+  // Admin Activities routes
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities$/,
+    paramNames: [],
+    handler: adminListActivitiesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities\/stats$/,
+    paramNames: [],
+    handler: adminActivityStatsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities\/user\/([^/]+)$/,
+    paramNames: ["userId"],
+    handler: adminUserActivitiesHandler,
+  },
+  // Public Activities routes (for web tracking)
+  {
+    method: "POST",
+    pattern: /^\/activities$/,
+    paramNames: [],
+    handler: logActivityHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/activities\/batch$/,
+    paramNames: [],
+    handler: batchLogActivityHandler,
   },
 ];
 

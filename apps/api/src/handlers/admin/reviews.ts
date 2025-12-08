@@ -27,12 +27,21 @@ export const listReviewsHandler: Handler = {
       const sortBy = params.sort_by || 'created_at';
       const sortOrder = params.sort_order === 'asc' ? 'asc' : 'desc';
 
+      // Build query based on status filter
+      let whereClause = sql``;
+      if (status === 'reported') {
+        whereClause = sql`WHERE rp.report_count > 0`;
+      } else if (status === 'hidden') {
+        whereClause = sql`WHERE rp.status = 'hidden'`;
+      }
+
       const result = await sql`
         SELECT 
           rp.id,
           rp.author_id,
           u.display_name as author_name,
           u.email as author_email,
+          u.avatar as author_avatar,
           rp.text,
           rp.features,
           rp.photos,
@@ -49,8 +58,8 @@ export const listReviewsHandler: Handler = {
         LEFT JOIN users u ON u.id = rp.author_id
         LEFT JOIN location_addresses la ON la.id = rp.location_address_id
         LEFT JOIN restaurants r ON r.id = rp.restaurant_id
-        ${status === 'reported' ? sql`WHERE rp.report_count > 0` : status === 'hidden' ? sql`WHERE rp.status = 'hidden'` : sql``}
-        ORDER BY ${sql.raw(sortBy)} ${sql.raw(sortOrder)}
+        ${whereClause}
+        ORDER BY rp.created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `.execute(db);

@@ -95,6 +95,7 @@ interface PostItem {
     shares?: number;
   };
   images: GalleryItem[];
+  features?: string[]; // Feature IDs from API
 }
 
 // Helper function to format time ago
@@ -219,8 +220,32 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
     images: Array.isArray(review.photos) 
       ? review.photos.map((photo) => ({ url: photo.url, caption: photo.caption }))
       : [],
+    features: review.features || [],
   };
 };
+
+// List of all 18 services with their feature IDs - Đồng bộ với 18 tiện ích
+const ALL_SERVICES = [
+  { id: "wifi", label: "Có wifi" },
+  { id: "card_payment", label: "Trả bằng thẻ" },
+  { id: "private_room", label: "Có phòng riêng" },
+  { id: "smoking_area", label: "Có khu vực hút thuốc" },
+  { id: "wheelchair_accessible", label: "Có hỗ trợ người khuyết tật" },
+  { id: "delivery", label: "Có giao hàng" },
+  { id: "car_parking", label: "Có chỗ đậu ôtô" },
+  { id: "kids_play_area", label: "Có chỗ chơi cho trẻ em" },
+  { id: "membership_card", label: "Có thẻ thành viên" },
+  { id: "football_streaming", label: "Có chiếu bóng đá" },
+  { id: "air_conditioning", label: "Có máy lạnh và điều hòa" },
+  { id: "air_con", label: "Có máy lạnh và điều hòa" },
+  { id: "reservation", label: "Nên đặt trước" },
+  { id: "free_motorbike_parking", label: "Giữ xe máy miễn phí" },
+  { id: "vat_invoice", label: "Có xuất hóa đơn đỏ" },
+  { id: "takeaway", label: "Cho mua về" },
+  { id: "outdoor_seating", label: "Có bàn ngoài trời" },
+  { id: "tipping", label: "Tip cho nhân viên" },
+  { id: "heater", label: "Có lò sưởi" },
+];
 
 function Gallery({ items }: { items: GalleryItem[] }) {
   const display = useMemo(() => items.slice(0, 5), [items]);
@@ -740,8 +765,23 @@ export function NearbyPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   
-  // Filter states
-  const [filters, setFilters] = useState<FilterState>({
+  // Filter states - draft (đang chỉnh sửa) và applied (đã áp dụng)
+  const [draftFilters, setDraftFilters] = useState<FilterState>({
+    trends: {
+      hot: false,
+      newest: false,
+      oldest: false,
+    },
+    categories: [],
+    services: [],
+    status: [],
+    priceRange: {
+      min: "",
+      max: "",
+    },
+  });
+  
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>({
     trends: {
       hot: false,
       newest: false,
@@ -903,38 +943,52 @@ export function NearbyPage() {
     let filtered = [...postsToFilter];
 
     // Filter by trends
-    if (filters.trends.hot) {
+    if (appliedFilters.trends.hot) {
       // Sort by upvotes + downvotes (total engagement)
       filtered = filtered.sort((a, b) => {
         const aEngagement = a.stats.upvotes + a.stats.downvotes;
         const bEngagement = b.stats.upvotes + b.stats.downvotes;
         return bEngagement - aEngagement;
       });
-    } else if (filters.trends.newest) {
-      // Sort by time (newest first - already sorted by API, but we can reverse if needed)
-      filtered = filtered.sort((a, b) => {
-        // Parse timeAgo to sort properly (simplified - in real app would use created_at)
-        return 0; // Already sorted by API
-      });
-    } else if (filters.trends.oldest) {
+    } else if (appliedFilters.trends.newest) {
+      // Sort by time (newest first - already sorted by API)
+      // No need to sort again as API already returns newest first
+    } else if (appliedFilters.trends.oldest) {
       filtered = filtered.reverse();
     }
 
     // Filter by status
-    if (filters.status.length > 0) {
+    if (appliedFilters.status.length > 0) {
       filtered = filtered.filter((post) => {
-        if (filters.status.includes("Đã kiểm duyệt")) {
+        if (appliedFilters.status.includes("Đã kiểm duyệt")) {
           return post.approved;
         }
-        if (filters.status.includes("Chưa kiểm duyệt")) {
+        if (appliedFilters.status.includes("Chưa kiểm duyệt")) {
           return !post.approved;
         }
         return true;
       });
     }
 
+    // Filter by services
+    if (appliedFilters.services.length > 0) {
+      filtered = filtered.filter((post) => {
+        const postFeatures = post.features || [];
+        if (postFeatures.length === 0) return false;
+        
+        // Check if post has at least one of the selected services
+        return appliedFilters.services.some((serviceId) => {
+          // Handle both air_conditioning and air_con
+          if (serviceId === "air_conditioning" || serviceId === "air_con") {
+            return postFeatures.includes("air_conditioning") || postFeatures.includes("air_con");
+          }
+          return postFeatures.includes(serviceId);
+        });
+      });
+    }
+
     // Filter by price range
-    if (filters.priceRange.min || filters.priceRange.max) {
+    if (appliedFilters.priceRange.min || appliedFilters.priceRange.max) {
       filtered = filtered.filter((post) => {
         // Extract price from priceRange string (e.g., "120,000 - 250,000 VNĐ")
         const priceMatch = post.priceRange.match(/(\d+(?:,\d+)*)/g);
@@ -943,8 +997,8 @@ export function NearbyPage() {
         const minPrice = priceMatch[0]?.replace(/,/g, "") || "0";
         const maxPrice = priceMatch[1]?.replace(/,/g, "") || minPrice;
         
-        const filterMin = filters.priceRange.min ? parseInt(filters.priceRange.min.replace(/,/g, "")) : 0;
-        const filterMax = filters.priceRange.max ? parseInt(filters.priceRange.max.replace(/,/g, "")) : Infinity;
+        const filterMin = appliedFilters.priceRange.min ? parseInt(appliedFilters.priceRange.min.replace(/,/g, "")) : 0;
+        const filterMax = appliedFilters.priceRange.max ? parseInt(appliedFilters.priceRange.max.replace(/,/g, "")) : Infinity;
         
         return parseInt(minPrice) <= filterMax && parseInt(maxPrice) >= filterMin;
       });
@@ -953,11 +1007,36 @@ export function NearbyPage() {
     return filtered;
   };
 
-  // Apply filters whenever allPosts or filters change
+  // Apply filters whenever allPosts or appliedFilters change
   useEffect(() => {
     const filtered = applyFilters(allPosts);
     setPosts(filtered);
-  }, [allPosts, filters]);
+  }, [allPosts, appliedFilters]);
+
+  // Handler to apply filters
+  const handleApplyFilters = () => {
+    setAppliedFilters({ ...draftFilters });
+  };
+
+  // Handler to reset filters
+  const handleResetFilters = () => {
+    const emptyFilters: FilterState = {
+      trends: {
+        hot: false,
+        newest: false,
+        oldest: false,
+      },
+      categories: [],
+      services: [],
+      status: [],
+      priceRange: {
+        min: "",
+        max: "",
+      },
+    };
+    setDraftFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+  };
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
@@ -971,34 +1050,107 @@ export function NearbyPage() {
       <div className="bg-gray-100 pb-12">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-8 sm:px-6 lg:flex-row lg:items-start lg:gap-8 lg:px-8">
         {/* Sidebar filters */}
-        <aside className="w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
-            <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 text-sm">
-              <SlidersHorizontal className="h-4 w-4 text-gray-700" />
-            </span>
-            Bộ lọc địa điểm
-          </h2>
-          <div className="space-y-4 text-sm text-gray-700">
+        <aside className="relative flex h-fit flex-col w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64 lg:max-h-[calc(100vh-6rem)]">
+          <div className="mb-4 flex items-center justify-between shrink-0">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 text-sm">
+                <SlidersHorizontal className="h-4 w-4 text-gray-700" />
+              </span>
+              Bộ lọc địa điểm
+            </h2>
+            {(draftFilters.trends.hot || draftFilters.trends.newest || draftFilters.trends.oldest || 
+              draftFilters.categories.length > 0 || draftFilters.services.length > 0 || 
+              draftFilters.status.length > 0 || draftFilters.priceRange.min || draftFilters.priceRange.max) && (
+              <button
+                onClick={handleResetFilters}
+                className="text-xs text-primary-500 hover:text-primary-600"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <div className="flex-1 space-y-4 text-sm text-gray-700 overflow-y-auto">
             <div>
               <p className="mb-2 font-semibold">Xu hướng</p>
               <div className="space-y-1">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Đang hot
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={draftFilters.trends.hot}
+                    onChange={(e) => {
+                      setDraftFilters((prev) => ({
+                        ...prev,
+                        trends: {
+                          ...prev.trends,
+                          hot: e.target.checked,
+                          newest: e.target.checked ? false : prev.trends.newest,
+                          oldest: e.target.checked ? false : prev.trends.oldest,
+                        },
+                      }));
+                    }}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                  />
+                  <span>Đang hot</span>
                 </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Mới nhất
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={draftFilters.trends.newest}
+                    onChange={(e) => {
+                      setDraftFilters((prev) => ({
+                        ...prev,
+                        trends: {
+                          ...prev.trends,
+                          newest: e.target.checked,
+                          hot: e.target.checked ? false : prev.trends.hot,
+                          oldest: e.target.checked ? false : prev.trends.oldest,
+                        },
+                      }));
+                    }}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                  />
+                  <span>Mới nhất</span>
                 </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" /> Cũ nhất
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={draftFilters.trends.oldest}
+                    onChange={(e) => {
+                      setDraftFilters((prev) => ({
+                        ...prev,
+                        trends: {
+                          ...prev.trends,
+                          oldest: e.target.checked,
+                          hot: e.target.checked ? false : prev.trends.hot,
+                          newest: e.target.checked ? false : prev.trends.newest,
+                        },
+                      }));
+                    }}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                  />
+                  <span>Cũ nhất</span>
                 </label>
               </div>
             </div>
             <div>
-              <p className="mb-2 font-semibold">Theo danh mục</p>
+              <p className="mb-2 font-semibold">Theo trạng thái</p>
               <div className="space-y-1">
-                {["Lẩu", "Nướng", "Buffet", "Mì/miến", "Ăn nhẹ"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
+                {["Đã kiểm duyệt", "Chưa kiểm duyệt"].map((item) => (
+                  <label key={item} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={draftFilters.status.includes(item)}
+                      onChange={(e) => {
+                        setDraftFilters((prev) => ({
+                          ...prev,
+                          status: e.target.checked
+                            ? [...prev.status, item]
+                            : prev.status.filter((s) => s !== item),
+                        }));
+                      }}
+                      className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                    />
+                    <span>{item}</span>
                   </label>
                 ))}
               </div>
@@ -1006,19 +1158,28 @@ export function NearbyPage() {
             <div>
               <p className="mb-2 font-semibold">Theo dịch vụ</p>
               <div className="space-y-1">
-                {["Wifi free", "Giữ xe free", "Quẹt thẻ", "Cho nhóm", "Tiệm"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo trạng thái</p>
-              <div className="space-y-1">
-                {["Đã kiểm duyệt", "Chưa kiểm duyệt"].map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" /> {item}
+                {ALL_SERVICES.filter((service) => {
+                  // Remove duplicate air_con if air_conditioning exists
+                  if (service.id === "air_con") {
+                    return !ALL_SERVICES.some((s) => s.id === "air_conditioning");
+                  }
+                  return true;
+                }).map((service) => (
+                  <label key={service.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={draftFilters.services.includes(service.id)}
+                      onChange={(e) => {
+                        setDraftFilters((prev) => ({
+                          ...prev,
+                          services: e.target.checked
+                            ? [...prev.services, service.id]
+                            : prev.services.filter((s) => s !== service.id),
+                        }));
+                      }}
+                      className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                    />
+                    <span className="text-sm">{service.label}</span>
                   </label>
                 ))}
               </div>
@@ -1029,16 +1190,44 @@ export function NearbyPage() {
                 <input
                   type="text"
                   placeholder="Từ"
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
+                  value={draftFilters.priceRange.min}
+                  onChange={(e) => {
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      priceRange: { ...prev.priceRange, min: e.target.value },
+                    }));
+                  }}
+                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
                 <input
                   type="text"
                   placeholder="Đến"
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm"
+                  value={draftFilters.priceRange.max}
+                  onChange={(e) => {
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      priceRange: { ...prev.priceRange, max: e.target.value },
+                    }));
+                  }}
+                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
               </div>
-              <button className="mt-3 w-full rounded bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-600">
+            </div>
+          </div>
+          {/* Sticky buttons at bottom */}
+          <div className="sticky bottom-0 bg-white pt-4 mt-4 border-t border-gray-100 shrink-0">
+            <div className="flex gap-2">
+              <button
+                onClick={handleApplyFilters}
+                className="flex-1 rounded bg-primary-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
+              >
                 Áp dụng
+              </button>
+              <button
+                onClick={handleResetFilters}
+                className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Reset
               </button>
             </div>
           </div>

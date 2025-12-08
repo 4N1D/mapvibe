@@ -80,8 +80,12 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
       const payload: any = {
         author_id: user.sub,
         text: content,
-        parent_comment_id: replyingTo?.id || null,
       };
+
+      // Only include parent_comment_id for replies
+      if (replyingTo?.id) {
+        payload.parent_comment_id = replyingTo.id;
+      }
 
       if (reviewId) {
         payload.review_post_id = reviewId;
@@ -95,9 +99,14 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
       // Extract comment from response (API returns { comment: ... })
       // Map text to content to match Comment interface
       const rawComment = response.data.comment || response.data;
+      
+      // Get user info from auth context to populate author_name and author_avatar
+      // since API might not return these fields (API only returns comment record without user join)
       const newComment: Comment = {
         ...rawComment,
         content: rawComment.text || rawComment.content,
+        author_name: rawComment.author_name || user?.name || user?.email || "Người dùng",
+        author_avatar: rawComment.author_avatar || user?.avatar || undefined,
         review_post_id: reviewId || rawComment.review_post_id,
         restaurant_id: restaurantId?.toString() || rawComment.restaurant_id,
       };
@@ -105,11 +114,16 @@ export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
       const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
       
       if (replyingTo) {
-        const newReply = {
+        // When replying, parent_id should be the ID of the comment being replied to directly
+        // API response already has parent_comment_id, but we need to set parent_id for UI consistency
+        const newReply: Comment = {
           ...newComment,
           reply_to_name: replyingTo.name,
-          parent_id: replyingTo.rootParentId,
+          parent_id: replyingTo.id, // Direct parent (the comment being replied to)
         };
+        
+        // Find the root parent comment (top-level) and add the reply to its replies array
+        // All replies are grouped under the top-level comment for display
         setLocalComments(
           currentComments.map((comment: Comment) =>
             comment.id === replyingTo.rootParentId

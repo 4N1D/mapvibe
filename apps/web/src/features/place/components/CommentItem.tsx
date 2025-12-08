@@ -42,12 +42,19 @@ export function CommentItem({
     setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
 
     try {
-      await apiClient.post(`/comments/${comment.id}/like`);
+      const response = await apiClient.post<{ liked: boolean; like_count: number }>(
+        `/reviews/comments/${comment.id}/like`
+      );
+      
+      // Update with actual response from server
+      setLiked(response.data.liked);
+      setLikeCount(response.data.like_count);
     } catch (error) {
       // Rollback on error
       setLiked(wasLiked);
       setLikeCount(prevCount);
       console.error("Failed to like comment:", error);
+      toast.error("Không thể like comment. Vui lòng thử lại.");
     }
   };
 
@@ -77,14 +84,14 @@ export function CommentItem({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gray-300 text-sm font-medium text-gray-600">
-              {comment.author_name.charAt(0).toUpperCase()}
+              {(comment.author_name || "U").charAt(0).toUpperCase()}
             </div>
           )}
         </div>
 
         <div className="flex-1">
           <div className="mb-1">
-            <span className="font-semibold text-gray-900">{comment.author_name}</span>
+            <span className="font-semibold text-gray-900">{comment.author_name || "Người dùng"}</span>
             <span className="ml-2 text-sm text-gray-400">{formatTime(comment.created_at)}</span>
           </div>
 
@@ -105,7 +112,7 @@ export function CommentItem({
             </button>
 
             <button
-              onClick={() => onReply(comment.id, comment.author_name, rootParentId || comment.id)}
+              onClick={() => onReply(comment.id, comment.author_name || "Người dùng", rootParentId || comment.id)}
               className="hover:text-primary-500 flex items-center gap-1 transition"
             >
               <MessageCircle className="h-4 w-4" />
@@ -133,7 +140,7 @@ export function CommentItem({
             <div className="mt-3">
               <CommentForm
                 onSubmit={onSubmitReply}
-                replyingTo={{ id: comment.id, name: comment.author_name }}
+                replyingTo={{ id: comment.id, name: comment.author_name || "Người dùng" }}
                 onCancelReply={onCancelReply}
                 loading={submitting}
               />

@@ -25,9 +25,15 @@ const STATUS_COLORS: Record<ReportStatus, string> = {
 
 const TARGET_LABELS: Record<TargetType, string> = {
   comment: "Bình luận",
-  review: "Bài viết",
+  review: "Nhận xét",
   user: "Người dùng",
   photo: "Ảnh",
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  comment: "Bình luận",
+  review_post: "Bài viết review",
+  restaurant_review: "Nhận xét địa điểm",
 };
 
 const REASON_LABELS: Record<ReportReason, string> = {
@@ -363,6 +369,16 @@ function ReportCard({
               <span className="font-medium text-gray-700">
                 {targetContent.author_name || "Ẩn danh"}
               </span>
+              {targetContent.type && (
+                <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
+                  {CONTENT_TYPE_LABELS[targetContent.type] || targetContent.type}
+                </span>
+              )}
+              {targetContent.rating_overall && (
+                <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">
+                  ⭐ {targetContent.rating_overall}
+                </span>
+              )}
             </div>
             <p className="line-clamp-2 text-gray-700">{targetContent.text}</p>
           </div>
@@ -492,11 +508,21 @@ function ReportDetailModal({
             <div>
               <h3 className="mb-2 text-sm font-medium text-gray-500">Nội dung bị báo cáo</h3>
               <div className="rounded-lg bg-gray-50 p-4">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-sm text-gray-500">Tác giả:</span>
                   <span className="font-medium text-gray-700">
                     {targetContent.author_name || "Ẩn danh"}
                   </span>
+                  {targetContent.type && (
+                    <span className="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                      {CONTENT_TYPE_LABELS[targetContent.type] || targetContent.type}
+                    </span>
+                  )}
+                  {targetContent.rating_overall && (
+                    <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                      ⭐ {Number(targetContent.rating_overall).toFixed(1)}
+                    </span>
+                  )}
                 </div>
                 <p className="whitespace-pre-wrap text-gray-800">{targetContent.text}</p>
                 <p className="mt-2 text-xs text-gray-400">

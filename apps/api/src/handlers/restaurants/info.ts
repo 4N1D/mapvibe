@@ -12,7 +12,7 @@ export const handler: Handler = {
         return badRequest('Restaurant slug is required');
       }
 
-      // Get restaurant by slug with all static and aggregated information
+      // Query 1: Get restaurant by slug
       const restaurant = await db
         .selectFrom('restaurants')
         .selectAll()
@@ -22,6 +22,19 @@ export const handler: Handler = {
       if (!restaurant) {
         return notFound('Restaurant not found');
       }
+
+      // Query 2: Get images from photos table (all types, no limit)
+      const photos = await db
+        .selectFrom('photos')
+        .select(['s3_url'])
+        .where('restaurant_id', '=', restaurant.id)
+        .where('is_safe', '=', true)
+        .orderBy('display_order', 'asc')
+        .orderBy('created_at', 'desc')
+        .execute();
+
+      // Extract image URLs
+      const images = photos.map(p => p.s3_url);
 
       return success({
         id: restaurant.id,
@@ -37,12 +50,15 @@ export const handler: Handler = {
         rating_price: restaurant.rating_price,
         rating_ambiance: restaurant.rating_ambiance,
         rating_quality: restaurant.rating_quality,
+        rating_service: restaurant.rating_service,
+        rating_location: restaurant.rating_location,
         review_count: restaurant.review_count,
         features: restaurant.features,
         cuisine_types: restaurant.cuisine_types,
         price_min: restaurant.price_min,
         price_max: restaurant.price_max,
         status: restaurant.status,
+        images: images,
         created_at: restaurant.created_at,
         updated_at: restaurant.updated_at,
       });

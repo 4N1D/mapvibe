@@ -1,4 +1,5 @@
 export { handler as infoHandler } from './info';
+export { handler as similarHandler } from './similar';
 export {
   listHandler as commentsListHandler,
   createHandler as commentsCreateHandler,

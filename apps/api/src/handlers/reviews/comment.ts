@@ -130,7 +130,7 @@ export const handler: Handler = {
             text,
             correction_type: correction_type ?? null,
             suggested_value: suggested_value ?? null,
-            upvote_count: 0,
+            like_count: 0,
             status: 'published',
           })
           .returningAll()

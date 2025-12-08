@@ -12,8 +12,16 @@ import {
 import { useVietnamAddress } from "../hooks/useVietnamAddress";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/axios";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 
 const MIN_REVIEW_LENGTH = 300;
+
+// Strip HTML tags and count text characters
+const getTextLength = (html: string): number => {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent?.length || 0;
+};
 
 // Format number with dots as thousand separator (VN style: 100.000)
 const formatPrice = (value: number | string): string => {
@@ -176,8 +184,9 @@ export function SuggestPlaceForm() {
       return;
     }
 
-    if (formData.review.length < MIN_REVIEW_LENGTH) {
-      toast.error(`Đánh giá phải có ít nhất ${MIN_REVIEW_LENGTH} ký tự`);
+    const reviewTextLength = getTextLength(formData.review);
+    if (reviewTextLength < MIN_REVIEW_LENGTH) {
+      toast.error(`Đánh giá phải có ít nhất ${MIN_REVIEW_LENGTH} ký tự (hiện tại: ${reviewTextLength})`);
       return;
     }
 
@@ -447,21 +456,12 @@ export function SuggestPlaceForm() {
       </div>
 
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label className="block text-sm font-medium text-gray-700">Đánh giá</label>
-            <span className={`text-xs ${formData.review.length < MIN_REVIEW_LENGTH ? "text-red-500" : "text-gray-500"}`}>
-              {formData.review.length}/{MIN_REVIEW_LENGTH} ký tự tối thiểu
-            </span>
-          </div>
-          <textarea
-            className={`min-h-32 w-full rounded-lg border bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 ${
-              formData.review.length > 0 && formData.review.length < MIN_REVIEW_LENGTH
-                ? "border-red-300 focus:border-red-500"
-                : "border-gray-300 focus:border-primary-500"
-            }`}
-            placeholder="Hãy chia sẻ đánh giá của bạn tại đây (tối thiểu 50 ký tự)..."
-            value={formData.review}
-            onChange={(e) => handleInputChange("review", e.target.value)}
+          <label className="mb-2 block text-sm font-medium text-gray-700">Đánh giá</label>
+          <RichTextEditor
+            content={formData.review}
+            onChange={(html) => handleInputChange("review", html)}
+            placeholder="Hãy chia sẻ đánh giá chi tiết của bạn tại đây. Bạn có thể sử dụng các công cụ định dạng để làm bài viết đẹp hơn..."
+            minLength={MIN_REVIEW_LENGTH}
           />
         </div>
 

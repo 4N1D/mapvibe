@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Heart, Flag, Star } from "lucide-react";
 import { RestaurantReview } from "@mapvibe/types";
+import { apiClient } from "@/lib/axios";
 import { ReportModal } from "./ReportModal";
+import toast from "react-hot-toast";
 
 interface ReviewItemProps {
   review: RestaurantReview;
@@ -13,14 +15,26 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
   const [likeCount, setLikeCount] = useState(review.like_count);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+  const handleLike = async () => {
+    // Optimistic update
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!wasLiked);
+    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+
+    try {
+      await apiClient.post(`/reviews/${review.id}/like`);
+    } catch (error) {
+      // Rollback on error
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      console.error("Failed to like review:", error);
+    }
   };
 
   const handleReport = async (reason: string, details?: string) => {
     console.log("Report submitted:", { reviewId: review.id, reason, details });
-    alert("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
   };
 
   return (

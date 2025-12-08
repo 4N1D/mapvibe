@@ -27,12 +27,21 @@ export const listReviewsHandler: Handler = {
       const sortBy = params.sort_by || 'created_at';
       const sortOrder = params.sort_order === 'asc' ? 'asc' : 'desc';
 
+      // Build query based on status filter
+      let whereClause = sql``;
+      if (status === 'reported') {
+        whereClause = sql`WHERE rp.report_count > 0`;
+      } else if (status === 'hidden') {
+        whereClause = sql`WHERE rp.status = 'hidden'`;
+      }
+
       const result = await sql`
         SELECT 
           rp.id,
           rp.author_id,
           u.display_name as author_name,
           u.email as author_email,
+          u.avatar as author_avatar,
           rp.text,
           rp.features,
           rp.photos,
@@ -49,8 +58,8 @@ export const listReviewsHandler: Handler = {
         LEFT JOIN users u ON u.id = rp.author_id
         LEFT JOIN location_addresses la ON la.id = rp.location_address_id
         LEFT JOIN restaurants r ON r.id = rp.restaurant_id
-        ${status === 'reported' ? sql`WHERE rp.report_count > 0` : status === 'hidden' ? sql`WHERE rp.status = 'hidden'` : sql``}
-        ORDER BY ${sql.raw(sortBy)} ${sql.raw(sortOrder)}
+        ${whereClause}
+        ORDER BY rp.created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `.execute(db);
@@ -224,7 +233,7 @@ export const listPendingLocationsHandler: Handler = {
           u.display_name as submitted_by_name,
           u.email as submitted_by_email
         FROM location_addresses la
-        LEFT JOIN users u ON u.id = la.submitted_by
+        LEFT JOIN users u ON u.id = la.created_by_user_id
         WHERE la.status = 'pending'
         ORDER BY la.created_at DESC
         LIMIT ${limit}
@@ -246,6 +255,116 @@ export const listPendingLocationsHandler: Handler = {
       });
     } catch (err) {
       console.error('[admin/locations/pending] Error:', err);
+      return error((err as Error).message);
+    }
+  },
+};
+
+// GET /admin/locations/:id - Get location detail
+export const getLocationHandler: Handler = {
+  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+    try {
+      const userId = getUserIdFromEvent(event);
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      const isAdmin = await isUserAdmin(userId);
+      if (!isAdmin) {
+        return unauthorized('Admin access required');
+      }
+
+      const locationId = event.pathParameters?.id;
+      if (!locationId) {
+        return badRequest('Location ID required');
+      }
+
+      const db = await getDb();
+
+      const result = await sql`
+        SELECT 
+          la.*,
+          u.display_name as submitted_by_name,
+          u.email as submitted_by_email
+        FROM location_addresses la
+        LEFT JOIN users u ON u.id = la.created_by_user_id
+        WHERE la.id = ${locationId}
+      `.execute(db);
+
+      if (result.rows.length === 0) {
+        return notFound('Location not found');
+      }
+
+      return success({ location: result.rows[0] });
+    } catch (err) {
+      console.error('[admin/locations/:id] Error:', err);
+      return error((err as Error).message);
+    }
+  },
+};
+
+// GET /admin/locations/:id/reviews - Get reviews for a location
+export const getLocationReviewsHandler: Handler = {
+  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+    try {
+      const userId = getUserIdFromEvent(event);
+      if (!userId) {
+        return unauthorized('Authentication required');
+      }
+
+      const isAdmin = await isUserAdmin(userId);
+      if (!isAdmin) {
+        return unauthorized('Admin access required');
+      }
+
+      const locationId = event.pathParameters?.id;
+      if (!locationId) {
+        return badRequest('Location ID required');
+      }
+
+      const db = await getDb();
+      const params = event.queryStringParameters || {};
+      
+      const limit = Math.min(parseInt(params.limit || '50'), 100);
+      const offset = parseInt(params.offset || '0');
+
+      const result = await sql`
+        SELECT 
+          rp.id,
+          rp.author_id,
+          u.display_name as author_name,
+          u.avatar as author_avatar,
+          rp.text,
+          rp.features,
+          rp.photos,
+          rp.upvote_count,
+          rp.downvote_count,
+          rp.status,
+          rp.created_at
+        FROM review_posts rp
+        LEFT JOIN users u ON u.id = rp.author_id
+        WHERE rp.location_address_id = ${locationId}
+        ORDER BY rp.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `.execute(db);
+
+      const countResult = await sql`
+        SELECT count(*)::int as total
+        FROM review_posts
+        WHERE location_address_id = ${locationId}
+      `.execute(db);
+
+      return success({
+        reviews: result.rows,
+        pagination: {
+          total: (countResult.rows[0] as any)?.total || 0,
+          limit,
+          offset,
+        },
+      });
+    } catch (err) {
+      console.error('[admin/locations/:id/reviews] Error:', err);
       return error((err as Error).message);
     }
   },

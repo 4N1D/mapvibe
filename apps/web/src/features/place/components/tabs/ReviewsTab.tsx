@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/axios";
 import { formatRelativeTime } from "@/utils/date";
 import { ReviewForm } from "../ReviewForm";
 import { ReviewItem } from "../ReviewItem";
+import toast from "react-hot-toast";
 
 interface ReviewsTabProps {
   restaurantId: number;
@@ -78,7 +79,7 @@ export function ReviewsTab({ restaurantId }: ReviewsTabProps) {
       setLocalReviews([response.data, ...currentReviews]);
     } catch (error) {
       console.error("Failed to submit review:", error);
-      alert("Không thể gửi nhận xét. Vui lòng thử lại.");
+      toast.error("Không thể gửi nhận xét. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }

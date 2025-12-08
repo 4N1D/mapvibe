@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import toast from "react-hot-toast";
 import { LoginForm } from "./LoginForm";
 import { SignUpForm } from "./SignUpForm";
 import { ConfirmForm } from "./ConfirmForm";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type ModalMode = "login" | "signup" | "confirm";
+type ModalMode = "login" | "signup" | "confirm" | "forgot";
 
 export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [mode, setMode] = useState<ModalMode>("login");
@@ -49,6 +51,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
           {mode === "login" && "Đăng nhập"}
           {mode === "signup" && "Đăng ký"}
           {mode === "confirm" && "Xác nhận Email"}
+          {mode === "forgot" && "Quên mật khẩu"}
         </h2>
 
         {/* Forms */}
@@ -56,7 +59,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
           <>
             <LoginForm
               onSuccess={handleClose}
-              onForgotPassword={() => alert("Tính năng đang phát triển")}
+              onForgotPassword={() => setMode("forgot")}
             />
             <p className="mt-6 text-center text-sm text-gray-600">
               Chưa có tài khoản?{" "}
@@ -96,6 +99,16 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
           <ConfirmForm
             email={email}
             onSuccess={() => setMode("login")}
+            onBack={() => setMode("login")}
+          />
+        )}
+
+        {mode === "forgot" && (
+          <ForgotPasswordForm
+            onSuccess={() => {
+              toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
+              setMode("login");
+            }}
             onBack={() => setMode("login")}
           />
         )}

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Flag } from "lucide-react";
 import { Comment } from "@mapvibe/types";
+import { apiClient } from "@/lib/axios";
 import { CommentForm } from "./CommentForm";
 import { ReportModal } from "./ReportModal";
+import toast from "react-hot-toast";
 
 interface CommentItemProps {
   comment: Comment;
@@ -32,9 +34,21 @@ export function CommentItem({
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+  const handleLike = async () => {
+    // Optimistic update
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!wasLiked);
+    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+
+    try {
+      await apiClient.post(`/comments/${comment.id}/like`);
+    } catch (error) {
+      // Rollback on error
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      console.error("Failed to like comment:", error);
+    }
   };
 
   const handleReport = async (reason: string, details?: string) => {
@@ -42,10 +56,10 @@ export function CommentItem({
       setReportLoading(true);
       // TODO: Call API to submit report
       console.log("Report submitted:", { commentId: comment.id, reason, details });
-      alert("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
     } catch (error) {
       console.error("Failed to submit report:", error);
-      alert("Không thể gửi báo cáo. Vui lòng thử lại.");
+      toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
     } finally {
       setReportLoading(false);
     }

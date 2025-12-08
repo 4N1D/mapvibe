@@ -1,7 +1,9 @@
+import React from "react";
 import { Card, CardContent } from "@mapvibe/ui-components";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Share2 } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
+import toast from "react-hot-toast";
 
 interface ReviewCardProps {
   data?: HotReview;
@@ -10,7 +12,7 @@ interface ReviewCardProps {
   formatTime?: (date: string) => string;
 }
 
-export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardProps) {
+export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
   if (loading) {
     return (
       <Card className="h-full flex flex-col overflow-hidden">
@@ -42,6 +44,34 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
   }
 
   if (!data) return null;
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/review/${data.id}`;
+    const shareText = `${data.text.substring(0, 100)}...`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Review từ ${data.author_name || data.author_id}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // User cancelled or error occurred
+        console.log("Share cancelled or failed:", err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Đã sao chép link vào clipboard!");
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        toast.error("Không thể chia sẻ. Vui lòng thử lại.");
+      }
+    }
+  };
 
   return (
     <Card className="h-full flex flex-col cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
@@ -96,11 +126,19 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
         {/* Reviewer info */}
         <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
-              <span className="text-xs font-medium text-gray-600">
-                {(data.author_name || data.author_id).charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {data.author_avatar ? (
+              <img
+                src={data.author_avatar}
+                alt={data.author_name || "Avatar"}
+                className="h-6 w-6 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
+                <span className="text-xs font-medium text-gray-600">
+                  {(data.author_name || data.author_id).charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div>
               <p className="text-xs font-medium text-gray-900">{data.author_name || data.author_id}</p>
               <p className="text-xs text-gray-500">
@@ -119,6 +157,14 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
               <MessageCircle className="h-3 w-3" />
               {data.comment_count}
             </span>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"
+              title="Chia sẻ"
+            >
+              <Share2 className="h-3 w-3" />
+              {data.share_count || 0}
+            </button>
           </div>
         </div>
       </CardContent>

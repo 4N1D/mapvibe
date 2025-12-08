@@ -14,12 +14,15 @@ import {
   createHandler as reviewCreateHandler,
   voteHandler as reviewVoteHandler,
   commentHandler as reviewCommentHandler,
+  commentLikeHandler as reviewCommentLikeHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
   shareHandler as reviewShareHandler,
   submitNewPlaceHandler as reviewSubmitNewPlaceHandler,
   approveLocationHandler as reviewApproveLocationHandler,
   cleanupExpiredHandler as reviewCleanupExpiredHandler,
+  loadCommentsHandler as reviewLoadCommentsHandler,
+  detailHandler as reviewDetailHandler,
 } from './handlers/reviews';
 
 import { handleCognitoTrigger, CognitoTriggerEvent } from "./handlers/auth";
@@ -31,14 +34,18 @@ import {
   getMyReviewsHandler,
   getMySavedHandler,
   getMyStatsHandler,
+  getMyVotesHandler,
+  getMyLikedCommentsHandler,
   getAvatarUploadUrlHandler,
   updateAvatarHandler,
   getBackgroundUploadUrlHandler,
   updateBackgroundHandler,
+  setPasswordHandler,
 } from "./handlers/users";
 import { getUploadUrlHandler as photoGetUploadUrlHandler, deletePhotoHandler } from "./handlers/photos";
 import {
   infoHandler as restaurantInfoHandler,
+  similarHandler as restaurantSimilarHandler,
   commentsListHandler as restaurantCommentsListHandler,
   commentsCreateHandler as restaurantCommentsCreateHandler,
   commentsLikeHandler as restaurantCommentsLikeHandler,
@@ -60,11 +67,23 @@ import {
   adminGetReviewHandler,
   adminUpdateReviewHandler,
   adminListPendingLocationsHandler,
+  adminGetLocationHandler,
+  adminGetLocationReviewsHandler,
   adminUpdateLocationHandler,
   adminListUsersHandler,
   adminGetUserHandler,
   adminUpdateUserHandler,
+  adminListReportsHandler,
+  adminGetReportHandler,
+  adminUpdateReportHandler,
+  adminListActivitiesHandler,
+  adminActivityStatsHandler,
+  adminUserActivitiesHandler,
 } from "./handlers/admin";
+import {
+  logActivityHandler,
+  batchLogActivityHandler,
+} from "./handlers/activities";
 
 
 // Route definitions
@@ -169,6 +188,24 @@ const routes: RouteDefinition[] = [
     paramNames: [],
     handler: reviewCleanupExpiredHandler,
   },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/([^/]+)\/comments$/,
+    paramNames: ['reviewId'],
+    handler: reviewLoadCommentsHandler,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/reviews\/comments\/([^/]+)\/like$/,
+    paramNames: ['commentId'],
+    handler: reviewCommentLikeHandler,
+  },
+  {
+    method: 'GET',
+    pattern: /^\/reviews\/([^/]+)$/,
+    paramNames: ['reviewId'],
+    handler: reviewDetailHandler,
+  },
 
   // Users routes
   {
@@ -208,6 +245,18 @@ const routes: RouteDefinition[] = [
     handler: getMyStatsHandler,
   },
   {
+    method: "GET",
+    pattern: /^\/users\/me\/votes$/,
+    paramNames: [],
+    handler: getMyVotesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/users\/me\/liked-comments$/,
+    paramNames: [],
+    handler: getMyLikedCommentsHandler,
+  },
+  {
     method: "POST",
     pattern: /^\/users\/me\/avatar$/,
     paramNames: [],
@@ -230,6 +279,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/users\/me\/background$/,
     paramNames: [],
     handler: updateBackgroundHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/me\/set-password$/,
+    paramNames: [],
+    handler: setPasswordHandler,
   },
   {
     method: "GET",
@@ -258,6 +313,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/restaurants\/([^/]+)\/info$/,
     paramNames: ["slug"],
     handler: restaurantInfoHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/restaurants\/([^/]+)\/similar$/,
+    paramNames: ["slug"],
+    handler: restaurantSimilarHandler,
   },
   // Comments routes
   {
@@ -377,6 +438,18 @@ const routes: RouteDefinition[] = [
     handler: adminListPendingLocationsHandler,
   },
   {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)\/reviews$/,
+    paramNames: ["id"],
+    handler: adminGetLocationReviewsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/locations\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetLocationHandler,
+  },
+  {
     method: "PATCH",
     pattern: /^\/admin\/locations\/([^/]+)$/,
     paramNames: ["id"],
@@ -399,6 +472,57 @@ const routes: RouteDefinition[] = [
     pattern: /^\/admin\/users\/([^/]+)$/,
     paramNames: ["id"],
     handler: adminUpdateUserHandler,
+  },
+  // Admin Reports routes
+  {
+    method: "GET",
+    pattern: /^\/admin\/reports$/,
+    paramNames: [],
+    handler: adminListReportsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/reports\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminGetReportHandler,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/admin\/reports\/([^/]+)$/,
+    paramNames: ["id"],
+    handler: adminUpdateReportHandler,
+  },
+  // Admin Activities routes
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities$/,
+    paramNames: [],
+    handler: adminListActivitiesHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities\/stats$/,
+    paramNames: [],
+    handler: adminActivityStatsHandler,
+  },
+  {
+    method: "GET",
+    pattern: /^\/admin\/activities\/user\/([^/]+)$/,
+    paramNames: ["userId"],
+    handler: adminUserActivitiesHandler,
+  },
+  // Public Activities routes (for web tracking)
+  {
+    method: "POST",
+    pattern: /^\/activities$/,
+    paramNames: [],
+    handler: logActivityHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/activities\/batch$/,
+    paramNames: [],
+    handler: batchLogActivityHandler,
   },
 ];
 

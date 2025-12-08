@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import toast from "react-hot-toast";
 
 interface ReviewFormProps {
   onSubmit: (data: {
@@ -63,7 +64,7 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + photos.length > 5) {
-      alert("Tối đa 5 ảnh");
+      toast.error("Tối đa 5 ảnh");
       return;
     }
 
@@ -89,7 +90,7 @@ export function ReviewForm({ onSubmit, loading }: ReviewFormProps) {
 
     const hasRating = Object.values(ratings).some((r) => r > 0);
     if (!hasRating) {
-      alert("Vui lòng đánh giá ít nhất 1 tiêu chí");
+      toast.error("Vui lòng đánh giá ít nhất 1 tiêu chí");
       return;
     }
 

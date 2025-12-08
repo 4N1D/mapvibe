@@ -143,6 +143,11 @@ export interface HotReview {
   created_at: string;
   score: string;
   tag: "hot" | "new" | "normal" | "trending";
+  restaurant_name?: string | null;
+  restaurant_address?: string | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  opening_hours?: string | null;
 }
 
 export interface HotReviewsResponse {

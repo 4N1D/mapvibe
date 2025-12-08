@@ -56,9 +56,16 @@ export const handler: Handler = {
             + (rp.view_count * 0.2)
             - (rp.downvote_count * 1.0)
           ) / (GREATEST(EXTRACT(EPOCH FROM (NOW() - rp.created_at)) / 3600.0, 0) + 6.0)
-          AS score
+          AS score,
+          COALESCE(la.restaurant_name, r.name_vi) AS restaurant_name,
+          COALESCE(la.full_address, r.address) AS restaurant_address,
+          COALESCE(la.price_min, r.price_min) AS price_min,
+          COALESCE(la.price_max, r.price_max) AS price_max,
+          COALESCE(la.opening_hours::text, r.opening_hours::text) AS opening_hours
         FROM review_posts rp
         LEFT JOIN users u ON rp.author_id = u.id
+        LEFT JOIN location_addresses la ON rp.location_address_id = la.id
+        LEFT JOIN restaurants r ON rp.restaurant_id = r.id
       `;
 
       const whereClause = restaurantId
@@ -98,6 +105,11 @@ export const handler: Handler = {
         created_at: string;
         hours_age: string;
         score: string;
+        restaurant_name: string | null;
+        restaurant_address: string | null;
+        price_min: number | null;
+        price_max: number | null;
+        opening_hours: string | null;
       }
       const reviews = (result.rows as HotReviewRow[]).map((row) => ({
         id: row.id,
@@ -115,6 +127,11 @@ export const handler: Handler = {
         created_at: row.created_at,
         score: row.score,
         tag: getRankTag(parseFloat(row.score), parseFloat(row.hours_age)),
+        restaurant_name: row.restaurant_name,
+        restaurant_address: row.restaurant_address,
+        price_min: row.price_min,
+        price_max: row.price_max,
+        opening_hours: row.opening_hours,
       }));
 
       return success({

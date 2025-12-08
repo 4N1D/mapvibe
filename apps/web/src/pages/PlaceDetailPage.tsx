@@ -115,6 +115,20 @@ export function PlaceDetailPage() {
     return min || max;
   };
 
+  // Parse features from API (can be JSON string, array, or PostgreSQL array format)
+  const parseFeatures = (): string[] => {
+    if (!restaurant?.features) return [];
+    if (Array.isArray(restaurant.features)) return restaurant.features;
+    if (typeof restaurant.features === "string") {
+      try {
+        return JSON.parse(restaurant.features);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
   // Map features to display names
   const featureLabels: Record<string, string> = {
     wifi: "Wifi miễn phí",
@@ -131,7 +145,7 @@ export function PlaceDetailPage() {
       case "gioi-thieu":
         return (
           <IntroductionTab
-            services={restaurant?.features?.map((f) => featureLabels[f] || f) || []}
+            services={parseFeatures().map((f) => featureLabels[f] || f)}
             cuisineTypes={parseCuisineTypes()}
             similarPlaces={[]}
             address={restaurant?.address || ""}
@@ -141,7 +155,7 @@ export function PlaceDetailPage() {
         );
 
       case "binh-luan":
-        return <CommentsTab restaurantId={restaurant.id} />;
+        return <CommentsTab restaurantId={restaurant.id} slug={slug} />;
 
       case "nhan-xet":
         return <ReviewsTab restaurantId={restaurant.id} slug={slug} />;

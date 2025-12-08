@@ -27,9 +27,10 @@ export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {
   const [hasMore, setHasMore] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["reviews", restaurantId],
-    queryFn: () => fetchReviews(restaurantId, 1),
+    queryKey: ["reviews", slug],
+    queryFn: () => fetchReviews(slug!, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
   });
 
   const reviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
@@ -39,10 +40,11 @@ export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchReviews(restaurantId, nextPage);
+      const response = await fetchReviews(slug, nextPage);
       const currentReviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
       setLocalReviews([...currentReviews, ...response.reviews]);
       setHasMore(response.page < response.total_pages);
@@ -73,7 +75,7 @@ export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {
         overall_rating: overallRating,
       };
 
-      const response = await apiClient.post<RestaurantReview>("/reviews", payload);
+      const response = await apiClient.post<RestaurantReview>(`/restaurants/${slug}/reviews`, payload);
       const currentReviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
       setLocalReviews([response.data, ...currentReviews]);
     } catch (error) {

@@ -4,8 +4,9 @@ import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvi
 import { apiClient } from "@/lib/axios";
 
 interface PhotosTabProps {
-  restaurantId: number;
-  showFilters?: boolean; // Default true, set to false to hide filter buttons
+  restaurantId: string;
+  slug?: string;
+  showFilters?: boolean;
 }
 
 type DisplayCategory = Exclude<PhotoCategory, "menu">;
@@ -17,14 +18,14 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   comment: "Bình luận",
 };
 
-const fetchPhotos = async (restaurantId: number, category: string, page: number) => {
+const fetchPhotos = async (slug: string, category: string, page: number) => {
   const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/photos/restaurant/${restaurantId}?page=${page}&limit=15&category=${category}`
+    `/restaurants/${slug}/photos?page=${page}&limit=15&category=${category}`
   );
   return response.data;
 };
 
-export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) {
+export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabProps) {
   const [category, setCategory] = useState<DisplayCategory>("all");
   const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
@@ -32,9 +33,10 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
   const [loadingMore, setLoadingMore] = useState(false);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["photos", restaurantId, category],
-    queryFn: () => fetchPhotos(restaurantId, category, 1),
+    queryKey: ["photos", slug, category],
+    queryFn: () => fetchPhotos(slug!, category, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
     select: (data) => {
       if (showFilters) {
         const { menu: _, ...counts } = data.category_counts;
@@ -52,10 +54,11 @@ export function PhotosTab({ restaurantId, showFilters = true }: PhotosTabProps) 
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchPhotos(restaurantId, category, nextPage);
+      const response = await fetchPhotos(slug, category, nextPage);
       setAllPhotos(
         page === 1
           ? [...(data?.photos || []), ...response.photos]

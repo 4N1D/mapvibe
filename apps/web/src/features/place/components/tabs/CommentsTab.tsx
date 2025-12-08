@@ -35,7 +35,7 @@ interface LikedCommentsResponse {
   liked_comment_ids: string[];
 }
 
-export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
+export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) {
   const { user, isAuthenticated } = useAuth();
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);

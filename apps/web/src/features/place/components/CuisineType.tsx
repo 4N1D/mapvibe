@@ -2,7 +2,7 @@ import { UtensilsCrossed } from "lucide-react";
 
 export interface Cuisine {
   name: string;
-  description: string;
+  description?: string;
 }
 
 interface CuisineTypeProps {
@@ -25,7 +25,9 @@ export function CuisineType({ cuisineTypes }: CuisineTypeProps) {
             </div>
 
             <h4 className="mb-2 text-sm font-bold uppercase text-[#085B96]">{type.name}</h4>
-            <p className="text-sm leading-relaxed text-gray-500">{type.description}</p>
+            {type.description && (
+              <p className="text-sm leading-relaxed text-gray-500">{type.description}</p>
+            )}
           </div>
         ))}
       </div>

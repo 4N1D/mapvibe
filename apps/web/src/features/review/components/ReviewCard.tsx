@@ -1,9 +1,31 @@
 import React from "react";
 import { Card, CardContent } from "@mapvibe/ui-components";
-import { Heart, MessageCircle, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Share2, MapPin, Clock, DollarSign } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
 import toast from "react-hot-toast";
+
+function formatPriceRange(priceMin?: number | null, priceMax?: number | null): string | null {
+  if (!priceMin && !priceMax) return null;
+  if (priceMin && priceMax) {
+    return `${priceMin.toLocaleString("vi-VN")}đ - ${priceMax.toLocaleString("vi-VN")}đ`;
+  }
+  if (priceMin) return `Từ ${priceMin.toLocaleString("vi-VN")}đ`;
+  if (priceMax) return `Đến ${priceMax.toLocaleString("vi-VN")}đ`;
+  return null;
+}
+
+function formatOpeningHours(openingHours?: string | null): string | null {
+  if (!openingHours) return null;
+  try {
+    const hours = typeof openingHours === "string" ? JSON.parse(openingHours) : openingHours;
+    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const today = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+    return hours[today] || null;
+  } catch {
+    return typeof openingHours === "string" ? openingHours : null;
+  }
+}
 
 interface ReviewCardProps {
   data?: HotReview;
@@ -119,6 +141,33 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
       </div>
 
       <CardContent className="flex flex-1 flex-col p-4">
+        {/* Restaurant info */}
+        {data.restaurant_name && (
+          <div className="mb-3 border-b border-gray-100 pb-3">
+            <h3 className="font-semibold text-gray-900 line-clamp-1">{data.restaurant_name}</h3>
+            {data.restaurant_address && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 line-clamp-1">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                {data.restaurant_address}
+              </p>
+            )}
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+              {formatPriceRange(data.price_min, data.price_max) && (
+                <span className="flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  {formatPriceRange(data.price_min, data.price_max)}
+                </span>
+              )}
+              {formatOpeningHours(data.opening_hours) && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatOpeningHours(data.opening_hours)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Review content */}
         <p className="line-clamp-3 text-sm text-gray-600">{data.text}</p>
 

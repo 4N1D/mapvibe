@@ -405,6 +405,14 @@ resource "aws_apigatewayv2_route" "reviews_comments_like" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "reviews_liked_comments" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /reviews/{reviewId}/liked-comments"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 # RAG Search routes
 resource "aws_apigatewayv2_route" "rag_search" {
   api_id    = aws_apigatewayv2_api.main.id

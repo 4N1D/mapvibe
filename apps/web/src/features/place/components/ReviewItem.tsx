@@ -23,18 +23,27 @@ export function ReviewItem({ review, formatTime }: ReviewItemProps) {
     setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
 
     try {
-      await apiClient.post(`/reviews/${review.id}/like`);
+      await apiClient.post(`/restaurants/reviews/${review.id}/like`);
     } catch (error) {
       // Rollback on error
       setLiked(wasLiked);
       setLikeCount(prevCount);
       console.error("Failed to like review:", error);
+      toast.error("Không thể thích nhận xét. Vui lòng thử lại.");
     }
   };
 
   const handleReport = async (reason: string, details?: string) => {
-    console.log("Report submitted:", { reviewId: review.id, reason, details });
-    toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    try {
+      await apiClient.post(`/restaurants/reviews/${review.id}/report`, {
+        reason,
+        details,
+      });
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+    } catch (error: any) {
+      const message = error.response?.data?.error || "Không thể gửi báo cáo";
+      toast.error(message);
+    }
   };
 
   return (

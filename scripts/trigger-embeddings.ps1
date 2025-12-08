@@ -7,6 +7,9 @@ param(
     [string]$RestaurantIds,
     
     [Parameter(Mandatory=$false)]
+    [string]$InputFile,
+    
+    [Parameter(Mandatory=$false)]
     [switch]$AllRestaurants,
     
     [Parameter(Mandatory=$true)]
@@ -60,13 +63,22 @@ if ($AllRestaurants) {
     Write-Host ""
     Write-Host "Then run this script with -RestaurantIds parameter" -ForegroundColor Yellow
     exit 0
+} elseif ($InputFile) {
+    if (-not (Test-Path $InputFile)) {
+        Write-Host "❌ Error: Input file not found: $InputFile" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "📄 Reading restaurant IDs from file: $InputFile" -ForegroundColor Yellow
+    $restaurantIdsList = Get-Content $InputFile | Where-Object { $_.Trim() -ne '' } | ForEach-Object { $_.Trim() }
+    Write-Host "   Found $($restaurantIdsList.Count) restaurant IDs" -ForegroundColor Gray
 } elseif ($RestaurantIds) {
     $restaurantIdsList = $RestaurantIds -split ',' | ForEach-Object { $_.Trim() }
 } else {
-    Write-Host "❌ Error: Either -RestaurantIds or -AllRestaurants must be provided" -ForegroundColor Red
+    Write-Host "❌ Error: Either -RestaurantIds, -InputFile, or -AllRestaurants must be provided" -ForegroundColor Red
     Write-Host ""
     Write-Host "Usage examples:" -ForegroundColor Yellow
     Write-Host "  .\scripts\trigger-embeddings.ps1 -RestaurantIds 'id1,id2,id3' -QueueUrl 'https://sqs...'" -ForegroundColor Gray
+    Write-Host "  .\scripts\trigger-embeddings.ps1 -InputFile 'data_gen/restaurant_ids.txt' -QueueUrl 'https://sqs...'" -ForegroundColor Gray
     Write-Host "  .\scripts\trigger-embeddings.ps1 -AllRestaurants -QueueUrl 'https://sqs...' -DbConnectionString '...'" -ForegroundColor Gray
     exit 1
 }
@@ -84,10 +96,9 @@ $failCount = 0
 
 foreach ($restaurantId in $restaurantIdsList) {
     try {
-        # Convert restaurant_id to number (1.0, 2.0, 3.0)
-        $restaurantIdNum = [double]$restaurantId
+        # Keep restaurant_id as string (supports both string IDs like "R_xxx" and numeric IDs)
         $messageBody = @{
-            restaurant_id = $restaurantIdNum
+            restaurant_id = $restaurantId
         } | ConvertTo-Json -Compress
         
         $response = Send-SQSMessage -QueueUrl $QueueUrl -MessageBody $messageBody -Region $AwsRegion

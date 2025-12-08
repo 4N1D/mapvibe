@@ -5,28 +5,32 @@ import { apiClient } from "@/lib/axios";
 import { formatRelativeTime } from "@/utils/date";
 import { CommentForm } from "../CommentForm";
 import { CommentItem } from "../CommentItem";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CommentsTabProps {
   restaurantId?: number;
-  slug?: string;
+  reviewId?: string;
 }
 
-const fetchComments = async (slug: string, page: number) => {
-  const response = await apiClient.get<CommentsResponse>(
-    `/restaurants/${slug}/comments?page=${page}&limit=10`
-  );
-  return response.data;
+const fetchComments = async (restaurantId?: number, reviewId?: string, page: number = 1) => {
+  if (reviewId) {
+    // Fetch comments for a specific review post
+    const response = await apiClient.get<CommentsResponse>(
+      `/reviews/${reviewId}/comments?page=${page}&limit=10`
+    );
+    return response.data;
+  } else if (restaurantId) {
+    // Fetch comments for a restaurant
+    const response = await apiClient.get<CommentsResponse>(
+      `/comments/${restaurantId}?page=${page}&limit=10`
+    );
+    return response.data;
+  }
+  throw new Error("Either restaurantId or reviewId must be provided");
 };
 
-export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
-  // Need slug to fetch comments
-  if (!slug) {
-    return (
-      <div className="rounded-lg bg-white p-6 shadow-sm">
-        <p className="py-8 text-center text-gray-500">Không thể tải bình luận</p>
-      </div>
-    );
-  }
+export function CommentsTab({ restaurantId, reviewId }: CommentsTabProps) {
+  const { user } = useAuth();
   const [localComments, setLocalComments] = useState<Comment[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -34,10 +38,13 @@ export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
+  const queryKey = reviewId ? ["comments", "review", reviewId] : ["comments", "restaurant", restaurantId];
+
   const { data } = useQuery({
-    queryKey: ["comments", slug],
-    queryFn: () => fetchComments(slug, 1),
+    queryKey,
+    queryFn: () => fetchComments(restaurantId, reviewId, 1),
     placeholderData: (prev) => prev,
+    enabled: !!(restaurantId || reviewId),
   });
 
   const comments = localComments.length > 0 ? localComments : (data?.comments || []);
@@ -50,7 +57,7 @@ export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchComments(slug, nextPage);
+      const response = await fetchComments(restaurantId, reviewId, nextPage);
       const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
       setLocalComments([...currentComments, ...response.comments]);
       setHasMore(response.page < response.total_pages);
@@ -63,21 +70,43 @@ export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
   };
 
   const handleSubmit = async (content: string) => {
+    if (!user?.sub) {
+      alert("Vui lòng đăng nhập để bình luận");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const payload = {
-        restaurant_id: restaurantId,
-        content,
-        parent_id: replyingTo?.id || null,
+      const payload: any = {
+        author_id: user.sub,
+        text: content,
+        parent_comment_id: replyingTo?.id || null,
       };
 
-      const response = await apiClient.post<Comment>("/comments", payload);
+      if (reviewId) {
+        payload.review_post_id = reviewId;
+      } else if (restaurantId) {
+        payload.restaurant_id = restaurantId;
+      }
+
+      const endpoint = reviewId ? "/reviews/comment" : "/comments";
+      const response = await apiClient.post<{ comment: any }>(endpoint, payload);
+      
+      // Extract comment from response (API returns { comment: ... })
+      // Map text to content to match Comment interface
+      const rawComment = response.data.comment || response.data;
+      const newComment: Comment = {
+        ...rawComment,
+        content: rawComment.text || rawComment.content,
+        review_post_id: reviewId || rawComment.review_post_id,
+        restaurant_id: restaurantId?.toString() || rawComment.restaurant_id,
+      };
 
       const currentComments = localComments.length > 0 ? localComments : (data?.comments || []);
       
       if (replyingTo) {
         const newReply = {
-          ...response.data,
+          ...newComment,
           reply_to_name: replyingTo.name,
           parent_id: replyingTo.rootParentId,
         };
@@ -90,7 +119,7 @@ export function CommentsTab({ restaurantId, slug }: CommentsTabProps) {
         );
         setReplyingTo(null);
       } else {
-        setLocalComments([response.data, ...currentComments]);
+        setLocalComments([newComment, ...currentComments]);
       }
     } catch (error) {
       console.error("Failed to post comment:", error);

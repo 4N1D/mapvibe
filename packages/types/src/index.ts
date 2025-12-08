@@ -158,7 +158,8 @@ export interface Comment {
   author_id: string;
   author_name: string;
   author_avatar?: string;
-  restaurant_id: string;
+  restaurant_id?: string;
+  review_post_id?: string;
   content: string;
   like_count: number;
   created_at: string;
@@ -168,7 +169,8 @@ export interface Comment {
 }
 
 export interface CommentsResponse {
-  restaurant_id: string;
+  restaurant_id?: string;
+  review_post_id?: string;
   total: number;
   page: number;
   limit: number;

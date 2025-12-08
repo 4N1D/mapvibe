@@ -461,7 +461,9 @@ export default function LocationDetailPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 line-clamp-2">{post.text}</p>
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {post.text.replace(/<[^>]*>/g, '')}
+                  </p>
                 </button>
               ))}
             </div>
@@ -547,9 +549,10 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div className="p-6">
-                  <p className="text-gray-800 text-base leading-relaxed whitespace-pre-wrap">
-                    {selectedPost.text}
-                  </p>
+                  <div 
+                    className="text-gray-800 text-base leading-relaxed [&>p]:mb-2 [&>p:last-child]:mb-0"
+                    dangerouslySetInnerHTML={{ __html: selectedPost.text }}
+                  />
 
                   {selectedPost.features && Object.keys(selectedPost.features).length > 0 && (
                     <div className="mt-4">

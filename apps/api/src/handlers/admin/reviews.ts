@@ -370,6 +370,24 @@ export const getLocationReviewsHandler: Handler = {
   },
 };
 
+interface CuisineType {
+  name: string;
+  description?: string;
+}
+
+interface UpdateLocationBody {
+  action: 'approve' | 'reject';
+  reason?: string;
+  // Restaurant info for approve action
+  name_vi?: string;
+  cuisine_types?: CuisineType[];
+  price_min?: number | null;
+  price_max?: number | null;
+  opening_hours?: string;
+  features?: string[];
+  description?: string;
+}
+
 // PATCH /admin/locations/:id - Approve/reject location
 export const updateLocationHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -389,7 +407,7 @@ export const updateLocationHandler: Handler = {
         return badRequest('Location ID required');
       }
 
-      let body: { action: string; reason?: string };
+      let body: UpdateLocationBody;
       try {
         body = JSON.parse(event.body || '{}');
       } catch {
@@ -403,26 +421,106 @@ export const updateLocationHandler: Handler = {
 
       const db = await getDb();
 
-      const updated = await db
-        .updateTable('location_addresses')
-        .set({
-          status: action === 'approve' ? 'approved' : 'rejected',
-          approved_by: action === 'approve' ? userId : null,
-          approved_at: action === 'approve' ? new Date() : null,
-          rejection_reason: action === 'reject' ? reason : null,
-          updated_at: new Date(),
-        })
+      // Get the location first
+      const location = await db
+        .selectFrom('location_addresses')
+        .selectAll()
         .where('id', '=', locationId)
-        .returningAll()
         .executeTakeFirst();
 
-      if (!updated) {
+      if (!location) {
         return notFound('Location not found');
       }
 
+      if (action === 'reject') {
+        // Just update status for rejection
+        const updated = await db
+          .updateTable('location_addresses')
+          .set({
+            status: 'rejected',
+            rejection_reason: reason || null,
+            updated_at: new Date(),
+          })
+          .where('id', '=', locationId)
+          .returningAll()
+          .executeTakeFirst();
+
+        return success({ 
+          message: 'Location rejected successfully',
+          location: updated,
+        });
+      }
+
+      // For approve action - create restaurant and link reviews
+      const { name_vi, cuisine_types, price_min, price_max, opening_hours, features, description } = body;
+
+      if (!name_vi?.trim()) {
+        return badRequest('Restaurant name (name_vi) is required for approval');
+      }
+
+      // Generate slug from name
+      const slug = name_vi
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Create restaurant
+      const restaurant = await db
+        .insertInto('restaurants')
+        .values({
+          name_vi,
+          slug: `${slug}-${Date.now()}`,
+          address: (location as any).full_address || (location as any).street_address,
+          ward: (location as any).ward,
+          city: (location as any).city,
+          geo_lat: (location as any).geo_lat,
+          geo_lng: (location as any).geo_lng,
+          cuisine_types: cuisine_types ? JSON.stringify(cuisine_types) : null,
+          price_min: price_min || null,
+          price_max: price_max || null,
+          opening_hours: opening_hours || null,
+          features: features ? JSON.stringify(features) : null,
+          description: description || null,
+          status: 'approved',
+          created_by: userId,
+        } as any)
+        .returningAll()
+        .executeTakeFirst();
+
+      if (!restaurant) {
+        return error('Failed to create restaurant');
+      }
+
+      // Update location status
+      await db
+        .updateTable('location_addresses')
+        .set({
+          status: 'approved',
+          approved_by: userId,
+          approved_at: new Date(),
+          restaurant_id: restaurant.id,
+          updated_at: new Date(),
+        } as any)
+        .where('id', '=', locationId)
+        .execute();
+
+      // Link review_posts to the new restaurant
+      await db
+        .updateTable('review_posts')
+        .set({
+          restaurant_id: restaurant.id,
+          status: 'approved',
+          updated_at: new Date(),
+        } as any)
+        .where('location_address_id', '=', locationId)
+        .execute();
+
       return success({ 
-        message: `Location ${action}d successfully`,
-        location: updated,
+        message: 'Location approved and restaurant created successfully',
+        restaurant,
       });
     } catch (err) {
       console.error('[admin/locations/:id] Error:', err);

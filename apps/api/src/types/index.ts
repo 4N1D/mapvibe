@@ -25,6 +25,10 @@ export interface APIGatewayEvent {
       path?: string;
     };
     authorizer?: APIGatewayAuthorizer;
+    identity?: {
+      sourceIp?: string;
+      userAgent?: string;
+    };
   };
   pathParameters?: Record<string, string> | null;
   queryStringParameters?: Record<string, string> | null;

@@ -93,16 +93,15 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     try {
       // Get presigned URL
-      const presignedResponse = await apiClient.post('/uploads/presigned-url', {
-        filename: file.name,
-        contentType: file.type,
-        folder: 'avatars',
+      const presignedResponse = await apiClient.post('/users/me/avatar', {
+        content_type: file.type,
+        file_size: file.size,
       });
 
-      const { uploadUrl, cdnUrl } = presignedResponse.data;
+      const { upload_url } = presignedResponse.data;
 
       // Upload to S3
-      await fetch(uploadUrl, {
+      await fetch(upload_url, {
         method: 'PUT',
         body: file,
         headers: {
@@ -110,8 +109,7 @@ export default function ProfilePage() {
         },
       });
 
-      // Update profile with new avatar URL
-      await apiClient.put('/users/me', { avatar: cdnUrl });
+      // Avatar URL already saved in backend, just refresh user
       await refreshUser();
       setAvatarPreview(null);
       toast.success('Đã cập nhật ảnh đại diện!');

@@ -285,7 +285,13 @@ export default function AnalyticsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-gray-900">{activity.user_name || 'Ẩn danh'}</span>
-                      <span className="text-gray-500">•</span>
+                      {activity.user_email && (
+                        <>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-sm text-gray-500">{activity.user_email}</span>
+                        </>
+                      )}
+                      <span className="text-gray-400">•</span>
                       <span className="text-sm text-gray-600">
                         {ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type}
                       </span>

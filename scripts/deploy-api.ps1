@@ -1,4 +1,9 @@
 # Deploy API to AWS Lambda via Terraform
+# Usage: pwsh ./scripts/deploy-api.ps1 [-Force]
+param(
+    [switch]$Force  # Force replace Lambda function
+)
+
 $ErrorActionPreference = "Stop"
 
 # Paths
@@ -47,13 +52,21 @@ if (-not (Test-Path $LAMBDA_DIST_DIR)) {
 }
 Copy-Item -Path "$API_DIR\dist\*" -Destination $LAMBDA_DIST_DIR -Recurse -Force
 
-# Step 3: Terraform init + apply
-Write-Host "`n==> [3/3] Terraform deploy..." -ForegroundColor Cyan
+# Step 3: Terraform deploy with force replace Lambda
+Write-Host "`n==> [3/4] Terraform deploy..." -ForegroundColor Cyan
 Push-Location $TERRAFORM_DIR
 & $TF init -upgrade
 Exit-OnError "Terraform init failed"
-& $TF apply
+
+# Force replace Lambda to ensure new code is deployed
+Write-Host "Force replacing Lambda function..." -ForegroundColor Yellow
+& $TF apply -replace="module.lambda_api.aws_lambda_function.api" -auto-approve
 Exit-OnError "Terraform apply failed"
+
+# Step 4: Re-apply to restore permissions (Cognito trigger permission gets lost after replace)
+Write-Host "`n==> [4/4] Restoring permissions..." -ForegroundColor Cyan
+& $TF apply -auto-approve
+Exit-OnError "Permission restore failed"
 Pop-Location
 
 Write-Host "`n==> Deploy completed!" -ForegroundColor Green

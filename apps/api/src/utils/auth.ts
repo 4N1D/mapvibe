@@ -36,7 +36,41 @@ export function getUserIdFromEvent(event: APIGatewayEvent): string | null {
     return authHeader;
   }
 
+  // Try to decode JWT from Authorization header (for routes without authorizer)
+  const token = getTokenFromHeader(event);
+  if (token) {
+    const decoded = decodeJwtPayload(token);
+    if (decoded?.sub) {
+      return decoded.sub;
+    }
+  }
+
   return null;
+}
+
+// Extract token from Authorization header
+function getTokenFromHeader(event: APIGatewayEvent): string | null {
+  const authHeader = event.headers?.Authorization || event.headers?.authorization;
+  if (!authHeader) return null;
+  
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return authHeader;
+}
+
+// Decode JWT payload without verification (for extracting user info)
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = parts[1];
+    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
 }
 
 export function getEmailFromEvent(event: APIGatewayEvent): string | null {

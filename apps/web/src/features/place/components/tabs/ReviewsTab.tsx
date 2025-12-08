@@ -114,23 +114,79 @@ export function ReviewsTab({ restaurantId, slug }: ReviewsTabProps) {
     try {
       setSubmitting(true);
 
+      // Calculate overall rating
       const ratingValues = Object.values(submitData.ratings).filter((r) => r > 0);
       const overallRating =
-        ratingValues.length > 0 ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length : 0;
+        ratingValues.length > 0 ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length : 5;
 
+      // Get user ID from profile
+      const profileRes = await apiClient.get<{ user: { id: string } }>("/users/me");
+      const authorId = profileRes.data.user.id;
+
+      // Upload photos first
+      const photoUrls: string[] = [];
+      for (const photo of submitData.photos) {
+        try {
+          // Get presigned upload URL
+          const uploadRes = await apiClient.post<{
+            upload_url: string;
+            cdn_url: string;
+          }>("/photos/upload-url", {
+            photo_type: "food",
+            content_type: photo.type,
+            file_size: photo.size,
+            restaurant_id: restaurantId,
+          });
+
+          // Upload to S3 directly
+          await fetch(uploadRes.data.upload_url, {
+            method: "PUT",
+            body: photo,
+            headers: { "Content-Type": photo.type },
+          });
+
+          photoUrls.push(uploadRes.data.cdn_url);
+        } catch (err) {
+          console.error("Failed to upload photo:", err);
+        }
+      }
+
+      // API expects individual rating fields, not a ratings object
       const payload = {
-        restaurant_id: restaurantId,
+        author_id: authorId,
+        text: submitData.content,
+        photos: photoUrls,
+        rating_quality: submitData.ratings.quality || 5,
+        rating_service: submitData.ratings.service || 5,
+        rating_location: submitData.ratings.location || 5,
+        rating_price: submitData.ratings.price || 5,
+        rating_ambiance: submitData.ratings.ambiance || 5,
+        rating_overall: overallRating || 5,
+      };
+
+      const response = await apiClient.post<{ review: any }>(`/restaurants/${slug}/reviews`, payload);
+      
+      // Transform response to match expected format
+      const newReview = {
+        id: response.data.review.id,
+        author_id: authorId,
+        author_name: "Bạn",
         content: submitData.content,
         ratings: submitData.ratings,
         overall_rating: overallRating,
+        photos: photoUrls,
+        like_count: 0,
+        comment_count: 0,
+        created_at: new Date().toISOString(),
       };
-
-      const response = await apiClient.post<RestaurantReview>(`/restaurants/${slug}/reviews`, payload);
+      
       const currentReviews = localReviews.length > 0 ? localReviews : data?.reviews || [];
-      setLocalReviews([response.data, ...currentReviews]);
-    } catch (error) {
+      setLocalReviews([newReview as any, ...currentReviews]);
+      toast.success("Đã gửi nhận xét thành công!");
+    } catch (error: any) {
       console.error("Failed to submit review:", error);
-      toast.error("Không thể gửi nhận xét. Vui lòng thử lại.");
+      const message = error.response?.data?.error || "Không thể gửi nhận xét. Vui lòng thử lại.";
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

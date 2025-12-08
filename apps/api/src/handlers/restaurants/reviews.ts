@@ -3,6 +3,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error } from "../../middlewares/response";
 import { recalculateRestaurantRatings } from "../../utils/rating";
+import { getUserIdFromEvent } from "../../utils/auth";
 
 interface CreateReviewBody {
   author_id: string;
@@ -76,6 +77,29 @@ export const listHandler: Handler = {
 
       const reviews = await query.limit(limit).offset(offset).execute();
 
+      // Get current user's likes if authenticated
+      const userId = getUserIdFromEvent(event);
+      let userLikedReviewIds: Set<string> = new Set();
+      
+      if (userId && reviews.length > 0) {
+        const reviewIds = reviews.map(r => r.id);
+        const userLikes = await db
+          .selectFrom("likes")
+          .select(["target_id"])
+          .where("user_id", "=", userId)
+          .where("target_type", "=", "review")
+          .where("target_id", "in", reviewIds)
+          .execute();
+        
+        userLikedReviewIds = new Set(userLikes.map(l => l.target_id));
+      }
+
+      // Add user_has_liked field to each review
+      const reviewsWithLikeStatus = reviews.map(review => ({
+        ...review,
+        user_has_liked: userLikedReviewIds.has(review.id),
+      }));
+
       // Get total count
       const countResult = await db
         .selectFrom("restaurant_reviews")
@@ -85,7 +109,7 @@ export const listHandler: Handler = {
 
       return success({
         restaurant_id: restaurant.id,
-        reviews,
+        reviews: reviewsWithLikeStatus,
         pagination: {
           limit,
           offset,

@@ -1255,7 +1255,8 @@ export function NearbyPage() {
                 Reset
               </button>
             </div>
-          </aside>
+          </div>
+        </aside>
 
           {/* Main content */}
           <main className="flex-1 space-y-6">

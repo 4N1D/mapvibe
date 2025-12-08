@@ -243,7 +243,7 @@ export default function LocationDetailPage() {
         <Skeleton className="h-32 w-full rounded-xl" />
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-4 space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
+            {[0, 1, 2].map((i) => (
               <Skeleton
                 key={i}
                 className="h-24 w-full rounded-xl"
@@ -706,17 +706,16 @@ export default function LocationDetailPage() {
                     <div className="mt-4">
                       <h4 className="mb-2 text-sm font-medium text-gray-700">Đặc điểm đề cập</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(selectedPost.features).map(
-                          ([key, value]) =>
-                            value && (
-                              <span
-                                key={key}
-                                className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
-                              >
-                                {key.replace(/_/g, " ")}
-                              </span>
-                            )
-                        )}
+                        {Object.entries(selectedPost.features)
+                          .filter(([, value]) => Boolean(value))
+                          .map(([key]) => (
+                            <span
+                              key={key}
+                              className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
+                            >
+                              {key.replace(/_/g, " ")}
+                            </span>
+                          ))}
                       </div>
                     </div>
                   )}

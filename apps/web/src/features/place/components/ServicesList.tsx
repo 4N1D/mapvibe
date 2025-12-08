@@ -4,7 +4,7 @@ interface ServicesListProps {
 
 export function ServicesList({ services }: ServicesListProps) {
   return (
-    <div className="rounded-lg bg-white p-6 shadow-[0_0_25px_rgba(0,0,0,0.2)]">
+    <div className="rounded-lg bg-white p-6 shadow-sm">
       <h3 className="mb-4 text-3xl font-bold text-gray-900">Dịch vụ</h3>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {services.map((service, idx) => (

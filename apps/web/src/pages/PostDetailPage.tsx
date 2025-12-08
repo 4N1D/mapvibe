@@ -8,13 +8,16 @@ import {
   PhoneCall,
   DollarSign,
   Clock,
-  Bookmark,
+  Star,
   MessageCircle,
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
-import { CommentsTab, PhotosTab, MenuTab } from "@/features/place";
+import { CommentsTab, PhotosTab, MenuTab, DirectionSidebar, ServicesList, CuisineType, Cuisine } from "@/features/place";
 import { apiClient } from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
+import { motion } from "motion/react";
+import toast from "react-hot-toast";
 
 interface ReviewPhoto {
   url: string;
@@ -84,6 +87,10 @@ interface PostDetail {
     comments: number;
   };
   images: string[];
+  lat?: number | null;
+  lng?: number | null;
+  features?: string[];
+  cuisineTypes?: Cuisine[];
 }
 
 // Helper function to format time ago
@@ -222,11 +229,33 @@ const extractCategories = (cuisineTypes?: string[] | Array<{ name: string; descr
   return [];
 };
 
+// Helper function to extract cuisine types
+const extractCuisineTypes = (cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null): Cuisine[] => {
+  if (!cuisineTypes) return [];
+  
+  if (Array.isArray(cuisineTypes)) {
+    if (cuisineTypes.length === 0) return [];
+    
+    // Check if first item is string or object
+    if (typeof cuisineTypes[0] === "string") {
+      return (cuisineTypes as string[]).map((name) => ({ name, description: "" }));
+    } else {
+      return (cuisineTypes as Array<{ name: string; description?: string }>).map((item) => ({
+        name: item.name,
+        description: item.description || "",
+      }));
+    }
+  }
+  
+  return [];
+};
+
 // Map API review to PostDetail
 const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
   const slug = generateSlug(review.location_name, review.id);
   const images = extractImages(review.photos);
   const categories = extractCategories(review.location_cuisine_types);
+  const cuisineTypes = extractCuisineTypes(review.location_cuisine_types);
   
   // Determine if location is open (simplified - you might want to add actual logic)
   const isOpen = true; // TODO: Add logic to check if location is currently open based on opening_hours
@@ -252,20 +281,60 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       likes: review.upvote_count,
       dislikes: review.downvote_count,
       comments: review.comment_count,
+      shares: review.share_count,
     },
     images: images.length > 0 ? images : [
       "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
     ],
+    lat: review.location_geo_lat ?? undefined,
+    lng: review.location_geo_lng ?? undefined,
+    features: review.features || [],
+    cuisineTypes,
   };
+};
+
+// Map feature IDs to display labels
+const mapFeatureToLabel = (featureId: string): string => {
+  const featureMap: Record<string, string> = {
+    wifi: "Có wifi",
+    delivery: "Có giao hàng",
+    air_con: "Có máy lạnh & điều hòa",
+    takeaway: "Cho mua về",
+    parking: "Có chỗ đậu xe",
+    card_payment: "Trả bằng thẻ",
+    car_parking: "Có chỗ đậu ôtô",
+    reservation: "Nên đặt trước",
+    outdoor_seating: "Có bàn ngoài trời",
+    private_room: "Có phòng riêng",
+    kids_play_area: "Có chỗ chơi cho trẻ em",
+    free_motorbike_parking: "Giữ xe máy miễn phí",
+    tipping: "Tip cho nhân viên",
+    smoking_area: "Có khu vực hút thuốc",
+    membership_card: "Có thẻ thành viên",
+    vat_invoice: "Có xuất hóa đơn đỏ",
+    heater: "Có lò sưởi",
+    wheelchair_accessible: "Có hỗ trợ người khuyết tật",
+    football_streaming: "Có chiếu bóng đá",
+  };
+  return featureMap[featureId] || featureId;
 };
 
 export function PostDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { user, isAuthenticated } = useAuth();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [activeTab, setActiveTab] = useState<string>("binh-luan");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  
+  // Vote states
+  const [localUpvotes, setLocalUpvotes] = useState(0);
+  const [localDownvotes, setLocalDownvotes] = useState(0);
+  const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(null);
+  const [voteAnimation, setVoteAnimation] = useState<"upvote" | "downvote" | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
 
   // Check if URL has #comments hash to auto-scroll to comments
   useEffect(() => {
@@ -324,6 +393,8 @@ export function PostDetailPage() {
         if (foundReview) {
           const mappedPost = mapReviewToPostDetail(foundReview);
           setPost(mappedPost);
+          setLocalUpvotes(mappedPost.stats.likes);
+          setLocalDownvotes(mappedPost.stats.dislikes);
           setImageError(false); // Reset image error state khi load bài review mới
         } else {
           setError("Không tìm thấy bài review");
@@ -346,6 +417,217 @@ export function PostDetailPage() {
   useEffect(() => {
     setImageError(false);
   }, [post?.id]);
+
+  // Fetch user_id once when component mounts
+  useEffect(() => {
+    if (isAuthenticated && user && !userId) {
+      const fetchUserId = async () => {
+        try {
+          const profileResponse = await apiClient.get<{ user: { id: string } }>("/users/me");
+          setUserId(profileResponse.data.user.id);
+        } catch (err) {
+          console.error("[PostDetailPage] Failed to get user profile:", err);
+          // Fallback to using sub
+          setUserId(user.sub);
+        }
+      };
+      fetchUserId();
+    }
+  }, [isAuthenticated, user, userId]);
+
+  // Fetch vote history to set initial vote status
+  useEffect(() => {
+    if (isAuthenticated && post && userId) {
+      const fetchVoteHistory = async () => {
+        try {
+          const response = await apiClient.get<{
+            votes: Array<{
+              review_post_id: string;
+              vote_type: "upvote" | "downvote";
+              created_at: string;
+            }>;
+          }>("/users/me/votes");
+          
+          // Find vote for current post
+          const vote = response.data.votes.find((v) => v.review_post_id === post.id);
+          if (vote) {
+            setVoteStatus(vote.vote_type === "upvote" ? "upvoted" : "downvoted");
+          } else {
+            setVoteStatus(null);
+          }
+        } catch (err) {
+          console.error("[PostDetailPage] Failed to fetch vote history:", err);
+          // If error, keep voteStatus as null (default)
+        }
+      };
+      fetchVoteHistory();
+    } else if (!isAuthenticated) {
+      // Reset vote status if user is not authenticated
+      setVoteStatus(null);
+    }
+  }, [isAuthenticated, post?.id, userId]);
+
+  // Strip HTML tags for plain text display
+  const stripHtml = (html: string): string => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  };
+
+  const handleVote = async (voteType: "upvote" | "downvote") => {
+    if (!isAuthenticated || !user || !post) {
+      toast.error("Vui lòng đăng nhập để vote");
+      return;
+    }
+
+    // If userId is not loaded yet, try to get it first
+    let currentUserId = userId;
+    if (!currentUserId) {
+      try {
+        const profileResponse = await apiClient.get<{ user: { id: string } }>("/users/me");
+        currentUserId = profileResponse.data.user.id;
+        setUserId(currentUserId);
+      } catch (err) {
+        console.error("[PostDetailPage] Failed to get user profile:", err);
+        toast.error("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
+        return;
+      }
+    }
+
+    // Optimistic update - update UI immediately
+    const previousStatus = voteStatus;
+    const previousUpvotes = localUpvotes;
+    const previousDownvotes = localDownvotes;
+
+    // Calculate optimistic counts based on current status
+    let newUpvotes = previousUpvotes;
+    let newDownvotes = previousDownvotes;
+    let newStatus: "upvoted" | "downvoted" | null = null;
+
+    if (previousStatus === "upvoted" && voteType === "upvote") {
+      // Toggle off upvote
+      newStatus = null;
+      newUpvotes = Math.max(0, previousUpvotes - 1);
+    } else if (previousStatus === "downvoted" && voteType === "downvote") {
+      // Toggle off downvote
+      newStatus = null;
+      newDownvotes = Math.max(0, previousDownvotes - 1);
+    } else if (previousStatus === null) {
+      // New vote
+      newStatus = voteType === "upvote" ? "upvoted" : "downvoted";
+      if (voteType === "upvote") {
+        newUpvotes = previousUpvotes + 1;
+      } else {
+        newDownvotes = previousDownvotes + 1;
+      }
+    } else {
+      // Switch vote (from upvote to downvote or vice versa)
+      newStatus = voteType === "upvote" ? "upvoted" : "downvoted";
+      if (voteType === "upvote") {
+        // Switching from downvote to upvote
+        newUpvotes = previousUpvotes + 1;
+        newDownvotes = Math.max(0, previousDownvotes - 1);
+      } else {
+        // Switching from upvote to downvote
+        newUpvotes = Math.max(0, previousUpvotes - 1);
+        newDownvotes = previousDownvotes + 1;
+      }
+    }
+
+    // Update UI immediately (optimistic update)
+    setLocalUpvotes(newUpvotes);
+    setLocalDownvotes(newDownvotes);
+    setVoteStatus(newStatus);
+    setVoteAnimation(voteType);
+    setTimeout(() => setVoteAnimation(null), 600);
+
+    try {
+      setIsVoting(true);
+
+      // Call vote API in background
+      const response = await apiClient.post<{
+        review_post: {
+          upvote_count: number;
+          downvote_count: number;
+        };
+        vote: {
+          action: "created" | "removed" | "switched";
+          vote_type: "upvote" | "downvote" | null;
+        };
+      }>("/reviews/vote", {
+        user_id: currentUserId,
+        review_post_id: post.id,
+        vote_type: voteType,
+      });
+
+      // Update with actual counts from server (in case of race conditions)
+      const actualUpvotes = response.data.review_post.upvote_count;
+      const actualDownvotes = response.data.review_post.downvote_count;
+      
+      setLocalUpvotes(actualUpvotes);
+      setLocalDownvotes(actualDownvotes);
+
+      // Update vote status based on actual action
+      const { action, vote_type } = response.data.vote;
+      if (action === "removed") {
+        setVoteStatus(null);
+      } else if (action === "created" || action === "switched") {
+        setVoteStatus(vote_type === "upvote" ? "upvoted" : "downvoted");
+      }
+
+      // Update post stats
+      setPost({
+        ...post,
+        stats: {
+          ...post.stats,
+          likes: actualUpvotes,
+          dislikes: actualDownvotes,
+        },
+      });
+    } catch (err) {
+      console.error("[PostDetailPage] Failed to vote:", err);
+      
+      // Rollback optimistic update on error
+      setLocalUpvotes(previousUpvotes);
+      setLocalDownvotes(previousDownvotes);
+      setVoteStatus(previousStatus);
+      
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error(error.response?.data?.message || error.message || "Không thể vote. Vui lòng thử lại.");
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!post) return;
+    
+    const shareUrl = `${window.location.origin}/post/${post.slug}`;
+    const plainDescription = stripHtml(post.description);
+    const shareText = `${post.title} - ${plainDescription.substring(0, 100)}...`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // User cancelled or error occurred
+        console.log("Share cancelled or failed:", err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Đã sao chép link vào clipboard!");
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        toast.error("Không thể chia sẻ. Vui lòng thử lại.");
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -451,15 +733,44 @@ export function PostDetailPage() {
             {/* Action Buttons */}
             <div className="mt-6 flex gap-3 border-t border-gray-100 pt-4">
               <button
+                onClick={() => {
+                  if (post.phone && post.phone !== "Chưa có số điện thoại") {
+                    // Remove any non-digit characters except + for international numbers
+                    const phoneNumber = post.phone.replace(/[^\d+]/g, "");
+                    window.location.href = `tel:${phoneNumber}`;
+                  } else {
+                    toast.error("Địa điểm này chưa có số điện thoại");
+                  }
+                }}
                 title={post.phone}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500"
               >
                 <PhoneCall className="h-4 w-4" />
                 Gọi điện thoại
               </button>
-              <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500">
-                <Bookmark className="h-4 w-4" />
-                Lưu vào Bộ sưu tập
+              <button
+                onClick={() => {
+                  setActiveTab("gioi-thieu");
+                  setTimeout(() => {
+                    const voteSection = document.getElementById("vote-section");
+                    if (voteSection) {
+                      const headerOffset = 80;
+                      const elementPosition = voteSection.getBoundingClientRect().top;
+                      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                      window.scrollTo({
+                        top: offsetPosition,
+                        behavior: "smooth"
+                      });
+                    } else {
+                      // Fallback: scroll to tab content
+                      document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }, 100);
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500"
+              >
+                <Star className="h-4 w-4" />
+                Đánh giá bài viết
               </button>
               <button
                 onClick={() => {
@@ -473,67 +784,16 @@ export function PostDetailPage() {
                 <MessageCircle className="h-4 w-4" />
                 Bình luận
               </button>
-              <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500">
+              <button
+                onClick={handleShare}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500"
+              >
                 <Share2 className="h-4 w-4" />
                 Chia sẻ
               </button>
             </div>
           </div>
         </section>
-      </div>
-
-      {/* Author Header */}
-      <div className="mb-6 flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          {post.authorAvatar ? (
-            <img
-              src={post.authorAvatar}
-              alt={post.author}
-              className="h-12 w-12 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
-              {post.author.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">{post.author}</span>
-              {post.approved ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
-                  NHÀ HÀNG MỚI
-                </span>
-              ) : (
-                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-semibold text-yellow-800 ring-1 ring-yellow-200">
-                  Chưa kiểm duyệt
-                </span>
-              )}
-            </div>
-            <span className="text-sm text-gray-500">{post.timeAgo}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="flex items-center gap-1 text-gray-600 hover:text-primary-500">
-            <ThumbsUp className="h-5 w-5" />
-            <span className="font-semibold">{post.stats.likes}</span>
-          </button>
-          <button className="flex items-center gap-1 text-gray-600 hover:text-red-500">
-            <ThumbsDown className="h-5 w-5" />
-            <span className="font-semibold">{post.stats.dislikes}</span>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("binh-luan");
-              setTimeout(() => {
-                document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
-              }, 100);
-            }}
-            className="flex items-center gap-1 text-gray-600 hover:text-primary-500"
-          >
-            <MessageCircle className="h-5 w-5" />
-            <span className="font-semibold">{post.stats.comments}</span>
-          </button>
-        </div>
       </div>
 
       {/* Tab Navigation */}
@@ -563,12 +823,153 @@ export function PostDetailPage() {
       {/* Tab Content */}
       <section id="tab-content">
         {activeTab === "gioi-thieu" && (
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">Giới thiệu</h3>
-            <div 
-              className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
-              dangerouslySetInnerHTML={{ __html: post.description }}
-            />
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <main className="space-y-6 lg:col-span-2">
+              {/* Services/Features Panel - Above introduction */}
+              {post.features && post.features.length > 0 && (
+                <ServicesList services={post.features.map(mapFeatureToLabel)} />
+              )}
+              
+              {/* Cuisine Types Panel - Display location services */}
+              {post.cuisineTypes && post.cuisineTypes.length > 0 && (
+                <CuisineType cuisineTypes={post.cuisineTypes} />
+              )}
+              
+              {/* Introduction Panel */}
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                {/* Author Section - Above title */}
+                <div className="mb-4 flex items-center gap-3 pb-4 border-b border-gray-100">
+                  {post.authorAvatar ? (
+                    <img
+                      src={post.authorAvatar}
+                      alt={post.author}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
+                      {post.author.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">{post.author}</span>
+                      {post.approved ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
+                          Đã kiểm duyệt
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-semibold text-yellow-800 ring-1 ring-yellow-200">
+                          Đang chờ duyệt
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-500">{post.timeAgo}</span>
+                  </div>
+                </div>
+                
+                {/* Title - Below author, above content */}
+                <h3 className="mb-4 text-lg font-semibold text-gray-900">Giới thiệu</h3>
+                
+                {/* Content */}
+                <div 
+                  className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
+                  dangerouslySetInnerHTML={{ __html: post.description }}
+                />
+                
+                {/* Action Buttons - Below content */}
+                <div id="vote-section" className="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4">
+                  <motion.button
+                    onClick={() => handleVote("upvote")}
+                    disabled={!isAuthenticated || isVoting}
+                    className={`flex items-center justify-center gap-1 rounded-full px-2 h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                      voteStatus === "upvoted"
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                    title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "upvoted" ? "Bỏ upvote" : "Upvote"}
+                    whileTap={{ scale: 0.95 }}
+                    animate={
+                      voteAnimation === "upvote"
+                        ? {
+                            scale: [1, 1.2, 1],
+                            rotate: [0, 10, -10, 0],
+                          }
+                        : {}
+                    }
+                    transition={{ duration: 0.3 }}
+                  >
+                    <ThumbsUp
+                      className={`h-4 w-4 transition-colors ${
+                        voteStatus === "upvoted" ? "fill-green-600 text-green-600" : ""
+                      }`}
+                    />
+                    {localUpvotes}
+                  </motion.button>
+                  <motion.button
+                    onClick={() => handleVote("downvote")}
+                    disabled={!isAuthenticated || isVoting}
+                    className={`flex items-center justify-center gap-1 rounded-full px-2 py-1 min-h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                      voteStatus === "downvoted"
+                        ? "bg-red-100 text-red-700 hover:bg-red-200"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                    title={!isAuthenticated ? "Vui lòng đăng nhập để vote" : voteStatus === "downvoted" ? "Bỏ downvote" : "Downvote"}
+                    whileTap={{ scale: 0.95 }}
+                    animate={
+                      voteAnimation === "downvote"
+                        ? {
+                            scale: [1, 1.2, 1],
+                            rotate: [0, -10, 10, 0],
+                          }
+                        : {}
+                    }
+                    transition={{ duration: 0.3 }}
+                  >
+                    <ThumbsDown
+                      className={`h-4 w-4 transition-colors ${
+                        voteStatus === "downvoted" ? "fill-red-600 text-red-600" : ""
+                      }`}
+                    />
+                    {localDownvotes}
+                  </motion.button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("binh-luan");
+                      setTimeout(() => {
+                        document.getElementById("tab-content")?.scrollIntoView({ behavior: "smooth" });
+                      }, 100);
+                    }}
+                    className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {post.stats.comments}
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
+                    title="Chia sẻ"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </main>
+
+            <aside className="hidden lg:block">
+              <DirectionSidebar
+                address={post.address}
+                lat={post.lat ?? undefined}
+                lng={post.lng ?? undefined}
+              />
+            </aside>
+
+            <div className="block lg:hidden">
+              <DirectionSidebar
+                address={post.address}
+                lat={post.lat ?? undefined}
+                lng={post.lng ?? undefined}
+              />
+            </div>
           </div>
         )}
 

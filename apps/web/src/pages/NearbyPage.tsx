@@ -357,14 +357,15 @@ function Gallery({ items }: { items: GalleryItem[] }) {
 interface PostCardProps {
   post: PostItem;
   onVoteUpdate?: (postId: string, upvotes: number, downvotes: number) => void;
+  initialVoteStatus?: "upvoted" | "downvoted" | null;
 }
 
-function PostCard({ post, onVoteUpdate }: PostCardProps) {
+function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
   const { user, isAuthenticated } = useAuth();
   const [localUpvotes, setLocalUpvotes] = useState(post.stats.upvotes);
   const [localDownvotes, setLocalDownvotes] = useState(post.stats.downvotes);
   const [_isVoting, setIsVoting] = useState(false);
-  const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(null);
+  const [voteStatus, setVoteStatus] = useState<"upvoted" | "downvoted" | null>(initialVoteStatus ?? null);
   const [voteAnimation, setVoteAnimation] = useState<"upvote" | "downvote" | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -384,6 +385,15 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
       fetchUserId();
     }
   }, [isAuthenticated, user, userId]);
+
+  // Update vote status when initialVoteStatus prop changes
+  useEffect(() => {
+    if (initialVoteStatus !== undefined) {
+      setVoteStatus(initialVoteStatus);
+    } else if (!isAuthenticated) {
+      setVoteStatus(null);
+    }
+  }, [initialVoteStatus, isAuthenticated]);
 
   const handleVote = async (voteType: "upvote" | "downvote") => {
     if (!isAuthenticated || !user) {
@@ -485,11 +495,16 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
 
       // Update vote status based on actual action
       const { action, vote_type } = response.data.vote;
+      let newVoteStatus: "upvoted" | "downvoted" | null = null;
       if (action === "removed") {
-        setVoteStatus(null);
+        newVoteStatus = null;
       } else if (action === "created" || action === "switched") {
-        setVoteStatus(vote_type === "upvote" ? "upvoted" : "downvoted");
+        newVoteStatus = vote_type === "upvote" ? "upvoted" : "downvoted";
       }
+      setVoteStatus(newVoteStatus);
+      
+      // Notify parent to update voteStatusMap if needed
+      // (This will be handled by the parent component if needed)
 
       // Notify parent with actual counts
       if (onVoteUpdate) {
@@ -622,7 +637,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
             <motion.button
               onClick={() => handleVote("upvote")}
               disabled={!isAuthenticated}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`flex items-center justify-center gap-1 rounded-full px-2 h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 voteStatus === "upvoted"
                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -649,7 +664,7 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
             <motion.button
               onClick={() => handleVote("downvote")}
               disabled={!isAuthenticated}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`flex items-center justify-center gap-1 rounded-full px-2 py-1 min-h-[28px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 voteStatus === "downvoted"
                   ? "bg-red-100 text-red-700 hover:bg-red-200"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -680,14 +695,14 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
                 sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
                 sessionStorage.setItem("nearbyPostId", post.id);
               }}
-              className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-gray-700 transition hover:bg-gray-200"
+              className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
             >
               <MessageCircle className="h-4 w-4" />
               {post.stats.comments}
             </Link>
             <button
               onClick={handleShare}
-              className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-gray-700 transition hover:bg-gray-200"
+              className="flex items-center justify-center gap-1 rounded-full bg-gray-100 px-2 h-[28px] text-gray-700 transition hover:bg-gray-200"
               title="Chia sẻ"
             >
               <Share2 className="h-4 w-4" />
@@ -699,14 +714,83 @@ function PostCard({ post, onVoteUpdate }: PostCardProps) {
   );
 }
 
+interface FilterState {
+  trends: {
+    hot: boolean;
+    newest: boolean;
+    oldest: boolean;
+  };
+  categories: string[];
+  services: string[];
+  status: string[];
+  priceRange: {
+    min: string;
+    max: string;
+  };
+}
+
 export function NearbyPage() {
-  const [posts, setPosts] = useState<PostItem[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [allPosts, setAllPosts] = useState<PostItem[]>([]); // Store all fetched posts
+  const [posts, setPosts] = useState<PostItem[]>([]); // Filtered posts to display
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [voteStatusMap, setVoteStatusMap] = useState<Record<string, "upvoted" | "downvoted" | null>>({});
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState<FilterState>({
+    trends: {
+      hot: false,
+      newest: false,
+      oldest: false,
+    },
+    categories: [],
+    services: [],
+    status: [],
+    priceRange: {
+      min: "",
+      max: "",
+    },
+  });
 
+  // Fetch reviews and vote history in parallel
   useEffect(() => {
-    fetchReviews();
-  }, []);
+    const fetchData = async () => {
+      // Fetch reviews and votes in parallel for better performance
+      await Promise.all([
+        fetchReviews(),
+        isAuthenticated ? fetchVoteHistory() : Promise.resolve(),
+      ]);
+    };
+    fetchData();
+  }, [isAuthenticated]);
+
+  const fetchVoteHistory = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const response = await apiClient.get<{
+        votes: Array<{
+          review_post_id: string;
+          vote_type: "upvote" | "downvote";
+          created_at: string;
+        }>;
+      }>("/users/me/votes");
+      
+      // Create a map from review_post_id to vote status
+      const map: Record<string, "upvoted" | "downvoted" | null> = {};
+      response.data.votes.forEach((vote) => {
+        map[vote.review_post_id] = vote.vote_type === "upvote" ? "upvoted" : "downvoted";
+      });
+      setVoteStatusMap(map);
+    } catch (err) {
+      console.error("[NearbyPage] Failed to fetch vote history:", err);
+      // If error, keep empty map (all votes will be null)
+    }
+  };
 
   // Khôi phục scroll position khi quay lại từ trang chi tiết
   useLayoutEffect(() => {
@@ -760,31 +844,124 @@ export function NearbyPage() {
     }
   }, [loading, posts]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (currentOffset: number = 0, append: boolean = false) => {
     try {
-      setLoading(true);
+      if (!append) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       setError(null);
 
       // Call real API endpoint (no mock data)
       const response = await apiClient.get<ReviewsResponse>("/reviews", {
         params: {
           limit: 20,
-          offset: 0,
+          offset: currentOffset,
         },
       });
 
       const reviews = response.data?.reviews || [];
       const mappedPosts = reviews.map(mapReviewToPostItem);
-      setPosts(mappedPosts);
+      
+      // Check if there are more posts to load
+      // If we got fewer reviews than the limit, or if reviews array is empty, there are no more posts
+      const hasMoreData = reviews.length > 0 && reviews.length >= (response.data?.limit || 20);
+      
+      if (append) {
+        setAllPosts((prevPosts) => {
+          const newPosts = [...prevPosts, ...mappedPosts];
+          setHasMore(hasMoreData);
+          setOffset(newPosts.length);
+          return newPosts;
+        });
+      } else {
+        setAllPosts(mappedPosts);
+        setHasMore(hasMoreData);
+        setOffset(mappedPosts.length);
+      }
+      
+      return mappedPosts;
     } catch (err) {
       console.error("[NearbyPage] Failed to fetch reviews:", err);
       const error = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
         error.response?.data?.message || error.message || "Không thể tải danh sách review"
       );
-      setPosts([]);
+      if (!append) {
+        setAllPosts([]);
+      }
+      return [];
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Filter posts based on filter criteria
+  const applyFilters = (postsToFilter: PostItem[]): PostItem[] => {
+    let filtered = [...postsToFilter];
+
+    // Filter by trends
+    if (filters.trends.hot) {
+      // Sort by upvotes + downvotes (total engagement)
+      filtered = filtered.sort((a, b) => {
+        const aEngagement = a.stats.upvotes + a.stats.downvotes;
+        const bEngagement = b.stats.upvotes + b.stats.downvotes;
+        return bEngagement - aEngagement;
+      });
+    } else if (filters.trends.newest) {
+      // Sort by time (newest first - already sorted by API, but we can reverse if needed)
+      filtered = filtered.sort((a, b) => {
+        // Parse timeAgo to sort properly (simplified - in real app would use created_at)
+        return 0; // Already sorted by API
+      });
+    } else if (filters.trends.oldest) {
+      filtered = filtered.reverse();
+    }
+
+    // Filter by status
+    if (filters.status.length > 0) {
+      filtered = filtered.filter((post) => {
+        if (filters.status.includes("Đã kiểm duyệt")) {
+          return post.approved;
+        }
+        if (filters.status.includes("Chưa kiểm duyệt")) {
+          return !post.approved;
+        }
+        return true;
+      });
+    }
+
+    // Filter by price range
+    if (filters.priceRange.min || filters.priceRange.max) {
+      filtered = filtered.filter((post) => {
+        // Extract price from priceRange string (e.g., "120,000 - 250,000 VNĐ")
+        const priceMatch = post.priceRange.match(/(\d+(?:,\d+)*)/g);
+        if (!priceMatch || priceMatch.length === 0) return false;
+        
+        const minPrice = priceMatch[0]?.replace(/,/g, "") || "0";
+        const maxPrice = priceMatch[1]?.replace(/,/g, "") || minPrice;
+        
+        const filterMin = filters.priceRange.min ? parseInt(filters.priceRange.min.replace(/,/g, "")) : 0;
+        const filterMax = filters.priceRange.max ? parseInt(filters.priceRange.max.replace(/,/g, "")) : Infinity;
+        
+        return parseInt(minPrice) <= filterMax && parseInt(maxPrice) >= filterMin;
+      });
+    }
+
+    return filtered;
+  };
+
+  // Apply filters whenever allPosts or filters change
+  useEffect(() => {
+    const filtered = applyFilters(allPosts);
+    setPosts(filtered);
+  }, [allPosts, filters]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchReviews(offset, true);
     }
   };
 
@@ -882,28 +1059,42 @@ export function NearbyPage() {
               <p className="text-gray-600">Chưa có review nào</p>
             </div>
           ) : (
-            posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onVoteUpdate={(postId, upvotes, downvotes) => {
-                  setPosts((prevPosts) =>
-                    prevPosts.map((p) =>
-                      p.id === postId
-                        ? {
-                            ...p,
-                            stats: {
-                              ...p.stats,
-                              upvotes,
-                              downvotes,
-                            },
-                          }
-                        : p
-                    )
-                  );
-                }}
-              />
-            ))
+            <>
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  initialVoteStatus={voteStatusMap[post.id] ?? null}
+                  onVoteUpdate={(postId, upvotes, downvotes) => {
+                    setPosts((prevPosts) =>
+                      prevPosts.map((p) =>
+                        p.id === postId
+                          ? {
+                              ...p,
+                              stats: {
+                                ...p.stats,
+                                upvotes,
+                                downvotes,
+                              },
+                            }
+                          : p
+                      )
+                    );
+                  }}
+                />
+              ))}
+              {hasMore && (
+                <div className="flex justify-center py-6">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="rounded-lg bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? "Đang tải..." : "Xem thêm bài review"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
           </main>
         </div>

@@ -405,10 +405,25 @@ export function PostDetailPage() {
         setLoading(true);
         setError(null);
 
-        // Fetch reviews from API
+        // First try to fetch review by ID directly
+        try {
+          const detailResponse = await apiClient.get<{ review: ReviewFromAPI }>(`/reviews/${slug}`);
+          if (detailResponse.data?.review) {
+            const mappedPost = mapReviewToPostDetail(detailResponse.data.review);
+            setPost(mappedPost);
+            setLocalUpvotes(mappedPost.stats.likes);
+            setLocalDownvotes(mappedPost.stats.dislikes);
+            setImageError(false);
+            return;
+          }
+        } catch {
+          // If direct fetch fails, try searching in reviews list
+        }
+
+        // Fallback: Fetch reviews from API and find by slug
         const response = await apiClient.get<ReviewsResponse>("/reviews", {
           params: {
-            limit: 100, // Fetch more to increase chance of finding the review
+            limit: 100,
             offset: 0,
           },
         });
@@ -426,7 +441,7 @@ export function PostDetailPage() {
           setPost(mappedPost);
           setLocalUpvotes(mappedPost.stats.likes);
           setLocalDownvotes(mappedPost.stats.dislikes);
-          setImageError(false); // Reset image error state khi load bài review mới
+          setImageError(false);
         } else {
           setError("Không tìm thấy bài review");
         }

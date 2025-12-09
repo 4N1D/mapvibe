@@ -144,43 +144,80 @@ export const handler: Handler = {
       const result = await query.execute(db);
       const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
 
-      // Collect all photo IDs from all reviews
-      const allPhotoIds: string[] = [];
-      const reviewPhotoIdsMap = new Map<string, string[]>();
+      // Get all review IDs
+      const reviewIds = rawReviews.map((r) => r.id);
 
-      for (const review of rawReviews) {
-        const photoIds = extractPhotoIds(review.photos);
-        if (photoIds.length > 0) {
-          reviewPhotoIdsMap.set(review.id, photoIds);
-          allPhotoIds.push(...photoIds);
+      // First try: Query photos directly from photos table by review_post_id
+      const reviewPhotosMap = new Map<string, Array<{ url: string }>>();
+      
+      if (reviewIds.length > 0) {
+        const photosFromTable = await db
+          .selectFrom("photos")
+          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url"])
+          .where("review_post_id", "in", reviewIds)
+          .orderBy("created_at", "asc")
+          .execute();
+
+        for (const photo of photosFromTable) {
+          if (photo.review_post_id) {
+            const url = photo.s3_thumbnail_url || photo.s3_url;
+            if (url) {
+              const existing = reviewPhotosMap.get(photo.review_post_id) || [];
+              existing.push({ url });
+              reviewPhotosMap.set(photo.review_post_id, existing);
+            }
+          }
         }
       }
 
-      // Batch lookup all photo URLs from database
-      const photoUrlMap = new Map<string, string>();
-      if (allPhotoIds.length > 0) {
-        const uniqueIds = [...new Set(allPhotoIds)];
-        const photoRecords = await db
-          .selectFrom("photos")
-          .select(["id", "s3_url", "s3_thumbnail_url"])
-          .where("id", "in", uniqueIds)
-          .execute();
+      // Fallback: For reviews without photos from table, try extracting from JSON field
+      const reviewsNeedingJsonPhotos = rawReviews.filter(
+        (r) => !reviewPhotosMap.has(r.id) && r.photos
+      );
 
-        for (const p of photoRecords) {
-          photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+      if (reviewsNeedingJsonPhotos.length > 0) {
+        const allPhotoIds: string[] = [];
+        const reviewPhotoIdsMap = new Map<string, string[]>();
+
+        for (const review of reviewsNeedingJsonPhotos) {
+          const photoIds = extractPhotoIds(review.photos);
+          if (photoIds.length > 0) {
+            reviewPhotoIdsMap.set(review.id, photoIds);
+            allPhotoIds.push(...photoIds);
+          }
+        }
+
+        if (allPhotoIds.length > 0) {
+          const uniqueIds = [...new Set(allPhotoIds)];
+          const photoRecords = await db
+            .selectFrom("photos")
+            .select(["id", "s3_url", "s3_thumbnail_url"])
+            .where("id", "in", uniqueIds)
+            .execute();
+
+          const photoUrlMap = new Map<string, string>();
+          for (const p of photoRecords) {
+            photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+          }
+
+          for (const [reviewId, photoIds] of reviewPhotoIdsMap) {
+            const photos = photoIds
+              .map((id) => {
+                const url = photoUrlMap.get(id);
+                return url ? { url } : null;
+              })
+              .filter((p): p is { url: string } => p !== null);
+            
+            if (photos.length > 0) {
+              reviewPhotosMap.set(reviewId, photos);
+            }
+          }
         }
       }
 
       // Build reviews with resolved photo URLs
       const reviews = rawReviews.map((review) => {
-        const photoIds = reviewPhotoIdsMap.get(review.id) || [];
-        const photos = photoIds
-          .map((id) => {
-            const url = photoUrlMap.get(id);
-            return url ? { url } : null;
-          })
-          .filter((p): p is { url: string } => p !== null);
-
+        const photos = reviewPhotosMap.get(review.id) || [];
         return {
           ...review,
           photos,

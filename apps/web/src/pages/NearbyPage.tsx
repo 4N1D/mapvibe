@@ -195,6 +195,11 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
         .replace(/(^-|-$)/g, "") || review.id
     : review.id;
 
+  // Debug: Log photos data
+  if (review.photos) {
+    console.log(`[Review ${review.id}] photos:`, review.photos);
+  }
+
   return {
     id: review.id,
     slug,

@@ -638,11 +638,41 @@ class RAGService:
         
         return [], ""
 
+    def get_restaurant_images(self, restaurant_ids: List[str]) -> Dict[str, str]:
+        """Lấy ảnh đầu tiên của mỗi restaurant từ table photos"""
+        if not restaurant_ids or not engine:
+            return {}
+        
+        try:
+            # Tạo placeholder cho các restaurant_id
+            placeholders = ", ".join([f":id_{i}" for i in range(len(restaurant_ids))])
+            sql_query = f"""
+                SELECT DISTINCT ON (restaurant_id) 
+                    restaurant_id, s3_url
+                FROM photos 
+                WHERE restaurant_id IN ({placeholders})
+                    AND s3_url IS NOT NULL
+                ORDER BY restaurant_id, created_at DESC
+            """
+            
+            params = {f"id_{i}": rid for i, rid in enumerate(restaurant_ids)}
+            
+            with engine.connect() as conn:
+                rows = conn.execute(text(sql_query), params).fetchall()
+                return {row.restaurant_id: row.s3_url for row in rows}
+        except Exception as e:
+            logger.error(f"Error fetching restaurant images: {e}")
+            return {}
+
     def generate_response_and_data(self, user_input, results, system_note, user_mood="neutral"):
         if not results:
             if user_mood == "negative":
                 return "Nghe vẻ bạn đang có chuyện không vui, nhưng tiếc là mình chưa tìm được quán nào phù hợp để giải sầu lúc này. Thử lại khu vực khác xem sao nhé! 🍺", []
             return "Xin lỗi, không tìm thấy quán nào phù hợp. 😅", []
+
+        # Lấy ảnh cho tất cả restaurants
+        restaurant_ids = [row.id for row in results]
+        images_map = self.get_restaurant_images(restaurant_ids)
 
         restaurants_data = []
         context_str = ""
@@ -658,7 +688,8 @@ class RAGService:
                 "priceRange": price_display, 
                 "hours": row.opening_hours or "N/A",
                 "business_type": row.business_type, 
-                "score": f"{row.final_score:.2f}"
+                "score": f"{row.final_score:.2f}",
+                "image": images_map.get(row.id)
             }
             restaurants_data.append(item)
             context_str += f"- {item['name']} ({item['address']}) | Giá: {item['priceRange']} | Giờ: {item['hours']} | Loại: {item['business_type']}\n"

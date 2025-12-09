@@ -32,7 +32,7 @@ export function ImageGalleryPreview({ images, restaurantName, onViewMore }: Imag
         <img
           src={images[0]}
           alt={restaurantName}
-          className={`${transformClass} object-cover" h-full w-full`}
+          className={`${transformClass} object-cover h-full w-full`}
         />
       </div>
 

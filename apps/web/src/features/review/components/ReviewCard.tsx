@@ -7,6 +7,7 @@ import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
 import toast from "react-hot-toast";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
+import { stripHtml } from "@/utils/text";
 
 function formatPriceRange(priceMin?: number | null, priceMax?: number | null): string | null {
   if (!priceMin && !priceMax) return null;
@@ -118,7 +119,7 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const shareUrl = `${window.location.origin}/review/${data.id}`;
-    const shareText = `${data.text.substring(0, 100)}...`;
+    const shareText = `${stripHtml(data.text).substring(0, 100)}...`;
 
     if (navigator.share) {
       try {
@@ -221,7 +222,7 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
         </div>
 
         {/* Review content - secondary */}
-        <p className="line-clamp-2 text-sm text-gray-600">{data.text}</p>
+        <p className="line-clamp-2 text-sm text-gray-600">{stripHtml(data.text)}</p>
 
         {/* Reviewer info */}
         <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">

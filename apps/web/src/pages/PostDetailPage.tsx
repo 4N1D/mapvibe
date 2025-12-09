@@ -26,6 +26,7 @@ import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
 import toast from "react-hot-toast";
+import { stripHtml } from "@/utils/text";
 
 interface ReviewPhoto {
   url: string;
@@ -354,7 +355,7 @@ export function PostDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, isAuthenticated } = useAuth();
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("binh-luan");
+  const [activeTab, setActiveTab] = useState<string>("gioi-thieu");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -511,12 +512,7 @@ export function PostDetailPage() {
     }
   }, [isAuthenticated, post?.id, userId]);
 
-  // Strip HTML tags for plain text display
-  const stripHtml = (html: string): string => {
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
-  };
+
 
   const handleVote = async (voteType: "upvote" | "downvote") => {
     if (!isAuthenticated || !user || !post) {

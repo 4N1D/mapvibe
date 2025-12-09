@@ -3,6 +3,44 @@ import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error } from "../../middlewares/response";
 import { sql } from "kysely";
 
+// Helper to extract photo IDs from photos JSON
+function extractPhotoIds(photos: unknown): string[] {
+  if (!photos) return [];
+
+  let photosData = photos;
+  if (typeof photosData === "string") {
+    try {
+      photosData = JSON.parse(photosData);
+    } catch {
+      return [];
+    }
+  }
+
+  const photoIds: string[] = [];
+
+  // Handle object format {general: [...], food: [...], menu: [...]}
+  if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+    const categories = photosData as Record<string, string[]>;
+    for (const category of Object.values(categories)) {
+      if (Array.isArray(category)) {
+        photoIds.push(...category);
+      }
+    }
+  }
+  // Handle array format
+  else if (Array.isArray(photosData)) {
+    for (const p of photosData) {
+      if (typeof p === "string") {
+        photoIds.push(p);
+      } else if (p && typeof p === "object" && "id" in p) {
+        photoIds.push((p as { id: string }).id);
+      }
+    }
+  }
+
+  return photoIds;
+}
+
 // GET /reviews/:reviewId - Get review detail by ID
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -69,7 +107,36 @@ export const handler: Handler = {
         .where("id", "=", reviewId)
         .execute();
 
-      const review = result.rows[0];
+      const row = result.rows[0] as Record<string, unknown>;
+
+      // Extract photo IDs and fetch URLs
+      const photoIds = extractPhotoIds(row.photos);
+      let photos: Array<{ url: string; caption?: string }> = [];
+
+      if (photoIds.length > 0) {
+        const photosFromDb = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url", "s3_medium_url"])
+          .where("id", "in", photoIds)
+          .execute();
+
+        // Maintain order and map to URLs
+        const photoUrlMap = new Map<string, { url: string }>();
+        for (const photo of photosFromDb) {
+          photoUrlMap.set(photo.id, {
+            url: photo.s3_medium_url || photo.s3_url,
+          });
+        }
+
+        photos = photoIds
+          .map((id) => photoUrlMap.get(id))
+          .filter((p): p is { url: string } => p !== undefined);
+      }
+
+      const review = {
+        ...row,
+        photos,
+      };
 
       return success({ review });
     } catch (err) {

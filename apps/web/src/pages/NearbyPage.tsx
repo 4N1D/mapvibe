@@ -12,11 +12,14 @@ import {
   DollarSign,
   ThumbsUp,
   ThumbsDown,
-  SlidersHorizontal,
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
 import { stripHtml } from "@/utils/text";
+import {
+  LocationFilterSidebar,
+  FilterState,
+} from "@/features/nearby/components/LocationFilterSidebar";
 
 interface GalleryItem {
   url: string;
@@ -218,28 +221,7 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
   };
 };
 
-// List of all 18 services with their feature IDs - Đồng bộ với 18 tiện ích
-const ALL_SERVICES = [
-  { id: "wifi", label: "Có wifi" },
-  { id: "card_payment", label: "Trả bằng thẻ" },
-  { id: "private_room", label: "Có phòng riêng" },
-  { id: "smoking_area", label: "Có khu vực hút thuốc" },
-  { id: "wheelchair_accessible", label: "Có hỗ trợ người khuyết tật" },
-  { id: "delivery", label: "Có giao hàng" },
-  { id: "car_parking", label: "Có chỗ đậu ôtô" },
-  { id: "kids_play_area", label: "Có chỗ chơi cho trẻ em" },
-  { id: "membership_card", label: "Có thẻ thành viên" },
-  { id: "football_streaming", label: "Có chiếu bóng đá" },
-  { id: "air_conditioning", label: "Có máy lạnh và điều hòa" },
-  { id: "air_con", label: "Có máy lạnh và điều hòa" },
-  { id: "reservation", label: "Nên đặt trước" },
-  { id: "free_motorbike_parking", label: "Giữ xe máy miễn phí" },
-  { id: "vat_invoice", label: "Có xuất hóa đơn đỏ" },
-  { id: "takeaway", label: "Cho mua về" },
-  { id: "outdoor_seating", label: "Có bàn ngoài trời" },
-  { id: "tipping", label: "Tip cho nhân viên" },
-  { id: "heater", label: "Có lò sưởi" },
-];
+
 
 function Gallery({ items }: { items: GalleryItem[] }) {
   const display = useMemo(() => items.slice(0, 5), [items]);
@@ -749,20 +731,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
   );
 }
 
-interface FilterState {
-  trends: {
-    hot: boolean;
-    newest: boolean;
-    oldest: boolean;
-  };
-  categories: string[];
-  services: string[];
-  status: string[];
-  priceRange: {
-    min: string;
-    max: string;
-  };
-}
+
 
 export function NearbyPage() {
   const { isAuthenticated } = useAuth();
@@ -1066,191 +1035,15 @@ export function NearbyPage() {
   return (
     <>
       <Toaster position="top-center" />
-      <div className="bg-gray-100 pb-12">
+      <div className="bg-gray-100 pb-20 lg:pb-12">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-8 sm:px-6 lg:flex-row lg:items-start lg:gap-8 lg:px-8">
-        {/* Sidebar filters */}
-        <aside className="relative flex h-fit flex-col w-full rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:w-64 lg:max-h-[calc(100vh-6rem)]">
-          <div className="mb-4 flex items-center justify-between shrink-0">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
-              <span className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 text-sm">
-                <SlidersHorizontal className="h-4 w-4 text-gray-700" />
-              </span>
-              Bộ lọc địa điểm
-            </h2>
-            {(draftFilters.trends.hot || draftFilters.trends.newest || draftFilters.trends.oldest || 
-              draftFilters.categories.length > 0 || draftFilters.services.length > 0 || 
-              draftFilters.status.length > 0 || draftFilters.priceRange.min || draftFilters.priceRange.max) && (
-              <button
-                onClick={handleResetFilters}
-                className="text-xs text-primary-500 hover:text-primary-600"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-          <div className="flex-1 space-y-4 text-sm text-gray-700 overflow-y-auto">
-            <div>
-              <p className="mb-2 font-semibold">Xu hướng</p>
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={draftFilters.trends.hot}
-                    onChange={(e) => {
-                      setDraftFilters((prev) => ({
-                        ...prev,
-                        trends: {
-                          ...prev.trends,
-                          hot: e.target.checked,
-                          newest: e.target.checked ? false : prev.trends.newest,
-                          oldest: e.target.checked ? false : prev.trends.oldest,
-                        },
-                      }));
-                    }}
-                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  />
-                  <span>Đang hot</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={draftFilters.trends.newest}
-                    onChange={(e) => {
-                      setDraftFilters((prev) => ({
-                        ...prev,
-                        trends: {
-                          ...prev.trends,
-                          newest: e.target.checked,
-                          hot: e.target.checked ? false : prev.trends.hot,
-                          oldest: e.target.checked ? false : prev.trends.oldest,
-                        },
-                      }));
-                    }}
-                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  />
-                  <span>Mới nhất</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={draftFilters.trends.oldest}
-                    onChange={(e) => {
-                      setDraftFilters((prev) => ({
-                        ...prev,
-                        trends: {
-                          ...prev.trends,
-                          oldest: e.target.checked,
-                          hot: e.target.checked ? false : prev.trends.hot,
-                          newest: e.target.checked ? false : prev.trends.newest,
-                        },
-                      }));
-                    }}
-                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  />
-                  <span>Cũ nhất</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo trạng thái</p>
-              <div className="space-y-1">
-                {["Đã kiểm duyệt", "Chưa kiểm duyệt"].map((item) => (
-                  <label key={item} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={draftFilters.status.includes(item)}
-                      onChange={(e) => {
-                        setDraftFilters((prev) => ({
-                          ...prev,
-                          status: e.target.checked
-                            ? [...prev.status, item]
-                            : prev.status.filter((s) => s !== item),
-                        }));
-                      }}
-                      className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                    />
-                    <span>{item}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo dịch vụ</p>
-              <div className="space-y-1">
-                {ALL_SERVICES.filter((service) => {
-                  // Remove duplicate air_con if air_conditioning exists
-                  if (service.id === "air_con") {
-                    return !ALL_SERVICES.some((s) => s.id === "air_conditioning");
-                  }
-                  return true;
-                }).map((service) => (
-                  <label key={service.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={draftFilters.services.includes(service.id)}
-                      onChange={(e) => {
-                        setDraftFilters((prev) => ({
-                          ...prev,
-                          services: e.target.checked
-                            ? [...prev.services, service.id]
-                            : prev.services.filter((s) => s !== service.id),
-                        }));
-                      }}
-                      className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                    />
-                    <span className="text-sm">{service.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 font-semibold">Theo khoảng giá</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Từ"
-                  value={draftFilters.priceRange.min}
-                  onChange={(e) => {
-                    setDraftFilters((prev) => ({
-                      ...prev,
-                      priceRange: { ...prev.priceRange, min: e.target.value },
-                    }));
-                  }}
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Đến"
-                  value={draftFilters.priceRange.max}
-                  onChange={(e) => {
-                    setDraftFilters((prev) => ({
-                      ...prev,
-                      priceRange: { ...prev.priceRange, max: e.target.value },
-                    }));
-                  }}
-                  className="w-1/2 rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-          </div>
-          {/* Sticky buttons at bottom */}
-          <div className="sticky bottom-0 bg-white pt-4 mt-4 border-t border-gray-100 shrink-0">
-            <div className="flex gap-2">
-              <button
-                onClick={handleApplyFilters}
-                className="flex-1 rounded bg-primary-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
-              >
-                Áp dụng
-              </button>
-              <button
-                onClick={handleResetFilters}
-                className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </aside>
+          {/* Sidebar filters - Desktop only, Mobile uses drawer */}
+          <LocationFilterSidebar
+            draftFilters={draftFilters}
+            setDraftFilters={setDraftFilters}
+            onApply={handleApplyFilters}
+            onReset={handleResetFilters}
+          />
 
           {/* Main content */}
           <main className="flex-1 space-y-6">

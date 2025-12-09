@@ -99,8 +99,103 @@ export const handler: Handler = {
         restaurant_review_count: string;
       };
 
+      const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
+
+      // Collect all photo IDs from all reviews
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              
+              // Check if it's already a URL
+              if (typeof firstItem === "string" && 
+                  (firstItem.startsWith("http://") || firstItem.startsWith("https://"))) {
+                // Already URLs - store directly
+                reviewPhotoMap.set(review.id, photosData);
+              } else if (typeof firstItem === "string") {
+                // Photo IDs - collect for batch lookup
+                const ids = photosData.filter((id: unknown) => typeof id === "string");
+                reviewPhotoMap.set(review.id, ids);
+                allPhotoIds.push(...ids);
+              }
+            } else if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+              // Handle object format {general: [...], food: [...], menu: [...]}
+              const categories = photosData as Record<string, unknown[]>;
+              const ids: string[] = [];
+              for (const category of Object.values(categories)) {
+                if (Array.isArray(category)) {
+                  for (const item of category) {
+                    if (typeof item === "string") {
+                      ids.push(item);
+                    } else if (item && typeof item === "object" && "id" in item) {
+                      ids.push((item as { id: string }).id);
+                    }
+                  }
+                }
+              }
+              if (ids.length > 0) {
+                reviewPhotoMap.set(review.id, ids);
+                allPhotoIds.push(...ids);
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Batch lookup all photo URLs
+      const photoUrlMap = new Map<string, string>();
+      if (allPhotoIds.length > 0) {
+        const uniqueIds = [...new Set(allPhotoIds)];
+        const photoRecords = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniqueIds)
+          .execute();
+        
+        for (const p of photoRecords) {
+          photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+        }
+      }
+
+      // Build reviews with resolved photo URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photos: Array<{ url: string }> = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (firstItem.startsWith("http://") || firstItem.startsWith("https://")) {
+            // Already URLs
+            photos = photoData.map((url) => ({ url }));
+          } else {
+            // Map IDs to URLs
+            photos = photoData
+              .map((id) => {
+                const url = photoUrlMap.get(id);
+                return url ? { url } : null;
+              })
+              .filter((p): p is { url: string } => p !== null);
+          }
+        }
+
+        return {
+          ...review,
+          photos,
+        };
+      });
+
       return success({
-        reviews: result.rows,
+        reviews,
         total: Number(counts?.total || 0),
         review_post_count: Number(counts?.review_post_count || 0),
         restaurant_review_count: Number(counts?.restaurant_review_count || 0),

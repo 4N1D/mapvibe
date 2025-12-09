@@ -39,6 +39,7 @@ interface ReviewFromAPI {
   author_name: string;
   author_avatar?: string | null;
   location_address_id?: string;
+  restaurant_id?: string;
   text: string;
   features?: string[];
   photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] };
@@ -48,6 +49,7 @@ interface ReviewFromAPI {
   share_count: number;
   view_count: number;
   created_at: string;
+  updated_at?: string;
   location_name?: string;
   location_street_address?: string;
   location_ward?: string;
@@ -64,7 +66,7 @@ interface ReviewFromAPI {
   location_review_count?: number;
   location_avg_upvote_rate?: number | null;
   location_status?: string;
-  restaurant_slug?: string | null;
+  restaurant_slug?: string;
 }
 
 interface ReviewsResponse {
@@ -77,8 +79,8 @@ interface ReviewsResponse {
 interface PostDetail {
   id: string;
   slug: string;
-  restaurantId: string | null;
-  restaurantSlug: string | null;
+  restaurantId: number;
+  restaurantSlug?: string;
   author: string;
   authorAvatar?: string;
   userRank: "Hạng đồng" | "Hạng bạc" | "Hạng vàng" | "Hạng kim cương" | "Hạng bạch kim";
@@ -212,11 +214,16 @@ const generateSlug = (locationName?: string, id?: string): string => {
 const extractImages = (
   photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] }
 ): string[] => {
-  if (!photos) return [];
+  if (!photos) {
+    console.log("[extractImages] No photos provided");
+    return [];
+  }
 
   // If photos is an array
   if (Array.isArray(photos)) {
-    return photos.map((photo) => photo.url);
+    const urls = photos.map((photo) => photo.url).filter(Boolean);
+    console.log(`[extractImages] Extracted ${urls.length} images from array:`, urls);
+    return urls;
   }
 
   // If photos is an object with general, food, menu
@@ -225,7 +232,9 @@ const extractImages = (
     ...(photos.food || []),
     ...(photos.menu || []),
   ];
-  return allPhotos.map((photo) => photo.url);
+  const urls = allPhotos.map((photo) => photo.url).filter(Boolean);
+  console.log(`[extractImages] Extracted ${urls.length} images from object:`, urls);
+  return urls;
 };
 
 // Helper function to extract categories from cuisine types
@@ -278,14 +287,19 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
   const categories = extractCategories(review.location_cuisine_types);
   const cuisineTypes = extractCuisineTypes(review.location_cuisine_types);
 
+  console.log("[mapReviewToPostDetail] Review photos:", review.photos);
+  console.log("[mapReviewToPostDetail] Extracted images:", images);
+
   // Determine if location is open (simplified - you might want to add actual logic)
   const isOpen = true; // TODO: Add logic to check if location is currently open based on opening_hours
 
   return {
     id: review.id,
     slug,
-    restaurantId: review.location_restaurant_id || null,
-    restaurantSlug: review.restaurant_slug || null,
+    restaurantId: review.location_restaurant_id
+      ? parseInt(review.location_restaurant_id.replace("R_", ""), 16) || 0
+      : 0,
+    restaurantSlug: review.restaurant_slug,
     author: review.author_name,
     authorAvatar: review.author_avatar || undefined,
     userRank: "Hạng đồng", // Default rank
@@ -304,12 +318,7 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       dislikes: review.downvote_count,
       comments: review.comment_count,
     },
-    images:
-      images.length > 0
-        ? images
-        : [
-            "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80",
-          ],
+    images: images.length > 0 ? images : [],
     lat: review.location_geo_lat ?? undefined,
     lng: review.location_geo_lng ?? undefined,
     features: review.features || [],
@@ -406,19 +415,37 @@ export function PostDetailPage() {
         setLoading(true);
         setError(null);
 
-        // First try to fetch review by ID directly
+        // First try to fetch review detail by ID directly (using the detail API endpoint)
+        // The slug parameter could be either a review ID (like RP_27a12ea0af) or a generated slug
+        // We always try to fetch by ID first since that's the most reliable way
         try {
+          console.log(`[PostDetailPage] Attempting to fetch review with ID/slug: ${slug}`);
           const detailResponse = await apiClient.get<{ review: ReviewFromAPI }>(`/reviews/${slug}`);
           if (detailResponse.data?.review) {
+            console.log("[PostDetailPage] Successfully fetched review detail from API:", detailResponse.data.review);
+            console.log("[PostDetailPage] Review photos:", detailResponse.data.review.photos);
             const mappedPost = mapReviewToPostDetail(detailResponse.data.review);
+            console.log("[PostDetailPage] Mapped post images:", mappedPost.images);
             setPost(mappedPost);
             setLocalUpvotes(mappedPost.stats.likes);
             setLocalDownvotes(mappedPost.stats.dislikes);
             setImageError(false);
+            setLoading(false);
             return;
           }
-        } catch {
-          // If direct fetch fails, try searching in reviews list
+        } catch (detailError: any) {
+          // If direct fetch fails, log the error and try fallback
+          console.log("[PostDetailPage] Direct fetch failed:", detailError.response?.status, detailError.message);
+          
+          // If slug looks like a review ID (starts with RP_) and we got a non-404 error, don't fallback
+          // This means the review ID format is correct but there's another issue
+          if (detailError.response?.status !== 404 && slug.startsWith("RP_")) {
+            console.error("[PostDetailPage] Review ID format looks correct but fetch failed:", detailError);
+            throw detailError;
+          }
+          
+          // For 404 or non-review-ID slugs, continue to fallback
+          console.log("[PostDetailPage] Falling back to reviews list search");
         }
 
         // Fallback: Fetch reviews from API and find by slug
@@ -714,21 +741,38 @@ export function PostDetailPage() {
         <section className="lg:order-1 lg:col-span-5">
           <div className="h-full overflow-hidden rounded-xl shadow-sm">
             <div className="h-96 w-full">
-              {post.images.length > 0 && post.images[0] && !imageError ? (
-                <img
-                  src={post.images[0]}
-                  alt={post.title}
-                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gray-100">
-                  <div className="flex flex-col items-center gap-3 text-gray-400">
-                    <ImageIcon className="h-12 w-12" />
-                    <span className="text-sm font-medium">Chưa có ảnh</span>
-                  </div>
-                </div>
-              )}
+              {(() => {
+                console.log("[PostDetailPage] Rendering gallery, post.images:", post.images);
+                console.log("[PostDetailPage] post.images.length:", post.images.length);
+                console.log("[PostDetailPage] post.images[0]:", post.images[0]);
+                console.log("[PostDetailPage] imageError:", imageError);
+                
+                if (post.images.length > 0 && post.images[0] && !imageError) {
+                  return (
+                    <img
+                      src={post.images[0]}
+                      alt={post.title}
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                      onError={(e) => {
+                        console.error("[PostDetailPage] Image load error:", post.images[0]);
+                        setImageError(true);
+                      }}
+                      onLoad={() => {
+                        console.log("[PostDetailPage] Image loaded successfully:", post.images[0]);
+                      }}
+                    />
+                  );
+                } else {
+                  return (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                        <ImageIcon className="h-12 w-12" />
+                        <span className="text-sm font-medium">Chưa có ảnh</span>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
         </section>
@@ -1040,17 +1084,32 @@ export function PostDetailPage() {
         {activeTab === "binh-luan" && <CommentsTab reviewId={post.id} />}
 
         {activeTab === "anh" && (
-          post.restaurantSlug ? (
-            <PhotosTab
-              slug={post.restaurantSlug}
-              showFilters={false}
-            />
-          ) : (
-            <div className="rounded-lg bg-white p-8 text-center shadow-sm">
-              <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
-              <p className="mt-4 text-gray-500">Chưa có ảnh cho địa điểm này.</p>
-            </div>
-          )
+          <div className="rounded-lg bg-white p-6 shadow-sm">
+            {post.images && post.images.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {post.images.map((imageUrl, index) => (
+                  <div
+                    key={index}
+                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-gray-100"
+                  >
+                    <img
+                      src={imageUrl}
+                      alt={`Ảnh ${index + 1} của ${post.title}`}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
+                      loading="lazy"
+                      onError={(e) => {
+                        console.error(`[PostDetailPage] Failed to load image ${index + 1}:`, imageUrl);
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/20" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-8 text-center text-gray-500">Chưa có ảnh nào.</p>
+            )}
+          </div>
         )}
 
         {activeTab === "thuc-don" && (

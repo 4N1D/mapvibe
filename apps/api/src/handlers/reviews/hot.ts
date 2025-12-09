@@ -2,6 +2,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, error } from "../../middlewares/response";
 import { sql } from "kysely";
+import { getUserIdFromEvent } from "../../utils/auth";
 
 function getRankTag(score: number, hoursAge: number): string {
   if (hoursAge <= 24 && score >= 0) {
@@ -111,28 +112,108 @@ export const handler: Handler = {
         price_max: number | null;
         opening_hours: string | null;
       }
-      const reviews = (result.rows as HotReviewRow[]).map((row) => ({
-        id: row.id,
-        author_id: row.author_id,
-        author_name: row.author_name,
-        author_avatar: row.author_avatar,
-        restaurant_id: row.restaurant_id,
-        text: row.text,
-        photos: row.photos,
-        upvote_count: row.upvote_count,
-        downvote_count: row.downvote_count,
-        comment_count: row.comment_count,
-        share_count: row.share_count,
-        view_count: row.view_count,
-        created_at: row.created_at,
-        score: row.score,
-        tag: getRankTag(parseFloat(row.score), parseFloat(row.hours_age)),
-        restaurant_name: row.restaurant_name,
-        restaurant_address: row.restaurant_address,
-        price_min: row.price_min,
-        price_max: row.price_max,
-        opening_hours: row.opening_hours,
-      }));
+
+      const userId = getUserIdFromEvent(event);
+      let userLikedReviewIds = new Set<string>();
+
+      if (userId && result.rows.length > 0) {
+        const reviewIds = (result.rows as HotReviewRow[]).map((r) => r.id);
+        const userVotes = await db
+          .selectFrom("votes")
+          .select("review_post_id")
+          .where("user_id", "=", userId)
+          .where("review_post_id", "in", reviewIds)
+          .where("vote_type", "=", "upvote")
+          .execute();
+        userLikedReviewIds = new Set(userVotes.map((v) => v.review_post_id));
+      }
+
+      // Extract first photo ID from each review (only need 1 for preview)
+      const reviewFirstPhotoMap = new Map<string, string>();
+
+      for (const row of result.rows as HotReviewRow[]) {
+        if (row.photos) {
+          let photosData = row.photos;
+          if (typeof photosData === "string") {
+            try {
+              photosData = JSON.parse(photosData);
+            } catch {
+              continue;
+            }
+          }
+
+          let firstPhotoId: string | null = null;
+
+          // Handle object format {general: [...], food: [...], menu: [...]}
+          if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+            const categories = photosData as Record<string, string[]>;
+            for (const category of Object.values(categories)) {
+              if (Array.isArray(category) && category.length > 0) {
+                firstPhotoId = category[0];
+                break;
+              }
+            }
+          }
+          // Handle array format
+          else if (Array.isArray(photosData) && photosData.length > 0) {
+            const first = photosData[0];
+            if (typeof first === "string") {
+              firstPhotoId = first;
+            } else if (first && typeof first === "object" && "id" in first) {
+              firstPhotoId = first.id;
+            }
+          }
+
+          if (firstPhotoId) {
+            reviewFirstPhotoMap.set(row.id, firstPhotoId);
+          }
+        }
+      }
+
+      // Fetch photo URLs from database (only unique first photos)
+      const photoUrlMap = new Map<string, string>();
+      const uniquePhotoIds = [...new Set(reviewFirstPhotoMap.values())];
+      if (uniquePhotoIds.length > 0) {
+        const photosFromDb = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniquePhotoIds)
+          .execute();
+
+        for (const photo of photosFromDb) {
+          photoUrlMap.set(photo.id, photo.s3_thumbnail_url || photo.s3_url);
+        }
+      }
+
+      const reviews = (result.rows as HotReviewRow[]).map((row) => {
+        const firstPhotoId = reviewFirstPhotoMap.get(row.id);
+        const firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
+        const photos = firstPhotoUrl ? [{ url: firstPhotoUrl }] : [];
+
+        return {
+          id: row.id,
+          author_id: row.author_id,
+          author_name: row.author_name,
+          author_avatar: row.author_avatar,
+          restaurant_id: row.restaurant_id,
+          text: row.text,
+          photos,
+          upvote_count: row.upvote_count,
+          downvote_count: row.downvote_count,
+          comment_count: row.comment_count,
+          share_count: row.share_count,
+          view_count: row.view_count,
+          created_at: row.created_at,
+          score: row.score,
+          tag: getRankTag(parseFloat(row.score), parseFloat(row.hours_age)),
+          restaurant_name: row.restaurant_name,
+          restaurant_address: row.restaurant_address,
+          price_min: row.price_min,
+          price_max: row.price_max,
+          opening_hours: row.opening_hours,
+          user_has_liked: userLikedReviewIds.has(row.id),
+        };
+      });
 
       return success({
         restaurant_id: restaurantId || null,

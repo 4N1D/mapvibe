@@ -30,6 +30,7 @@ interface ReviewsApiResponse {
     author_id: string;
     author_name: string;
     author_avatar?: string;
+    user_has_liked?: boolean;
   }>;
   pagination: { limit: number; offset: number; total: number };
 }
@@ -60,6 +61,7 @@ const fetchReviews = async (slug: string, page: number) => {
     like_count: r.upvote_count,
     comment_count: r.comment_count,
     created_at: r.created_at,
+    user_has_liked: r.user_has_liked || false,
   }));
   
   return {

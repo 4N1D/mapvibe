@@ -161,10 +161,10 @@ export function PlaceDetailPage() {
         return <ReviewsTab restaurantId={restaurant.id} slug={slug} />;
 
       case "anh":
-        return <PhotosTab restaurantId={restaurant.id} slug={slug} />;
+        return <PhotosTab slug={slug} />;
 
       case "thuc-don":
-        return <MenuTab restaurantId={restaurant.id} slug={slug} />;
+        return <MenuTab slug={slug} />;
 
       default:
         return null;

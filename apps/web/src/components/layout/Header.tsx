@@ -202,7 +202,7 @@ export function Header() {
                   Trang chủ
                 </Link>
                 <Link
-                  to="/explore"
+                  to="/suggest"
                   className="rounded-lg px-3 py-2 font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Đề xuất địa điểm

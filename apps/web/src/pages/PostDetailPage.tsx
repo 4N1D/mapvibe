@@ -26,6 +26,7 @@ import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
 import toast from "react-hot-toast";
+import { stripHtml } from "@/utils/text";
 
 interface ReviewPhoto {
   url: string;
@@ -316,7 +317,6 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       likes: review.upvote_count,
       dislikes: review.downvote_count,
       comments: review.comment_count,
-      shares: review.share_count,
     },
     images: images.length > 0 ? images : [],
     lat: review.location_geo_lat ?? undefined,
@@ -364,7 +364,7 @@ export function PostDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, isAuthenticated } = useAuth();
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("binh-luan");
+  const [activeTab, setActiveTab] = useState<string>("gioi-thieu");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -539,12 +539,7 @@ export function PostDetailPage() {
     }
   }, [isAuthenticated, post?.id, userId]);
 
-  // Strip HTML tags for plain text display
-  const stripHtml = (html: string): string => {
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
-  };
+
 
   const handleVote = async (voteType: "upvote" | "downvote") => {
     if (!isAuthenticated || !user || !post) {
@@ -1117,7 +1112,16 @@ export function PostDetailPage() {
           </div>
         )}
 
-        {activeTab === "thuc-don" && <MenuTab restaurantId={post.restaurantId} />}
+        {activeTab === "thuc-don" && (
+          post.restaurantSlug ? (
+            <MenuTab slug={post.restaurantSlug} />
+          ) : (
+            <div className="rounded-lg bg-white p-8 text-center shadow-sm">
+              <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-4 text-gray-500">Chưa có thực đơn cho địa điểm này.</p>
+            </div>
+          )
+        )}
       </section>
     </div>
   );

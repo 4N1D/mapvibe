@@ -11,7 +11,7 @@ interface ReviewItemProps {
 }
 
 export function ReviewItem({ review, formatTime }: ReviewItemProps) {
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState((review as any).user_has_liked || false);
   const [likeCount, setLikeCount] = useState(review.like_count);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 

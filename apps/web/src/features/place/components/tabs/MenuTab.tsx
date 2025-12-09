@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RestaurantPhoto, RestaurantPhotosResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
 interface MenuTabProps {
-  restaurantId: string;
   slug?: string;
+  restaurantId?: string | number;
+}
+
+interface MenuPhoto {
+  id: string;
+  url: string;
+  thumbnail_url?: string;
+  menu_name?: string;
 }
 
 interface MenuApiResponse {
@@ -14,6 +20,7 @@ interface MenuApiResponse {
     id: string;
     s3_url: string;
     s3_thumbnail_url?: string;
+    menu_name?: string;
   }>;
   pagination: { limit: number; offset: number; total: number };
 }
@@ -24,13 +31,12 @@ const fetchMenuPhotos = async (slug: string, page: number) => {
     `/restaurants/${slug}/menu?limit=12&offset=${offset}`
   );
   
-  // Transform API response to expected format
   const data = response.data;
-  const photos = (data.menu_photos || []).map(p => ({
+  const photos: MenuPhoto[] = (data.menu_photos || []).map(p => ({
     id: p.id,
     url: p.s3_url,
     thumbnail_url: p.s3_thumbnail_url,
-    category: "menu" as const,
+    menu_name: p.menu_name,
   }));
   
   return {
@@ -40,18 +46,27 @@ const fetchMenuPhotos = async (slug: string, page: number) => {
   };
 };
 
-export function MenuTab({ restaurantId, slug }: MenuTabProps) {
-  const [localPhotos, setLocalPhotos] = useState<RestaurantPhoto[]>([]);
+export function MenuTab({ slug, restaurantId }: MenuTabProps) {
+  const [localPhotos, setLocalPhotos] = useState<MenuPhoto[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["menu-photos", slug],
+    queryKey: ["menu-photos", slug || restaurantId],
     queryFn: () => fetchMenuPhotos(slug!, 1),
     placeholderData: (prev) => prev,
     enabled: !!slug,
   });
+
+  // If no slug provided, show message
+  if (!slug) {
+    return (
+      <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+        <p className="py-8 text-center text-gray-500">Chưa có ảnh thực đơn nào.</p>
+      </div>
+    );
+  }
 
   const photos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
 
@@ -90,14 +105,14 @@ export function MenuTab({ restaurantId, slug }: MenuTabProps) {
               <div className="relative aspect-[3/4] cursor-pointer overflow-hidden rounded-lg bg-gray-100">
                 <img
                   src={photo.thumbnail_url || photo.url}
-                  alt={photo.caption || "Thực đơn"}
+                  alt={photo.menu_name || "Thực đơn"}
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   loading="lazy"
                 />
                 <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
               </div>
-              {photo.caption && (
-                <p className="mt-2 text-sm font-medium text-gray-700">{photo.caption}</p>
+              {photo.menu_name && (
+                <p className="mt-2 text-center text-sm font-medium text-gray-700">{photo.menu_name}</p>
               )}
             </div>
           ))}

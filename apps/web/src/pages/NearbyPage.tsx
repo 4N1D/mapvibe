@@ -16,13 +16,7 @@ import {
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
-
-// Strip HTML tags for plain text display
-const stripHtml = (html: string): string => {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-};
+import { stripHtml } from "@/utils/text";
 
 interface GalleryItem {
   url: string;

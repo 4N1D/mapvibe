@@ -65,9 +65,11 @@ export function CommentItem({
     setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
 
     try {
-      const response = await apiClient.post<{ liked: boolean; like_count: number }>(
-        `/reviews/comments/${comment.id}/like`
-      );
+      // Choose endpoint based on comment type (restaurant vs review post)
+      const endpoint = comment.restaurant_id
+        ? `/restaurants/comments/${comment.id}/like`
+        : `/reviews/comments/${comment.id}/like`;
+      const response = await apiClient.post<{ liked: boolean; like_count: number }>(endpoint);
 
       // Update with actual response from server
       setLiked(response.data.liked);
@@ -95,7 +97,11 @@ export function CommentItem({
   const handleReport = async (reason: string, details?: string) => {
     try {
       setReportLoading(true);
-      await apiClient.post(`/restaurants/comments/${comment.id}/report`, {
+      // Choose endpoint based on comment type (restaurant vs review post)
+      const endpoint = comment.restaurant_id
+        ? `/restaurants/comments/${comment.id}/report`
+        : `/reviews/comments/${comment.id}/report`;
+      await apiClient.post(endpoint, {
         reason,
         details,
       });

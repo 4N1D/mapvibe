@@ -148,6 +148,7 @@ export interface HotReview {
   price_min?: number | null;
   price_max?: number | null;
   opening_hours?: string | null;
+  user_has_liked?: boolean;
 }
 
 export interface HotReviewsResponse {
@@ -221,7 +222,7 @@ export interface RestaurantReviewsResponse {
 // ============================================
 // Restaurant Photo Types (for PhotosTab)
 // ============================================
-export type PhotoCategory = "all" | "food" | "view" | "comment" | "menu";
+export type PhotoCategory = "all" | "food" | "view" | "review" | "menu";
 
 export interface RestaurantPhoto {
   id: string;

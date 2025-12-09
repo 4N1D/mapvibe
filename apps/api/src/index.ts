@@ -15,6 +15,7 @@ import {
   voteHandler as reviewVoteHandler,
   commentHandler as reviewCommentHandler,
   commentLikeHandler as reviewCommentLikeHandler,
+  commentReportHandler as reviewCommentReportHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
   shareHandler as reviewShareHandler,
@@ -87,6 +88,7 @@ import {
   adminUserActivitiesHandler,
 } from "./handlers/admin";
 import { logActivityHandler, batchLogActivityHandler } from "./handlers/activities";
+import { searchHandler as locationSearchHandler } from "./handlers/locations";
 
 // Route definitions
 interface RouteDefinition {
@@ -133,6 +135,14 @@ const routes: RouteDefinition[] = [
     pattern: /^\/places\/batch$/,
     paramNames: [],
     handler: batchHandler,
+  },
+
+  // Locations routes
+  {
+    method: "GET",
+    pattern: /^\/locations\/search$/,
+    paramNames: [],
+    handler: locationSearchHandler,
   },
 
   // Reviews routes
@@ -201,6 +211,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/reviews\/comments\/([^/]+)\/like$/,
     paramNames: ["commentId"],
     handler: reviewCommentLikeHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/reviews\/comments\/([^/]+)\/report$/,
+    paramNames: ["commentId"],
+    handler: reviewCommentReportHandler,
   },
   {
     method: "GET",

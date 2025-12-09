@@ -3,6 +3,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error } from "../../middlewares/response";
 import { recalculateRestaurantRatings } from "../../utils/rating";
+import { getUserIdFromEvent } from "../../utils/auth";
 
 interface CreateReviewBody {
   author_id: string;
@@ -74,7 +75,101 @@ export const listHandler: Handler = {
         query = query.orderBy("restaurant_reviews.created_at", sortOrder);
       }
 
-      const reviews = await query.limit(limit).offset(offset).execute();
+      const rawReviews = await query.limit(limit).offset(offset).execute();
+
+      // Collect all photo IDs from all reviews first
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              
+              // Check if it's already a URL
+              if (typeof firstItem === "string" && 
+                  (firstItem.startsWith("http://") || firstItem.startsWith("https://"))) {
+                // Already URLs - store directly
+                reviewPhotoMap.set(review.id, photosData);
+              } else {
+                // Photo IDs - collect for batch lookup
+                const ids = photosData.filter((id: unknown) => typeof id === "string");
+                reviewPhotoMap.set(review.id, ids);
+                allPhotoIds.push(...ids);
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Batch lookup all photo URLs
+      const photoUrlMap = new Map<string, string>();
+      if (allPhotoIds.length > 0) {
+        const uniqueIds = [...new Set(allPhotoIds)];
+        const photoRecords = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url"])
+          .where("id", "in", uniqueIds)
+          .execute();
+        
+        for (const p of photoRecords) {
+          photoUrlMap.set(p.id, p.s3_url);
+        }
+      }
+
+      // Build reviews with resolved photo URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photoUrls: string[] = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (firstItem.startsWith("http://") || firstItem.startsWith("https://")) {
+            // Already URLs
+            photoUrls = photoData;
+          } else {
+            // Map IDs to URLs
+            photoUrls = photoData
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+          }
+        }
+
+        return {
+          ...review,
+          photos: photoUrls,
+        };
+      });
+
+      // Get current user's likes if authenticated
+      const userId = getUserIdFromEvent(event);
+      let userLikedReviewIds: Set<string> = new Set();
+      
+      if (userId && reviews.length > 0) {
+        const reviewIds = reviews.map(r => r.id);
+        const userLikes = await db
+          .selectFrom("likes")
+          .select(["target_id"])
+          .where("user_id", "=", userId)
+          .where("target_type", "=", "review")
+          .where("target_id", "in", reviewIds)
+          .execute();
+        
+        userLikedReviewIds = new Set(userLikes.map(l => l.target_id));
+      }
+
+      // Add user_has_liked field to each review
+      const reviewsWithLikeStatus = reviews.map(review => ({
+        ...review,
+        user_has_liked: userLikedReviewIds.has(review.id),
+      }));
 
       // Get total count
       const countResult = await db
@@ -85,7 +180,7 @@ export const listHandler: Handler = {
 
       return success({
         restaurant_id: restaurant.id,
-        reviews,
+        reviews: reviewsWithLikeStatus,
         pagination: {
           limit,
           offset,

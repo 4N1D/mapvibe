@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input, Button } from "@mapvibe/ui-components";
-import { X, Upload, Loader2 } from "lucide-react";
+import { X, Upload, Loader2, MapPin, Plus } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   FEATURES,
@@ -8,6 +8,7 @@ import {
   type SuggestPlaceFormData,
   type PhotoUploadItem,
   type PhotoType,
+  type LocationSuggestion,
 } from "../types";
 import { useVietnamAddress } from "../hooks/useVietnamAddress";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,7 +50,25 @@ const initialFormData: SuggestPlaceFormData = {
   features: [],
   photos: [],
   review: "",
+  selectedLocationId: undefined,
 };
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export function SuggestPlaceForm() {
   const { user } = useAuth();
@@ -60,8 +79,120 @@ export function SuggestPlaceForm() {
     food: null,
     view: null,
     menu: null,
-    other: null,
+    review: null,
   });
+
+  // Location search state
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchingLocations, setSearchingLocations] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  const debouncedName = useDebounce(formData.name, 300);
+
+  // Search locations when name changes
+  useEffect(() => {
+    const searchLocations = async () => {
+      if (!debouncedName || debouncedName.length < 2 || selectedLocation) {
+        setLocationSuggestions([]);
+        return;
+      }
+
+      setSearchingLocations(true);
+      try {
+        const response = await apiClient.get<{ locations: LocationSuggestion[] }>(
+          `/locations/search?q=${encodeURIComponent(debouncedName)}&limit=8`
+        );
+        setLocationSuggestions(response.data.locations || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Failed to search locations:", error);
+        setLocationSuggestions([]);
+      } finally {
+        setSearchingLocations(false);
+      }
+    };
+
+    searchLocations();
+  }, [debouncedName, selectedLocation]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        nameInputRef.current &&
+        !nameInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle selecting a location suggestion
+  const handleSelectLocation = (location: LocationSuggestion) => {
+    setSelectedLocation(location);
+    setShowSuggestions(false);
+
+    // Parse address parts if available
+    const addressParts = location.address?.split(", ") || [];
+    const streetAddress = addressParts[0] || "";
+
+    // Parse opening hours
+    let openTime = "";
+    let closeTime = "";
+    if (location.opening_hours) {
+      const firstDay = Object.values(location.opening_hours)[0];
+      if (firstDay) {
+        const times = firstDay.split(" - ");
+        openTime = times[0]?.trim() || "";
+        closeTime = times[1]?.trim() || "";
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      name: location.name,
+      streetAddress: streetAddress,
+      phone: location.phone || "",
+      priceMin: location.price_min || 0,
+      priceMax: location.price_max || 0,
+      openTime,
+      closeTime,
+      features: location.features || [],
+      selectedLocationId: location.id,
+    }));
+  };
+
+  // Handle creating new location (clear selection)
+  const handleCreateNew = () => {
+    setSelectedLocation(null);
+    setShowSuggestions(false);
+    setFormData((prev) => ({
+      ...prev,
+      selectedLocationId: undefined,
+    }));
+  };
+
+  // Clear selected location when name changes manually
+  const handleNameChange = (value: string) => {
+    if (selectedLocation && value !== selectedLocation.name) {
+      setSelectedLocation(null);
+      setFormData((prev) => ({
+        ...prev,
+        name: value,
+        selectedLocationId: undefined,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, name: value }));
+    }
+  };
 
   const {
     provinces,
@@ -314,12 +445,89 @@ export function SuggestPlaceForm() {
           Hãy chia sẻ địa điểm yêu thích của bạn cùng với chúng tôi
         </h1>
 
-        <Input
-          label="Tên địa điểm"
-          placeholder="Nhập tên quán ăn/uống tại đây ..."
-          value={formData.name}
-          onChange={(e) => handleInputChange("name", e.target.value)}
-        />
+        {/* Name input with autocomplete */}
+        <div className="relative">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Tên địa điểm
+          </label>
+          <div className="relative">
+            <input
+              ref={nameInputRef}
+              type="text"
+              placeholder="Nhập tên quán ăn/uống tại đây ..."
+              value={formData.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => {
+                if (locationSuggestions.length > 0 && !selectedLocation) {
+                  setShowSuggestions(true);
+                }
+              }}
+              className={`w-full rounded-lg border px-4 py-3 outline-none transition-colors focus:border-primary-500 focus:ring-2 focus:ring-primary-200 ${
+                selectedLocation ? "border-green-500 bg-green-50" : "border-gray-300"
+              }`}
+            />
+            {searchingLocations && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              </div>
+            )}
+            {selectedLocation && (
+              <button
+                type="button"
+                onClick={handleCreateNew}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Selected location badge */}
+          {selectedLocation && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+              <MapPin className="h-4 w-4" />
+              <span>Đã chọn: {selectedLocation.address}</span>
+            </div>
+          )}
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && locationSuggestions.length > 0 && !selectedLocation && (
+            <div
+              ref={suggestionsRef}
+              className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg"
+            >
+              {locationSuggestions.map((location) => (
+                <button
+                  key={location.id}
+                  type="button"
+                  onClick={() => handleSelectLocation(location)}
+                  className="flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-gray-50"
+                >
+                  <MapPin className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary-500" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900">{location.name}</div>
+                    <div className="truncate text-sm text-gray-500">{location.address}</div>
+                  </div>
+                  <span className="flex-shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                    Chờ duyệt
+                  </span>
+                </button>
+              ))}
+
+              {/* Add new option */}
+              <button
+                type="button"
+                onClick={handleCreateNew}
+                className="flex w-full items-center gap-3 bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100"
+              >
+                <Plus className="h-5 w-5 text-primary-500" />
+                <span className="font-medium text-primary-600">
+                  Thêm địa điểm mới: "{formData.name}"
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
           <div className="md:col-span-1">

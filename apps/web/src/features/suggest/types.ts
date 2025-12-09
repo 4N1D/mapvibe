@@ -11,22 +11,36 @@ export interface SuggestPlaceFormData {
   features: string[];
   photos: PhotoUploadItem[];
   review: string;
+  selectedLocationId?: string;
 }
 
-export type PhotoType = "food" | "view" | "menu" | "other";
+export interface LocationSuggestion {
+  id: string;
+  name: string;
+  address: string;
+  status: string;
+  price_min?: number | null;
+  price_max?: number | null;
+  phone?: string | null;
+  opening_hours?: Record<string, string> | null;
+  features?: string[] | null;
+}
+
+export type PhotoType = "food" | "view" | "menu" | "review";
 
 export interface PhotoUploadItem {
   id: string;
   file: File;
   preview: string;
   type: PhotoType;
+  menuName?: string;
 }
 
 export const PHOTO_TYPES: { id: PhotoType; label: string }[] = [
   { id: "food", label: "Món ăn" },
   { id: "view", label: "Không gian" },
   { id: "menu", label: "Menu" },
-  { id: "other", label: "Khác" },
+  { id: "review", label: "Nhận xét" },
 ];
 
 export interface Province {

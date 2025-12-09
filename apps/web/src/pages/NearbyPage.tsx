@@ -20,6 +20,7 @@ import {
   LocationFilterSidebar,
   FilterState,
 } from "@/features/nearby/components/LocationFilterSidebar";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 interface GalleryItem {
   url: string;
@@ -1049,7 +1050,7 @@ export function NearbyPage() {
           <main className="flex-1 space-y-6">
             {loading ? (
               <div className="flex min-h-[300px] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+                <MapVibeLoader size="md" text="Đang tải bài review..." />
               </div>
             ) : error ? (
               <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">{error}</div>

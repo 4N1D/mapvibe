@@ -11,6 +11,7 @@ import {
   RestaurantInfo,
   ReviewsTab,
 } from "@/features/place";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 interface CuisineType {
   name: string;
@@ -70,7 +71,7 @@ export function PlaceDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <MapVibeLoader size="lg" text="Đang tải thông tin địa điểm..." />
       </div>
     );
   }

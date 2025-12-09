@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
 import toast from "react-hot-toast";
 import { stripHtml } from "@/utils/text";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 interface ReviewPhoto {
   url: string;
@@ -701,7 +702,7 @@ export function PostDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <MapVibeLoader size="lg" text="Đang tải bài viết..." />
       </div>
     );
   }
@@ -741,38 +742,21 @@ export function PostDetailPage() {
         <section className="lg:order-1 lg:col-span-5">
           <div className="h-full overflow-hidden rounded-xl shadow-sm">
             <div className="h-96 w-full">
-              {(() => {
-                console.log("[PostDetailPage] Rendering gallery, post.images:", post.images);
-                console.log("[PostDetailPage] post.images.length:", post.images.length);
-                console.log("[PostDetailPage] post.images[0]:", post.images[0]);
-                console.log("[PostDetailPage] imageError:", imageError);
-                
-                if (post.images.length > 0 && post.images[0] && !imageError) {
-                  return (
-                    <img
-                      src={post.images[0]}
-                      alt={post.title}
-                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                      onError={(e) => {
-                        console.error("[PostDetailPage] Image load error:", post.images[0]);
-                        setImageError(true);
-                      }}
-                      onLoad={() => {
-                        console.log("[PostDetailPage] Image loaded successfully:", post.images[0]);
-                      }}
-                    />
-                  );
-                } else {
-                  return (
-                    <div className="flex h-full w-full items-center justify-center bg-gray-100">
-                      <div className="flex flex-col items-center gap-3 text-gray-400">
-                        <ImageIcon className="h-12 w-12" />
-                        <span className="text-sm font-medium">Chưa có ảnh</span>
-                      </div>
-                    </div>
-                  );
-                }
-              })()}
+              {post.images.length > 0 && post.images[0] && !imageError ? (
+                <img
+                  src={post.images[0]}
+                  alt={post.title}
+                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                  <div className="flex flex-col items-center gap-3 text-gray-400">
+                    <ImageIcon className="h-12 w-12" />
+                    <span className="text-sm font-medium">Chưa có ảnh</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -824,7 +808,6 @@ export function PostDetailPage() {
               <button
                 onClick={() => {
                   if (post.phone && post.phone !== "Chưa có số điện thoại") {
-                    // Remove any non-digit characters except + for international numbers
                     const phoneNumber = post.phone.replace(/[^\d+]/g, "");
                     window.location.href = `tel:${phoneNumber}`;
                   } else {
@@ -851,7 +834,6 @@ export function PostDetailPage() {
                         behavior: "smooth",
                       });
                     } else {
-                      // Fallback: scroll to tab content
                       document
                         .getElementById("tab-content")
                         ?.scrollIntoView({ behavior: "smooth" });

@@ -19,6 +19,7 @@ import {
   type ToastData,
   type ProfileMenuItem,
 } from "@/features/profile";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -138,7 +139,7 @@ export function ProfilePage() {
   if (authLoading || profileLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <MapVibeLoader size="lg" text="Đang tải hồ sơ..." />
       </div>
     );
   }

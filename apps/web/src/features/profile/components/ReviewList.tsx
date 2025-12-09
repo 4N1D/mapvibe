@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { UserReview } from "../types";
 import { formatDateDisplay } from "../utils";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 interface ReviewListProps {
   reviews: UserReview[];
@@ -15,7 +16,7 @@ export function ReviewList({ reviews, loading, error, hasMore, onLoadMore }: Rev
   if (loading && reviews.length === 0) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <MapVibeLoader size="md" text="Đang tải bài đánh giá..." />
       </div>
     );
   }

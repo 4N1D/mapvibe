@@ -2,6 +2,7 @@ import { Bookmark } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SavedRestaurant } from "../types";
 import { formatDateDisplay, formatPrice } from "../utils";
+import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
 interface SavedListProps {
   saved: SavedRestaurant[];
@@ -15,7 +16,7 @@ export function SavedList({ saved, loading, error, hasMore, onLoadMore }: SavedL
   if (loading && saved.length === 0) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <MapVibeLoader size="md" text="Đang tải danh sách đã lưu..." />
       </div>
     );
   }

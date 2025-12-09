@@ -222,7 +222,7 @@ export interface RestaurantReviewsResponse {
 // ============================================
 // Restaurant Photo Types (for PhotosTab)
 // ============================================
-export type PhotoCategory = "all" | "food" | "view" | "comment" | "menu";
+export type PhotoCategory = "all" | "food" | "view" | "review" | "menu";
 
 export interface RestaurantPhoto {
   id: string;

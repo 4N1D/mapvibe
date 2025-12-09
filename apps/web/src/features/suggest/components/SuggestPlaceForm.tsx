@@ -60,7 +60,7 @@ export function SuggestPlaceForm() {
     food: null,
     view: null,
     menu: null,
-    other: null,
+    review: null,
   });
 
   const {

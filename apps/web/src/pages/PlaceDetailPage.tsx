@@ -164,7 +164,7 @@ export function PlaceDetailPage() {
         return <PhotosTab restaurantId={restaurant.id} slug={slug} />;
 
       case "thuc-don":
-        return <MenuTab restaurantId={restaurant.id} slug={slug} />;
+        return <MenuTab slug={slug} />;
 
       default:
         return null;

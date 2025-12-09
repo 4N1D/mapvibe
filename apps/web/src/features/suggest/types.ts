@@ -13,20 +13,21 @@ export interface SuggestPlaceFormData {
   review: string;
 }
 
-export type PhotoType = "food" | "view" | "menu" | "other";
+export type PhotoType = "food" | "view" | "menu" | "review";
 
 export interface PhotoUploadItem {
   id: string;
   file: File;
   preview: string;
   type: PhotoType;
+  menuName?: string;
 }
 
 export const PHOTO_TYPES: { id: PhotoType; label: string }[] = [
   { id: "food", label: "Món ăn" },
   { id: "view", label: "Không gian" },
   { id: "menu", label: "Menu" },
-  { id: "other", label: "Khác" },
+  { id: "review", label: "Nhận xét" },
 ];
 
 export interface Province {

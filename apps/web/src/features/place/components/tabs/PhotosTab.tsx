@@ -15,7 +15,7 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   all: "Tất cả",
   food: "Thức ăn",
   view: "Không gian",
-  comment: "Nhận xét",
+  review: "Nhận xét",
 };
 
 interface PhotosApiResponse {
@@ -25,6 +25,7 @@ interface PhotosApiResponse {
     s3_url: string;
     s3_thumbnail_url?: string;
     photo_type: string;
+    menu_name?: string;
   }>;
   counts: Record<string, number>;
   pagination: { limit: number; offset: number; total: number };
@@ -32,8 +33,7 @@ interface PhotosApiResponse {
 
 const fetchPhotos = async (slug: string, category: string, page: number) => {
   const offset = (page - 1) * 15;
-  // Map frontend 'comment' category to backend 'other' type
-  const type = category === "all" ? "" : category === "comment" ? "other" : category;
+  const type = category === "all" ? "" : category;
   const url = `/restaurants/${slug}/photos?limit=15&offset=${offset}${type ? `&type=${type}` : ""}`;
   const response = await apiClient.get<PhotosApiResponse>(url);
   
@@ -44,6 +44,7 @@ const fetchPhotos = async (slug: string, category: string, page: number) => {
     url: p.s3_url,
     thumbnail_url: p.s3_thumbnail_url,
     category: p.photo_type as any,
+    caption: p.menu_name,
   }));
   
   return {
@@ -54,7 +55,7 @@ const fetchPhotos = async (slug: string, category: string, page: number) => {
       all: Object.values(data.counts || {}).reduce((a, b) => a + b, 0),
       food: data.counts?.food || 0,
       view: data.counts?.view || 0,
-      comment: data.counts?.other || 0,
+      review: data.counts?.review || 0,
     },
   };
 };
@@ -81,7 +82,7 @@ export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabP
   });
 
   const photos = page === 1 ? data?.photos || [] : allPhotos;
-  const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, comment: 0 };
+  const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, review: 0 };
 
   if (data && page === 1 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);

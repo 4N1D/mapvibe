@@ -2,7 +2,7 @@ import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
 import { getDb } from "../../services/db";
 import { success, notFound, badRequest, error } from "../../middlewares/response";
 
-type PhotoType = "food" | "view" | "menu" | "other";
+type PhotoType = "food" | "view" | "menu" | "review";
 
 // GET /restaurants/:slug/photos - Fetch photos with optional type filter
 export const listHandler: Handler = {
@@ -41,6 +41,7 @@ export const listHandler: Handler = {
           "s3_medium_url",
           "s3_large_url",
           "photo_type",
+          "menu_name",
           "display_order",
           "view_count",
           "created_at",
@@ -127,6 +128,7 @@ export const menuHandler: Handler = {
           "s3_thumbnail_url",
           "s3_medium_url",
           "s3_large_url",
+          "menu_name",
           "display_order",
           "view_count",
           "created_at",

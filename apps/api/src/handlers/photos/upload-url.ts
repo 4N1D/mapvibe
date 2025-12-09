@@ -5,7 +5,7 @@ import { getPresignedUploadUrl, generatePhotoKey } from "../../services/s3";
 import { success, badRequest, unauthorized, error } from "../../middlewares/response";
 import { getUserIdFromEvent } from "@/utils/auth";
 
-type PhotoType = "food" | "view" | "menu" | "other" | "user_avatar" | "user_background";
+type PhotoType = "food" | "view" | "menu" | "review" | "user_avatar" | "user_background";
 
 interface GetUploadUrlBody {
   photo_type: PhotoType;
@@ -14,6 +14,7 @@ interface GetUploadUrlBody {
   restaurant_id?: string;
   location_address_id?: string;
   review_post_id?: string;
+  menu_name?: string;
 }
 
 const ALLOWED_CONTENT_TYPES: Record<string, string> = {
@@ -49,6 +50,7 @@ export const handler: Handler = {
         restaurant_id,
         location_address_id,
         review_post_id,
+        menu_name,
       } = body;
 
       if (!userId) {
@@ -104,6 +106,7 @@ export const handler: Handler = {
           review_post_id: review_post_id ?? null,
           uploaded_by: userId,
           photo_type,
+          menu_name: photo_type === "menu" ? (menu_name ?? null) : null,
           s3_url: presignedResult.cdnUrl,
           s3_thumbnail_url: null,
           s3_medium_url: null,

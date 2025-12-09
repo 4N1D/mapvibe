@@ -275,18 +275,20 @@ function Gallery({ items }: { items: GalleryItem[] }) {
       <div className="relative col-span-3 row-span-2 overflow-hidden rounded-lg bg-gray-900">
         {display[0] && !imageErrors.has(0) ? (
           <>
-            {/* Blurred background */}
+            {/* Blurred background with vibrant colors */}
             <img
               src={display[0].url}
               alt=""
-              className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl"
+              className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl brightness-110 saturate-150"
               aria-hidden="true"
             />
+            {/* Gradient overlay for extra color pop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 via-transparent to-purple-500/20" />
             {/* Main image */}
             <img
               src={display[0].url}
               alt=""
-              className="relative h-full w-full object-contain"
+              className="relative h-full w-full object-contain drop-shadow-lg"
               onError={() => handleImageError(0)}
             />
           </>
@@ -595,14 +597,14 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
           )}
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold text-gray-900">{post.author}</div>
+              <div className="text-sm font-semibold text-primary-600 hover:text-primary-700">{post.author}</div>
               {post.approved ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-200">
-                  Đã kiểm duyệt
+                <span className="rounded-full bg-gradient-to-r from-green-100 to-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-300">
+                  ✓ Đã kiểm duyệt
                 </span>
               ) : (
-                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-semibold text-yellow-800 ring-1 ring-yellow-200">
-                  Chưa kiểm duyệt
+                <span className="rounded-full bg-gradient-to-r from-yellow-100 to-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 ring-1 ring-orange-300">
+                  ⏳ Chưa kiểm duyệt
                 </span>
               )}
             </div>
@@ -610,24 +612,24 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
           </div>
         </div>
 
-        <h3 className="mt-3 text-lg font-semibold text-gray-900">{post.title}</h3>
+        <h3 className="mt-3 text-lg font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">{post.title}</h3>
 
-        <div className="mt-2 space-y-1 text-sm text-gray-700">
-          <div className="flex items-center gap-2 text-gray-700">
-            <MapPin className="h-4 w-4 text-gray-400" />
-            <span>{post.address}</span>
+        <div className="mt-2 space-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-red-500" />
+            <span className="text-gray-700">{post.address}</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <Phone className="h-4 w-4 text-gray-400" />
-            <span>{post.phone}</span>
+          <div className="flex items-center gap-2">
+            <Phone className="h-4 w-4 text-green-500" />
+            <span className="text-gray-700">{post.phone}</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <DollarSign className="h-4 w-4 text-gray-400" />
-            <span>{post.priceRange}</span>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-amber-500" />
+            <span className="text-gray-700">{post.priceRange}</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <Clock className="h-4 w-4 text-gray-400" />
-            <span>Giờ mở cửa | {post.hours}</span>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-blue-500" />
+            <span className="text-gray-700">Giờ mở cửa | {post.hours}</span>
           </div>
         </div>
 
@@ -645,9 +647,9 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
               sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
               sessionStorage.setItem("nearbyPostId", post.id);
             }}
-            className="text-red-600 hover:underline"
+            className="font-medium bg-gradient-to-r from-primary-500 to-purple-500 bg-clip-text text-transparent hover:from-primary-600 hover:to-purple-600 transition-all"
           >
-            Xem chi tiết
+            Xem chi tiết →
           </Link>
           <div className="flex items-center gap-3">
             <motion.button

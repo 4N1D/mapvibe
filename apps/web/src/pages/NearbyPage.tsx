@@ -272,14 +272,24 @@ function Gallery({ items }: { items: GalleryItem[] }) {
   return (
     <div className="grid h-full w-full grid-cols-5 grid-rows-2 gap-1 sm:gap-2">
       {/* Main image spans 2 rows, 3 cols */}
-      <div className="relative col-span-3 row-span-2 overflow-hidden rounded-lg">
+      <div className="relative col-span-3 row-span-2 overflow-hidden rounded-lg bg-gray-900">
         {display[0] && !imageErrors.has(0) ? (
-          <img
-            src={display[0].url}
-            alt=""
-            className="h-full w-full object-cover"
-            onError={() => handleImageError(0)}
-          />
+          <>
+            {/* Blurred background */}
+            <img
+              src={display[0].url}
+              alt=""
+              className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl"
+              aria-hidden="true"
+            />
+            {/* Main image */}
+            <img
+              src={display[0].url}
+              alt=""
+              className="relative h-full w-full object-contain"
+              onError={() => handleImageError(0)}
+            />
+          </>
         ) : (
           <PlaceholderPanel />
         )}

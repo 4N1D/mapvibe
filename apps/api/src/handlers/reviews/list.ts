@@ -3,6 +3,50 @@ import { getDb } from "../../services/db";
 import { success, error } from "../../middlewares/response";
 import { sql } from "kysely";
 
+// Helper to extract photo IDs from photos JSON (supports multiple formats)
+function extractPhotoIds(photos: unknown): string[] {
+  if (!photos) return [];
+
+  let photosData = photos;
+  if (typeof photosData === "string") {
+    try {
+      photosData = JSON.parse(photosData);
+    } catch {
+      return [];
+    }
+  }
+
+  const photoIds: string[] = [];
+
+  // Handle object format {general: [...], food: [...], menu: [...]}
+  if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+    const categories = photosData as Record<string, unknown[]>;
+    for (const category of Object.values(categories)) {
+      if (Array.isArray(category)) {
+        for (const item of category) {
+          if (typeof item === "string") {
+            photoIds.push(item);
+          } else if (item && typeof item === "object" && "id" in item) {
+            photoIds.push((item as { id: string }).id);
+          }
+        }
+      }
+    }
+  }
+  // Handle array format
+  else if (Array.isArray(photosData)) {
+    for (const p of photosData) {
+      if (typeof p === "string") {
+        photoIds.push(p);
+      } else if (p && typeof p === "object" && "id" in p) {
+        photoIds.push((p as { id: string }).id);
+      }
+    }
+  }
+
+  return photoIds;
+}
+
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -98,12 +142,56 @@ export const handler: Handler = {
       }
 
       const result = await query.execute(db);
+      const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
+
+      // Collect all photo IDs from all reviews
+      const allPhotoIds: string[] = [];
+      const reviewPhotoIdsMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        const photoIds = extractPhotoIds(review.photos);
+        if (photoIds.length > 0) {
+          reviewPhotoIdsMap.set(review.id, photoIds);
+          allPhotoIds.push(...photoIds);
+        }
+      }
+
+      // Batch lookup all photo URLs from database
+      const photoUrlMap = new Map<string, string>();
+      if (allPhotoIds.length > 0) {
+        const uniqueIds = [...new Set(allPhotoIds)];
+        const photoRecords = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniqueIds)
+          .execute();
+
+        for (const p of photoRecords) {
+          photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+        }
+      }
+
+      // Build reviews with resolved photo URLs
+      const reviews = rawReviews.map((review) => {
+        const photoIds = reviewPhotoIdsMap.get(review.id) || [];
+        const photos = photoIds
+          .map((id) => {
+            const url = photoUrlMap.get(id);
+            return url ? { url } : null;
+          })
+          .filter((p): p is { url: string } => p !== null);
+
+        return {
+          ...review,
+          photos,
+        };
+      });
 
       return success({
-        count: result.rows.length,
+        count: reviews.length,
         limit,
         offset,
-        reviews: result.rows,
+        reviews,
       });
     } catch (err) {
       console.error("[reviews/list] Error:", err);

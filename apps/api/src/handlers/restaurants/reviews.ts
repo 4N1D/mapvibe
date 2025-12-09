@@ -75,7 +75,78 @@ export const listHandler: Handler = {
         query = query.orderBy("restaurant_reviews.created_at", sortOrder);
       }
 
-      const reviews = await query.limit(limit).offset(offset).execute();
+      const rawReviews = await query.limit(limit).offset(offset).execute();
+
+      // Collect all photo IDs from all reviews first
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              
+              // Check if it's already a URL
+              if (typeof firstItem === "string" && 
+                  (firstItem.startsWith("http://") || firstItem.startsWith("https://"))) {
+                // Already URLs - store directly
+                reviewPhotoMap.set(review.id, photosData);
+              } else {
+                // Photo IDs - collect for batch lookup
+                const ids = photosData.filter((id: unknown) => typeof id === "string");
+                reviewPhotoMap.set(review.id, ids);
+                allPhotoIds.push(...ids);
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Batch lookup all photo URLs
+      const photoUrlMap = new Map<string, string>();
+      if (allPhotoIds.length > 0) {
+        const uniqueIds = [...new Set(allPhotoIds)];
+        const photoRecords = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url"])
+          .where("id", "in", uniqueIds)
+          .execute();
+        
+        for (const p of photoRecords) {
+          photoUrlMap.set(p.id, p.s3_url);
+        }
+      }
+
+      // Build reviews with resolved photo URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photoUrls: string[] = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (firstItem.startsWith("http://") || firstItem.startsWith("https://")) {
+            // Already URLs
+            photoUrls = photoData;
+          } else {
+            // Map IDs to URLs
+            photoUrls = photoData
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+          }
+        }
+
+        return {
+          ...review,
+          photos: photoUrls,
+        };
+      });
 
       // Get current user's likes if authenticated
       const userId = getUserIdFromEvent(event);

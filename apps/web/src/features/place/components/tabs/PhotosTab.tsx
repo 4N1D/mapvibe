@@ -15,7 +15,7 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   all: "Tất cả",
   food: "Thức ăn",
   view: "Không gian",
-  comment: "Bình luận",
+  comment: "Nhận xét",
 };
 
 interface PhotosApiResponse {
@@ -32,7 +32,8 @@ interface PhotosApiResponse {
 
 const fetchPhotos = async (slug: string, category: string, page: number) => {
   const offset = (page - 1) * 15;
-  const type = category === "all" ? "" : category;
+  // Map frontend 'comment' category to backend 'other' type
+  const type = category === "all" ? "" : category === "comment" ? "other" : category;
   const url = `/restaurants/${slug}/photos?limit=15&offset=${offset}${type ? `&type=${type}` : ""}`;
   const response = await apiClient.get<PhotosApiResponse>(url);
   

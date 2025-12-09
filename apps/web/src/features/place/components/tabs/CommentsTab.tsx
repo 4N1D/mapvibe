@@ -166,12 +166,31 @@ export function CommentsTab({ restaurantId, slug, reviewId }: CommentsTabProps) 
     setReplyingTo({ id: commentId, name: authorName, rootParentId });
   };
 
+  // Extract liked comment IDs from restaurant comments response (user_has_liked field)
+  useEffect(() => {
+    if (!reviewId && data?.comments && isAuthenticated) {
+      const extractLikedIds = (comments: Comment[]): string[] => {
+        const likedIds: string[] = [];
+        for (const comment of comments) {
+          if ((comment as any).user_has_liked) {
+            likedIds.push(comment.id);
+          }
+          if (comment.replies) {
+            likedIds.push(...extractLikedIds(comment.replies));
+          }
+        }
+        return likedIds;
+      };
+      const likedIds = extractLikedIds(data.comments);
+      setLikedCommentIds(new Set(likedIds));
+    }
+  }, [data?.comments, reviewId, isAuthenticated]);
+
   // Fetch liked comments when reviewId is available and user is authenticated
   useEffect(() => {
     const fetchLikedComments = async () => {
       if (!reviewId) {
-        // Reset liked comments if no reviewId
-        setLikedCommentIds(new Set());
+        // For restaurant comments, liked status comes from API response (user_has_liked)
         return;
       }
 

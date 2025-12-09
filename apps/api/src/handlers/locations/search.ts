@@ -21,6 +21,9 @@ export const handler: Handler = {
       // Approved locations are already in restaurants table - users should review there
       const searchPattern = `%${query}%`;
 
+      // Debug: Log search query
+      console.log("[locations/search] Searching for:", query, "pattern:", searchPattern);
+
       const result = await sql`
         SELECT 
           la.id,
@@ -42,6 +45,8 @@ export const handler: Handler = {
         ORDER BY la.restaurant_name ASC
         LIMIT ${limit}
       `.execute(db);
+
+      console.log("[locations/search] Found:", result.rows.length, "results");
 
       interface LocationRow {
         id: string;

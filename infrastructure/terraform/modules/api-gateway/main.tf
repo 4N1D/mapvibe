@@ -109,6 +109,13 @@ resource "aws_apigatewayv2_route" "places_nearby" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+# Locations routes
+resource "aws_apigatewayv2_route" "locations_search" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /locations/search"
+  target    = "integrations/${aws_apigatewayv2_integration.places.id}"
+}
+
 resource "aws_apigatewayv2_route" "photos_upload_url" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "POST /photos/upload-url"

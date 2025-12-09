@@ -498,7 +498,7 @@ export function SuggestPlaceForm() {
             >
               {locationSuggestions.map((location) => (
                 <button
-                  key={`${location.source}-${location.id}`}
+                  key={location.id}
                   type="button"
                   onClick={() => handleSelectLocation(location)}
                   className="flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-gray-50"
@@ -508,11 +508,9 @@ export function SuggestPlaceForm() {
                     <div className="font-medium text-gray-900">{location.name}</div>
                     <div className="truncate text-sm text-gray-500">{location.address}</div>
                   </div>
-                  {location.status === "approved" && (
-                    <span className="flex-shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                      Đã duyệt
-                    </span>
-                  )}
+                  <span className="flex-shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                    Chờ duyệt
+                  </span>
                 </button>
               ))}
 

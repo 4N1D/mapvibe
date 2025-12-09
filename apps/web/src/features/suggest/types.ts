@@ -19,7 +19,6 @@ export interface LocationSuggestion {
   name: string;
   address: string;
   status: string;
-  source: "location_address" | "restaurant";
   price_min?: number | null;
   price_max?: number | null;
   phone?: string | null;

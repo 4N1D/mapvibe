@@ -1,14 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Interactive script to seed photos for restaurants
+ * Interactive script to seed photos for review posts
+ * Photos will be linked to location_addresses via the review post
  * 
  * Usage:
- *   bun run scripts/seed-photos.ts
- * 
- * Requirements:
- *   - AWS credentials configured
- *   - .env file with DB credentials
- *   - Ảnh nằm trong folder local
+ *   bun run scripts/seed-review-photos.ts
  */
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -33,7 +29,6 @@ if (fs.existsSync(envPath)) {
     const key = trimmedLine.substring(0, eqIndex).trim();
     let value = trimmedLine.substring(eqIndex + 1).trim();
     
-    // Remove surrounding quotes if present
     if ((value.startsWith('"') && value.endsWith('"')) || 
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
@@ -47,11 +42,6 @@ if (fs.existsSync(envPath)) {
 const S3_BUCKET = process.env.S3_PHOTOS_BUCKET || "mapvibe-photos-mvp";
 const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN || "";
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
-
-// Photo types
-type PhotoType = "food" | "view" | "menu" | "review";
-
-const PHOTO_TYPES: PhotoType[] = ["food", "view", "menu", "review"];
 
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
 
@@ -123,28 +113,35 @@ async function uploadToS3(filePath: string, s3Key: string): Promise<string> {
   return getCdnUrl(s3Key);
 }
 
-async function listRestaurants() {
-  const restaurants = await db
-    .selectFrom("restaurants")
-    .select(["id", "name_vi", "address"])
-    .orderBy("name_vi")
+async function listReviewPosts() {
+  const reviews = await db
+    .selectFrom("review_posts as rp")
+    .leftJoin("location_addresses as la", "la.id", "rp.location_address_id")
+    .leftJoin("users as u", "u.id", "rp.author_id")
+    .select([
+      "rp.id",
+      "rp.author_id",
+      "rp.location_address_id",
+      "rp.text",
+      "rp.created_at",
+      "la.restaurant_name",
+      "la.street_address",
+      "u.display_name as author_name",
+    ])
+    .orderBy("rp.created_at", "desc")
     .execute();
   
-  console.log("\n=== Danh sách Restaurants ===");
-  restaurants.forEach((r, i) => {
-    console.log(`${i + 1}. [${r.id.substring(0, 8)}...] ${r.name_vi} - ${r.address || "N/A"}`);
+  console.log("\n=== Danh sách Review Posts ===");
+  reviews.forEach((r, i) => {
+    const textSnippet = r.text ? r.text.substring(0, 50) + "..." : "N/A";
+    const location = r.restaurant_name || r.street_address || "Unknown location";
+    console.log(`${i + 1}. [${r.id.substring(0, 10)}...] by ${r.author_name || "Unknown"}`);
+    console.log(`   📍 ${location}`);
+    console.log(`   📝 ${textSnippet}`);
+    console.log("");
   });
   
-  return restaurants;
-}
-
-async function getExistingUser(): Promise<string | null> {
-  const user = await db
-    .selectFrom("users")
-    .select("id")
-    .limit(1)
-    .executeTakeFirst();
-  return user?.id || null;
+  return reviews;
 }
 
 function listImagesInFolder(folderPath: string): string[] {
@@ -161,58 +158,36 @@ function listImagesInFolder(folderPath: string): string[] {
 }
 
 async function main() {
-  console.log("🖼️  Mapvibe Photo Seeder");
-  console.log("========================\n");
+  console.log("🖼️  Mapvibe Review Photo Seeder");
+  console.log("================================\n");
   
   // Init DB
   console.log("Connecting to database...");
   await initDb();
   console.log("✓ Database connected\n");
   
-  // Get admin user
-  const adminUserId = await getExistingUser();
-  if (!adminUserId) {
-    console.log("❌ Không tìm thấy user nào trong database. Vui lòng tạo user trước.");
-    process.exit(1);
-  }
-  console.log(`Using user ID: ${adminUserId}\n`);
-  
-  // List restaurants
-  const restaurants = await listRestaurants();
-  if (restaurants.length === 0) {
-    console.log("❌ Không có restaurant nào trong database.");
+  // List review posts
+  const reviews = await listReviewPosts();
+  if (reviews.length === 0) {
+    console.log("❌ Không có review post nào trong database.");
     process.exit(1);
   }
   
-  // Select restaurant
-  const restaurantIndex = await question("\nChọn restaurant (nhập số): ");
-  const selectedRestaurant = restaurants[parseInt(restaurantIndex) - 1];
-  if (!selectedRestaurant) {
-    console.log("❌ Restaurant không hợp lệ");
+  // Select review post
+  const reviewIndex = await question("Chọn review post (nhập số): ");
+  const selectedReview = reviews[parseInt(reviewIndex) - 1];
+  if (!selectedReview) {
+    console.log("❌ Review post không hợp lệ");
     process.exit(1);
   }
-  console.log(`\n✓ Đã chọn: ${selectedRestaurant.name_vi}\n`);
   
-  // Select photo type
-  console.log("=== Loại ảnh ===");
-  PHOTO_TYPES.forEach((t, i) => console.log(`${i + 1}. ${t}`));
-  const typeIndex = await question("\nChọn loại ảnh (nhập số): ");
-  const selectedType = PHOTO_TYPES[parseInt(typeIndex) - 1];
-  if (!selectedType) {
-    console.log("❌ Loại ảnh không hợp lệ");
-    process.exit(1);
-  }
-  console.log(`\n✓ Loại ảnh: ${selectedType}\n`);
-  
-  // Get menu name if type is menu
-  let menuName: string | null = null;
-  if (selectedType === "menu") {
-    menuName = await question("Nhập tên menu (VD: 'Menu chính', để trống nếu không có): ");
-    menuName = menuName.trim() || null;
-  }
+  const locationName = selectedReview.restaurant_name || selectedReview.street_address || "Unknown";
+  console.log(`\n✓ Đã chọn review của: ${selectedReview.author_name}`);
+  console.log(`  📍 Location: ${locationName}`);
+  console.log(`  🔗 Location Address ID: ${selectedReview.location_address_id || "None"}\n`);
   
   // Select folder
-  const folderPath = await question("\nNhập đường dẫn folder chứa ảnh: ");
+  const folderPath = await question("Nhập đường dẫn folder chứa ảnh: ");
   const absolutePath = path.isAbsolute(folderPath) 
     ? folderPath 
     : path.resolve(process.cwd(), folderPath);
@@ -227,7 +202,7 @@ async function main() {
   images.forEach((img, i) => console.log(`${i + 1}. ${img}`));
   
   // Confirm upload
-  const confirm = await question(`\nUpload ${images.length} ảnh lên S3? (y/n): `);
+  const confirm = await question(`\nUpload ${images.length} ảnh cho review này? (y/n): `);
   if (confirm.toLowerCase() !== "y") {
     console.log("Đã hủy.");
     process.exit(0);
@@ -241,10 +216,10 @@ async function main() {
     const imagePath = path.join(absolutePath, imageName);
     const ext = path.extname(imageName);
     
-    // Generate S3 key
+    // Generate S3 key - use 'review' folder
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
-    const s3Key = `${selectedType}/${adminUserId}/${timestamp}-${random}${ext}`;
+    const s3Key = `review/${selectedReview.author_id}/${timestamp}-${random}${ext}`;
     
     console.log(`[${i + 1}/${images.length}] Uploading ${imageName}...`);
     
@@ -252,14 +227,16 @@ async function main() {
       // Upload to S3
       const cdnUrl = await uploadToS3(imagePath, s3Key);
       
-      // Insert to DB
+      // Insert to DB - link to review_post and location_address
       const photoId = crypto.randomUUID();
       await db.insertInto("photos").values({
         id: photoId,
-        restaurant_id: selectedRestaurant.id,
-        uploaded_by: adminUserId,
-        photo_type: selectedType,
-        menu_name: menuName,
+        location_address_id: selectedReview.location_address_id || null,
+        restaurant_id: null,
+        review_post_id: selectedReview.id,
+        uploaded_by: selectedReview.author_id,
+        photo_type: "review",
+        menu_name: null,
         s3_url: cdnUrl,
         s3_thumbnail_url: null,
         s3_medium_url: null,

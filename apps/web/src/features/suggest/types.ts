@@ -23,7 +23,6 @@ export interface LocationSuggestion {
   price_max?: number | null;
   phone?: string | null;
   opening_hours?: Record<string, string> | null;
-  features?: string[] | null;
 }
 
 export type PhotoType = "food" | "view" | "menu" | "review";

@@ -37,8 +37,7 @@ export const handler: Handler = {
           la.price_max,
           la.phone,
           la.opening_hours,
-          la.cuisine_types,
-          la.features
+          la.cuisine_types
         FROM location_addresses la
         WHERE la.restaurant_name ILIKE ${searchPattern}
           AND la.status = 'pending'
@@ -61,7 +60,6 @@ export const handler: Handler = {
         phone: string | null;
         opening_hours: string | null;
         cuisine_types: string | null;
-        features: string | null;
       }
 
       const locations = (result.rows as LocationRow[]).map((row) => ({
@@ -74,7 +72,6 @@ export const handler: Handler = {
         phone: row.phone,
         opening_hours: row.opening_hours ? (typeof row.opening_hours === 'string' ? JSON.parse(row.opening_hours) : row.opening_hours) : null,
         cuisine_types: row.cuisine_types ? (typeof row.cuisine_types === 'string' ? JSON.parse(row.cuisine_types) : row.cuisine_types) : null,
-        features: row.features ? (typeof row.features === 'string' ? JSON.parse(row.features) : row.features) : null,
       }));
 
       return success({ locations });

@@ -165,7 +165,6 @@ export function SuggestPlaceForm() {
       priceMax: location.price_max || 0,
       openTime,
       closeTime,
-      features: location.features || [],
       selectedLocationId: location.id,
     }));
   };

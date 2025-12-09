@@ -166,6 +166,66 @@ export const updateReviewHandler: Handler = {
       const db = await getDb();
       const updateData: Record<string, unknown> = { updated_at: new Date() };
 
+      // Handle delete action separately (hard delete)
+      if (action === "delete") {
+        // Delete in transaction to ensure data integrity
+        await db.transaction().execute(async (trx) => {
+          // 1. Get all comment IDs for this review
+          const comments = await trx
+            .selectFrom("comments")
+            .select("id")
+            .where("review_post_id", "=", reviewId)
+            .execute();
+          
+          const commentIds = comments.map(c => c.id);
+          
+          // 2. Delete likes on comments of this review
+          if (commentIds.length > 0) {
+            await trx
+              .deleteFrom("likes")
+              .where("target_type", "=", "comment")
+              .where("target_id", "in", commentIds)
+              .execute();
+          }
+          
+          // 3. Delete comments
+          await trx
+            .deleteFrom("comments")
+            .where("review_post_id", "=", reviewId)
+            .execute();
+          
+          // 4. Delete votes
+          await trx
+            .deleteFrom("votes")
+            .where("review_post_id", "=", reviewId)
+            .execute();
+          
+          // 5. Delete reports targeting this review
+          await trx
+            .deleteFrom("reports")
+            .where("target_type", "=", "review_post")
+            .where("target_id", "=", reviewId)
+            .execute();
+          
+          // 6. Delete photos associated with this review
+          await trx
+            .deleteFrom("photos")
+            .where("review_post_id", "=", reviewId)
+            .execute();
+          
+          // 7. Delete the review itself
+          await trx
+            .deleteFrom("review_posts")
+            .where("id", "=", reviewId)
+            .execute();
+        });
+
+        return success({
+          message: "Review deleted successfully",
+          review: { id: reviewId },
+        });
+      }
+
       switch (action) {
         case "approve":
           updateData.status = "published";
@@ -174,10 +234,6 @@ export const updateReviewHandler: Handler = {
         case "hide":
           updateData.status = "hidden";
           updateData.hidden_reason = reason || "Violated community guidelines";
-          break;
-        case "delete":
-          updateData.status = "deleted";
-          updateData.hidden_reason = reason || "Deleted by admin";
           break;
         case "restore":
           updateData.status = "published";

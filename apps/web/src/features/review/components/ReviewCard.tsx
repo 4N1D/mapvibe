@@ -154,26 +154,28 @@ export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: Revi
 
       <CardContent className="flex flex-1 flex-col p-4">
         {/* Restaurant info - always show */}
-        <div className="mb-3 border-b border-gray-100 pb-3">
-          <h3 className="font-semibold text-gray-900 line-clamp-1">
+        <div className="mb-3 rounded-lg bg-gradient-to-r from-slate-50 to-gray-50 p-3 ring-1 ring-gray-100">
+          <h3 className="font-bold text-gray-900 line-clamp-1">
             {data.restaurant_name || "Địa điểm chưa xác định"}
           </h3>
           {data.restaurant_address && (
-            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-blue-600 line-clamp-1">
-              <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
-              {data.restaurant_address}
-            </p>
+            <div className="mt-2 flex items-start gap-2 rounded-md bg-white/70 px-2.5 py-1.5">
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-500" />
+              <p className="text-xs leading-relaxed text-gray-600 line-clamp-2">
+                {data.restaurant_address}
+              </p>
+            </div>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {formatPriceRange(data.price_min, data.price_max) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                <DollarSign className="h-3 w-3" />
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                <DollarSign className="h-3.5 w-3.5" />
                 {formatPriceRange(data.price_min, data.price_max)}
               </span>
             )}
             {formatOpeningHours(data.opening_hours) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
-                <Clock className="h-3 w-3" />
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+                <Clock className="h-3.5 w-3.5" />
                 {formatOpeningHours(data.opening_hours)}
               </span>
             )}

@@ -652,7 +652,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
 
         <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
           <Link
-            to={`/post/${post.slug}`}
+            to={`/post/${post.id}`}
             onClick={() => {
               // Lưu scroll position và post ID trước khi navigate
               sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
@@ -730,7 +730,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
               {localDownvotes}
             </motion.button>
             <Link
-              to={`/post/${post.slug}#comments`}
+              to={`/post/${post.id}#comments`}
               onClick={() => {
                 // Lưu scroll position và post ID trước khi navigate
                 sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());

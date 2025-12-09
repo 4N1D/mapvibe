@@ -206,6 +206,19 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
   }
 
+  # Cache behavior for /menu/* → Photos bucket (restaurant menus)
+  ordered_cache_behavior {
+    path_pattern     = "/menu/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
   # SPA support: redirect 403/404 to index.html
   custom_error_response {
     error_code            = 403

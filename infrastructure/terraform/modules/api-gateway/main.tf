@@ -368,6 +368,14 @@ resource "aws_apigatewayv2_route" "reviews_share" {
   target    = "integrations/${aws_apigatewayv2_integration.places.id}"
 }
 
+resource "aws_apigatewayv2_route" "reviews_report" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "POST /reviews/report"
+  target             = "integrations/${aws_apigatewayv2_integration.places.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_route" "reviews_submit_new_place" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /reviews/submit-new-place"

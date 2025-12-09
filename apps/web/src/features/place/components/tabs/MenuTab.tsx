@@ -2,6 +2,13 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
 
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url?: string): string | undefined => {
+  if (!url) return url;
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
 interface MenuTabProps {
   slug?: string;
   restaurantId?: string | number;
@@ -34,8 +41,8 @@ const fetchMenuPhotos = async (slug: string, page: number) => {
   const data = response.data;
   const photos: MenuPhoto[] = (data.menu_photos || []).map(p => ({
     id: p.id,
-    url: p.s3_url,
-    thumbnail_url: p.s3_thumbnail_url,
+    url: fixCdnUrl(p.s3_url) || p.s3_url,
+    thumbnail_url: fixCdnUrl(p.s3_thumbnail_url),
     menu_name: p.menu_name,
   }));
   

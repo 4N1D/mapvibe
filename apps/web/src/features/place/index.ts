@@ -4,6 +4,7 @@ export { ServicesList } from "./components/ServicesList";
 export { CuisineType, type Cuisine } from "./components/CuisineType";
 export { SimilarPlaces } from "./components/SimilarPlaces";
 export { DirectionSidebar } from "./components/DirectionSidebar";
+export { ReportModal } from "./components/ReportModal";
 export { IntroductionTab } from "./components/tabs/IntroductionTab";
 export { CommentsTab } from "./components/tabs/CommentsTab";
 export { ReviewsTab } from "./components/tabs/ReviewsTab";

@@ -16,6 +16,7 @@ import {
   commentHandler as reviewCommentHandler,
   commentLikeHandler as reviewCommentLikeHandler,
   commentReportHandler as reviewCommentReportHandler,
+  reportHandler as reviewReportHandler,
   hotHandler as reviewHotHandler,
   listHandler as reviewListHandler,
   shareHandler as reviewShareHandler,
@@ -181,6 +182,12 @@ const routes: RouteDefinition[] = [
     pattern: /^\/reviews\/share$/,
     paramNames: [],
     handler: reviewShareHandler,
+  },
+  {
+    method: "POST",
+    pattern: /^\/reviews\/report$/,
+    paramNames: [],
+    handler: reviewReportHandler,
   },
   {
     method: "POST",

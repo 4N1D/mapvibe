@@ -6,7 +6,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import toast from "react-hot-toast";
 
 type ReportStatus = "pending" | "reviewing" | "resolved" | "dismissed";
-type TargetType = "comment" | "review" | "user" | "photo";
+type TargetType = "comment" | "review" | "review_post" | "user" | "photo";
 type ReportReason = "spam" | "inappropriate" | "harassment" | "misinformation" | "other";
 
 const STATUS_LABELS: Record<ReportStatus, string> = {
@@ -25,9 +25,18 @@ const STATUS_COLORS: Record<ReportStatus, string> = {
 
 const TARGET_LABELS: Record<TargetType, string> = {
   comment: "Bình luận",
-  review: "Nhận xét",
+  review: "Nhận xét địa điểm",
+  review_post: "Bài viết review",
   user: "Người dùng",
   photo: "Ảnh",
+};
+
+const TARGET_COLORS: Record<TargetType, string> = {
+  comment: "bg-blue-100 text-blue-700",
+  review: "bg-purple-100 text-purple-700",
+  review_post: "bg-orange-100 text-orange-700",
+  user: "bg-gray-100 text-gray-700",
+  photo: "bg-green-100 text-green-700",
 };
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -323,8 +332,8 @@ function ReportCard({
             >
               {STATUS_LABELS[report.status as ReportStatus]}
             </span>
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-              {TARGET_LABELS[report.target_type as TargetType]}
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${TARGET_COLORS[report.target_type as TargetType] || "bg-gray-100 text-gray-700"}`}>
+              {TARGET_LABELS[report.target_type as TargetType] || report.target_type}
             </span>
             <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
               {REASON_LABELS[report.reason as ReportReason]}
@@ -362,7 +371,7 @@ function ReportCard({
         </div>
 
         {/* Target Content Preview */}
-        {targetContent && (
+        {targetContent ? (
           <div className="mb-4 rounded-lg bg-gray-50 p-4">
             <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
               <span>Nội dung bị báo cáo:</span>
@@ -381,6 +390,15 @@ function ReportCard({
               )}
             </div>
             <p className="line-clamp-2 text-gray-700">{targetContent.text}</p>
+          </div>
+        ) : (
+          <div className="mb-4 rounded-lg bg-yellow-50 p-4">
+            <p className="text-sm text-yellow-700">
+              Không thể tải nội dung bị báo cáo. Nội dung có thể đã bị xóa hoặc ID không hợp lệ.
+            </p>
+            <p className="mt-1 text-xs text-yellow-600">
+              Target ID: {report.target_id} | Type: {report.target_type}
+            </p>
           </div>
         )}
 
@@ -481,8 +499,8 @@ function ReportDetailModal({
             >
               {STATUS_LABELS[report.status as ReportStatus]}
             </span>
-            <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-              {TARGET_LABELS[report.target_type as TargetType]}
+            <span className={`rounded-full px-3 py-1 text-sm font-medium ${TARGET_COLORS[report.target_type as TargetType] || "bg-gray-100 text-gray-700"}`}>
+              {TARGET_LABELS[report.target_type as TargetType] || report.target_type}
             </span>
             <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">
               {REASON_LABELS[report.reason as ReportReason]}
@@ -504,9 +522,9 @@ function ReportDetailModal({
           </div>
 
           {/* Target Content */}
-          {targetContent && (
-            <div>
-              <h3 className="mb-2 text-sm font-medium text-gray-500">Nội dung bị báo cáo</h3>
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-gray-500">Nội dung bị báo cáo</h3>
+            {targetContent ? (
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-sm text-gray-500">Tác giả:</span>
@@ -529,8 +547,17 @@ function ReportDetailModal({
                   {new Date(targetContent.created_at).toLocaleDateString("vi-VN")}
                 </p>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-lg bg-yellow-50 p-4">
+                <p className="text-sm text-yellow-700">
+                  Không thể tải nội dung bị báo cáo. Nội dung có thể đã bị xóa hoặc ID không hợp lệ.
+                </p>
+                <p className="mt-1 text-xs text-yellow-600">
+                  Target ID: {report.target_id} | Type: {report.target_type}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Details */}
           {report.details && (

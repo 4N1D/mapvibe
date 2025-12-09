@@ -21,7 +21,9 @@ import {
   ServicesList,
   CuisineType,
   Cuisine,
+  ReportModal,
 } from "@/features/place";
+import { Flag } from "lucide-react";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
@@ -194,6 +196,13 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
   return mostCommonRange || hourRanges[0];
 };
 
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url: string): string => {
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  // Replace any cloudfront domain with the correct one
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
 // Helper function to generate slug from location name or use id
 const generateSlug = (locationName?: string, id?: string): string => {
   if (locationName) {
@@ -222,7 +231,7 @@ const extractImages = (
 
   // If photos is an array
   if (Array.isArray(photos)) {
-    const urls = photos.map((photo) => photo.url).filter(Boolean);
+    const urls = photos.map((photo) => fixCdnUrl(photo.url)).filter(Boolean);
     console.log(`[extractImages] Extracted ${urls.length} images from array:`, urls);
     return urls;
   }
@@ -233,7 +242,7 @@ const extractImages = (
     ...(photos.food || []),
     ...(photos.menu || []),
   ];
-  const urls = allPhotos.map((photo) => photo.url).filter(Boolean);
+  const urls = allPhotos.map((photo) => fixCdnUrl(photo.url)).filter(Boolean);
   console.log(`[extractImages] Extracted ${urls.length} images from object:`, urls);
   return urls;
 };
@@ -369,6 +378,10 @@ export function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+
+  // Report states
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   // Vote states
   const [localUpvotes, setLocalUpvotes] = useState(0);
@@ -699,6 +712,29 @@ export function PostDetailPage() {
     }
   };
 
+  const handleReport = async (reason: string, details?: string) => {
+    if (!post || !isAuthenticated) {
+      toast.error("Vui lòng đăng nhập để báo cáo");
+      return;
+    }
+
+    try {
+      setReportLoading(true);
+      await apiClient.post("/reviews/report", {
+        review_post_id: post.id,
+        reason,
+        details,
+      });
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn!");
+      setIsReportModalOpen(false);
+    } catch (err) {
+      console.error("Failed to report:", err);
+      toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -767,10 +803,24 @@ export function PostDetailPage() {
             <div>
               {/* Title & Categories */}
               <div className="mb-4">
-                <div className="mb-3">
+                <div className="mb-3 flex items-start justify-between gap-4">
                   <h1 className="text-2xl font-bold leading-tight text-gray-900 md:text-4xl">
                     {post.title}
                   </h1>
+                  {/* Report Button */}
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        toast.error("Vui lòng đăng nhập để báo cáo");
+                        return;
+                      }
+                      setIsReportModalOpen(true);
+                    }}
+                    className="shrink-0 rounded-full p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    title="Báo cáo bài viết"
+                  >
+                    <Flag className="h-5 w-5" />
+                  </button>
                 </div>
                 <div className="mb-5 text-sm font-medium text-gray-500">
                   {post.categories.join(" • ")}
@@ -868,6 +918,15 @@ export function PostDetailPage() {
           </div>
         </section>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        onSubmit={handleReport}
+        authorName={post.author}
+        loading={reportLoading}
+      />
 
       {/* Tab Navigation */}
       <section className="mb-6">

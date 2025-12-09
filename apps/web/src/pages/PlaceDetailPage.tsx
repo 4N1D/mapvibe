@@ -13,6 +13,18 @@ import {
 } from "@/features/place";
 import { MapVibeLoader } from "@/components/common/MapVibeLoader";
 
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url: string): string => {
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
+// Fix all CDN URLs in an array
+const fixCdnUrls = (urls?: string[]): string[] => {
+  if (!urls) return [];
+  return urls.map(fixCdnUrl);
+};
+
 interface CuisineType {
   name: string;
   description?: string;
@@ -189,7 +201,7 @@ export function PlaceDetailPage() {
         <section className="lg:order-1 lg:col-span-5">
           <div className="h-full overflow-hidden rounded-xl shadow-sm">
             <img
-              src={restaurant.images?.[0]}
+              src={fixCdnUrls(restaurant.images)?.[0]}
               alt={restaurant.name}
               className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
             />
@@ -229,7 +241,7 @@ export function PlaceDetailPage() {
       <section className="mb-8">
         <h2 className="mb-4 text-lg font-bold text-gray-900">Preview</h2>
         <ImageGalleryPreview
-          images={restaurant.images}
+          images={fixCdnUrls(restaurant.images)}
           restaurantName={restaurant.name}
           onViewMore={() => {
             setActiveTab("anh");

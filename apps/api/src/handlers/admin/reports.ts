@@ -58,35 +58,30 @@ export const listReportsHandler: Handler = {
               LEFT JOIN users cu ON c.author_id = cu.id
               WHERE c.id = r.target_id
             )
-            WHEN r.target_type = 'review' THEN (
-              -- Try review_posts first, then restaurant_reviews
-              COALESCE(
-                (
-                  SELECT json_build_object(
-                    'text', rp.text,
-                    'author_id', rp.author_id,
-                    'author_name', rpu.display_name,
-                    'created_at', rp.created_at,
-                    'type', 'review_post'
-                  )
-                  FROM review_posts rp
-                  LEFT JOIN users rpu ON rp.author_id = rpu.id
-                  WHERE rp.id = r.target_id
-                ),
-                (
-                  SELECT json_build_object(
-                    'text', rr.text,
-                    'author_id', rr.author_id,
-                    'author_name', rru.display_name,
-                    'created_at', rr.created_at,
-                    'rating_overall', rr.rating_overall,
-                    'type', 'restaurant_review'
-                  )
-                  FROM restaurant_reviews rr
-                  LEFT JOIN users rru ON rr.author_id = rru.id
-                  WHERE rr.id = r.target_id
-                )
+            WHEN r.target_type = 'review_post' THEN (
+              SELECT json_build_object(
+                'text', rp.text,
+                'author_id', rp.author_id,
+                'author_name', rpu.display_name,
+                'created_at', rp.created_at,
+                'type', 'review_post'
               )
+              FROM review_posts rp
+              LEFT JOIN users rpu ON rp.author_id = rpu.id
+              WHERE rp.id = r.target_id::text
+            )
+            WHEN r.target_type = 'review' THEN (
+              SELECT json_build_object(
+                'text', rr.text,
+                'author_id', rr.author_id,
+                'author_name', rru.display_name,
+                'created_at', rr.created_at,
+                'rating_overall', rr.rating_overall,
+                'type', 'restaurant_review'
+              )
+              FROM restaurant_reviews rr
+              LEFT JOIN users rru ON rr.author_id = rru.id
+              WHERE rr.id = r.target_id
             )
             ELSE NULL
           END as target_content
@@ -216,21 +211,18 @@ export const updateReportHandler: Handler = {
               .set({ status: "hidden" })
               .where("id", "=", report.target_id)
               .execute();
-          } else if (report.target_type === "review") {
-            // Try review_posts first, then restaurant_reviews
-            const rpResult = await db
+          } else if (report.target_type === "review_post") {
+            await db
               .updateTable("review_posts")
               .set({ status: "hidden" })
               .where("id", "=", report.target_id)
-              .executeTakeFirst();
-            
-            if (!rpResult.numUpdatedRows || rpResult.numUpdatedRows === BigInt(0)) {
-              await sql`
-                UPDATE restaurant_reviews 
-                SET updated_at = NOW() 
-                WHERE id = ${report.target_id}
-              `.execute(db);
-            }
+              .execute();
+          } else if (report.target_type === "review") {
+            await sql`
+              UPDATE restaurant_reviews 
+              SET updated_at = NOW() 
+              WHERE id = ${report.target_id}
+            `.execute(db);
           }
         } else if (action === "delete_content") {
           if (report.target_type === "comment") {
@@ -239,21 +231,17 @@ export const updateReportHandler: Handler = {
               .set({ status: "deleted" })
               .where("id", "=", report.target_id)
               .execute();
-          } else if (report.target_type === "review") {
-            // Try review_posts first
-            const rpResult = await db
+          } else if (report.target_type === "review_post") {
+            await db
               .updateTable("review_posts")
               .set({ status: "deleted" })
               .where("id", "=", report.target_id)
-              .executeTakeFirst();
-            
-            // If not found in review_posts, delete from restaurant_reviews
-            if (!rpResult.numUpdatedRows || rpResult.numUpdatedRows === BigInt(0)) {
-              await db
-                .deleteFrom("restaurant_reviews")
-                .where("id", "=", report.target_id)
-                .execute();
-            }
+              .execute();
+          } else if (report.target_type === "review") {
+            await db
+              .deleteFrom("restaurant_reviews")
+              .where("id", "=", report.target_id)
+              .execute();
           }
         } else if (action === "ban_user") {
           // Get the author of the content
@@ -265,22 +253,19 @@ export const updateReportHandler: Handler = {
               .where("id", "=", report.target_id)
               .executeTakeFirst();
             authorId = comment?.author_id || null;
-          } else if (report.target_type === "review") {
-            // Try review_posts first
-            let review = await db
+          } else if (report.target_type === "review_post") {
+            const review = await db
               .selectFrom("review_posts")
               .select(["author_id"])
               .where("id", "=", report.target_id)
               .executeTakeFirst();
-            
-            // If not found, try restaurant_reviews
-            if (!review) {
-              review = await db
-                .selectFrom("restaurant_reviews")
-                .select(["author_id"])
-                .where("id", "=", report.target_id)
-                .executeTakeFirst();
-            }
+            authorId = review?.author_id || null;
+          } else if (report.target_type === "review") {
+            const review = await db
+              .selectFrom("restaurant_reviews")
+              .select(["author_id"])
+              .where("id", "=", report.target_id)
+              .executeTakeFirst();
             authorId = review?.author_id || null;
           }
 
@@ -348,26 +333,22 @@ export const getReportHandler: Handler = {
           WHERE c.id = ${reportData.target_id}
         `.execute(db);
         targetContent = result.rows[0] || null;
-      } else if (reportData.target_type === "review") {
-        // Try review_posts first
-        let result = await sql`
+      } else if (reportData.target_type === "review_post") {
+        const result = await sql`
           SELECT rp.*, u.display_name as author_name, u.avatar as author_avatar, 'review_post' as content_type
           FROM review_posts rp
           LEFT JOIN users u ON rp.author_id = u.id
           WHERE rp.id = ${reportData.target_id}
         `.execute(db);
         targetContent = result.rows[0] || null;
-        
-        // If not found, try restaurant_reviews
-        if (!targetContent) {
-          result = await sql`
-            SELECT rr.*, u.display_name as author_name, u.avatar as author_avatar, 'restaurant_review' as content_type
-            FROM restaurant_reviews rr
-            LEFT JOIN users u ON rr.author_id = u.id
-            WHERE rr.id = ${reportData.target_id}
-          `.execute(db);
-          targetContent = result.rows[0] || null;
-        }
+      } else if (reportData.target_type === "review") {
+        const result = await sql`
+          SELECT rr.*, u.display_name as author_name, u.avatar as author_avatar, 'restaurant_review' as content_type
+          FROM restaurant_reviews rr
+          LEFT JOIN users u ON rr.author_id = u.id
+          WHERE rr.id = ${reportData.target_id}
+        `.execute(db);
+        targetContent = result.rows[0] || null;
       }
 
       // Get other reports for same target

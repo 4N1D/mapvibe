@@ -3,6 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url?: string): string | undefined => {
+  if (!url) return url;
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
 interface PhotosTabProps {
   slug?: string;
   showFilters?: boolean;
@@ -40,8 +47,8 @@ const fetchPhotos = async (slug: string, category: string, page: number) => {
   const data = response.data;
   const photos = data.photos.map(p => ({
     id: p.id,
-    url: p.s3_url,
-    thumbnail_url: p.s3_thumbnail_url,
+    url: fixCdnUrl(p.s3_url) || p.s3_url,
+    thumbnail_url: fixCdnUrl(p.s3_thumbnail_url),
     category: p.photo_type as any,
     caption: p.menu_name,
   }));

@@ -4,7 +4,6 @@ import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvi
 import { apiClient } from "@/lib/axios";
 
 interface PhotosTabProps {
-  restaurantId: string;
   slug?: string;
   showFilters?: boolean;
 }

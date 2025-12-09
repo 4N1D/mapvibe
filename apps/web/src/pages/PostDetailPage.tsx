@@ -64,6 +64,7 @@ interface ReviewFromAPI {
   location_review_count?: number;
   location_avg_upvote_rate?: number | null;
   location_status?: string;
+  restaurant_slug?: string | null;
 }
 
 interface ReviewsResponse {
@@ -76,7 +77,8 @@ interface ReviewsResponse {
 interface PostDetail {
   id: string;
   slug: string;
-  restaurantId: number;
+  restaurantId: string | null;
+  restaurantSlug: string | null;
   author: string;
   authorAvatar?: string;
   userRank: "Hạng đồng" | "Hạng bạc" | "Hạng vàng" | "Hạng kim cương" | "Hạng bạch kim";
@@ -282,9 +284,8 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
   return {
     id: review.id,
     slug,
-    restaurantId: review.location_restaurant_id
-      ? parseInt(review.location_restaurant_id.replace("R_", ""), 16) || 0
-      : 0,
+    restaurantId: review.location_restaurant_id || null,
+    restaurantSlug: review.restaurant_slug || null,
     author: review.author_name,
     authorAvatar: review.author_avatar || undefined,
     userRank: "Hạng đồng", // Default rank
@@ -302,7 +303,6 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       likes: review.upvote_count,
       dislikes: review.downvote_count,
       comments: review.comment_count,
-      shares: review.share_count,
     },
     images:
       images.length > 0
@@ -1040,13 +1040,29 @@ export function PostDetailPage() {
         {activeTab === "binh-luan" && <CommentsTab reviewId={post.id} />}
 
         {activeTab === "anh" && (
-          <PhotosTab
-            restaurantId={post.restaurantId}
-            showFilters={false}
-          />
+          post.restaurantSlug ? (
+            <PhotosTab
+              slug={post.restaurantSlug}
+              showFilters={false}
+            />
+          ) : (
+            <div className="rounded-lg bg-white p-8 text-center shadow-sm">
+              <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-4 text-gray-500">Chưa có ảnh cho địa điểm này.</p>
+            </div>
+          )
         )}
 
-        {activeTab === "thuc-don" && <MenuTab restaurantId={post.restaurantId} />}
+        {activeTab === "thuc-don" && (
+          post.restaurantSlug ? (
+            <MenuTab slug={post.restaurantSlug} />
+          ) : (
+            <div className="rounded-lg bg-white p-8 text-center shadow-sm">
+              <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-4 text-gray-500">Chưa có thực đơn cho địa điểm này.</p>
+            </div>
+          )
+        )}
       </section>
     </div>
   );

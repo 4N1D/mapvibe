@@ -88,6 +88,7 @@ import {
   adminUserActivitiesHandler,
 } from "./handlers/admin";
 import { logActivityHandler, batchLogActivityHandler } from "./handlers/activities";
+import { searchHandler as locationSearchHandler } from "./handlers/locations";
 
 // Route definitions
 interface RouteDefinition {
@@ -134,6 +135,14 @@ const routes: RouteDefinition[] = [
     pattern: /^\/places\/batch$/,
     paramNames: [],
     handler: batchHandler,
+  },
+
+  // Locations routes
+  {
+    method: "GET",
+    pattern: /^\/locations\/search$/,
+    paramNames: [],
+    handler: locationSearchHandler,
   },
 
   // Reviews routes

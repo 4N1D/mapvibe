@@ -11,6 +11,20 @@ export interface SuggestPlaceFormData {
   features: string[];
   photos: PhotoUploadItem[];
   review: string;
+  selectedLocationId?: string;
+}
+
+export interface LocationSuggestion {
+  id: string;
+  name: string;
+  address: string;
+  status: string;
+  source: "location_address" | "restaurant";
+  price_min?: number | null;
+  price_max?: number | null;
+  phone?: string | null;
+  opening_hours?: Record<string, string> | null;
+  features?: string[] | null;
 }
 
 export type PhotoType = "food" | "view" | "menu" | "review";

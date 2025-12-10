@@ -8,19 +8,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // MapVibe brand colors - based on UI designs
+        // MapVibe brand colors - warm peach/amber theme
         primary: {
-          50: "#fef2f2",
-          100: "#fee2e2",
-          200: "#fecaca",
-          300: "#fca5a5",
-          400: "#f87171",
-          500: "#E85A4F", // Main brand color (đỏ cam)
-          600: "#dc2626",
-          700: "#b91c1c",
-          800: "#991b1b",
-          900: "#7f1d1d",
-          950: "#450a0a",
+          50: "#fdf8f4",
+          100: "#fbeee4",
+          200: "#f7dcc9",
+          300: "#f0c5a5",
+          400: "#e7aa7e", // Light variant
+          500: "#E7AA7E", // Main brand color (warm peach)
+          600: "#d4935f",
+          700: "#b87545",
+          800: "#965c36",
+          900: "#7a4b2d",
+          950: "#422616",
         },
         secondary: {
           50: "#f0fdf4",

@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -12,8 +13,23 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     console.log(`[${config.method?.toUpperCase()}] ${config.url}`);
+
+    // Add Authorization header with JWT token
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      if (idToken) {
+        config.headers.Authorization = `Bearer ${idToken}`;
+        console.log("[Auth] Added JWT token to request");
+      }
+    } catch (error) {
+      console.warn("[Auth] Failed to get session token:", error);
+      // Continue with request even if token is not available
+    }
+
     return config;
   },
   (error) => {
@@ -26,7 +42,7 @@ apiClient.interceptors.response.use(
     console.log(`[${response.status}] ${response.config.url}`);
     return response;
   },
-  async (error: AxiosError) => {
+  async (error: AxiosError<{ error?: string }>) => {
     const originalRequest = error.config;
 
     console.error(`[${error.response?.status}] ${originalRequest?.url}`);
@@ -41,8 +57,14 @@ apiClient.interceptors.response.use(
           break;
 
         case 403:
-          // Forbidden
-          console.warn("Forbidden - không có quyền truy cập");
+          // Check if user is banned
+          if (error.response.data?.error?.includes("banned")) {
+            console.warn("User banned - logging out");
+            // Dispatch custom event to trigger logout
+            window.dispatchEvent(new CustomEvent("user-banned"));
+          } else {
+            console.warn("Forbidden - không có quyền truy cập");
+          }
           break;
 
         case 404:

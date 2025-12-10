@@ -4,8 +4,12 @@ import { Pool } from "pg";
 // Check if running on AWS Lambda
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
+// Database schema type - using Record for dynamic tables
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DatabaseSchema = Record<string, any>;
+
 // Database instance (singleton)
-let db: Kysely<any> | null = null;
+let db: Kysely<DatabaseSchema> | null = null;
 
 interface DBCredentials {
   host: string;
@@ -46,7 +50,7 @@ async function getCredentials(): Promise<DBCredentials> {
   };
 }
 
-export async function getDb(): Promise<Kysely<any>> {
+export async function getDb(): Promise<Kysely<DatabaseSchema>> {
   if (db) return db;
 
   const creds = await getCredentials();

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import {
   signIn as cognitoSignIn,
   signUp as cognitoSignUp,
@@ -9,6 +9,8 @@ import {
   signInWithGoogle as cognitoSignInWithGoogle,
 } from "@/lib/cognito";
 import { Hub } from "aws-amplify/utils";
+import { apiClient } from "@/lib/axios";
+import { trackActivityImmediate } from "@/lib/activityTracker";
 
 /**
  * User type
@@ -17,6 +19,8 @@ export interface User {
   email: string;
   name?: string;
   sub: string; // Cognito user ID
+  avatar?: string;
+  isOAuthUser?: boolean; // true if user signed up via Google/OAuth
 }
 
 /**
@@ -31,6 +35,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateUserAvatar: (avatarUrl: string) => void;
   isAuthenticated: boolean;
 }
 
@@ -43,35 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from session on mount and listen for OAuth events
-  useEffect(() => {
-    // Listen for auth events from Amplify Hub
-    const hubListenerCancelToken = Hub.listen("auth", ({ payload }) => {
-      switch (payload.event) {
-        case "signedIn":
-        case "signInWithRedirect":
-          checkAuth();
-          break;
-        case "signInWithRedirect_failure":
-          console.error("[Auth] OAuth login failed:", payload.data);
-          break;
-        case "signedOut":
-          setUser(null);
-          break;
-      }
-    });
-
-    // Initial auth check
-    checkAuth();
-
-    // Cleanup listener on unmount
-    return () => hubListenerCancelToken();
-  }, []);
-
   /**
    * Check if user is authenticated
    */
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const cognitoUser = await getCurrentUser();
 
@@ -79,11 +59,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const attributes = await getUserAttributes();
 
         if (attributes) {
-          setUser({
+          const userData: User = {
             email: attributes.email || "",
             name: attributes.name || attributes.email || cognitoUser.username,
             sub: attributes.sub || cognitoUser.userId,
-          });
+            isOAuthUser: attributes.isOAuthUser === "true",
+          };
+
+          // Fetch user profile to get avatar
+          try {
+            const response = await apiClient.get<{
+              user: { avatar?: string; display_name?: string };
+            }>("/users/me");
+            if (response.data?.user) {
+              userData.avatar = response.data.user.avatar;
+              if (response.data.user.display_name) {
+                userData.name = response.data.user.display_name;
+              }
+            }
+          } catch (apiError) {
+            console.warn("[Auth] Failed to fetch user profile:", apiError);
+          }
+
+          setUser(userData);
         } else {
           setUser(null);
         }
@@ -96,7 +94,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load user from session on mount and listen for OAuth events
+  useEffect(() => {
+    const hubListenerCancelToken = Hub.listen("auth", ({ payload }) => {
+      switch (payload.event) {
+        case "signedIn":
+        case "signInWithRedirect":
+          checkAuth();
+          trackActivityImmediate("login", { metadata: { method: "google" } });
+          break;
+        case "signInWithRedirect_failure":
+          console.error("[Auth] OAuth login failed:", payload.data);
+          break;
+        case "signedOut":
+          setUser(null);
+          break;
+      }
+    });
+
+    // Listen for user-banned event from axios interceptor
+    const handleUserBanned = async () => {
+      console.warn("[Auth] User banned - forcing logout");
+      await cognitoSignOut();
+      setUser(null);
+      alert("Tài khoản của bạn đã bị cấm. Vui lòng liên hệ quản trị viên.");
+    };
+    window.addEventListener("user-banned", handleUserBanned);
+
+    // Initial auth check
+    checkAuth();
+
+    // Cleanup listener on unmount
+    return () => {
+      hubListenerCancelToken();
+      window.removeEventListener("user-banned", handleUserBanned);
+    };
+  }, [checkAuth]);
 
   /**
    * Sign in with email/password
@@ -105,6 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await cognitoSignIn(email, password);
       await checkAuth();
+      // Track login activity
+      trackActivityImmediate("login", { metadata: { method: "email" } });
     } catch (error: any) {
       // Handle "There is already a signed in user" error
       if (error.message?.includes("There is already a signed in user")) {
@@ -112,6 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           await cognitoSignIn(email, password);
           await checkAuth();
+          trackActivityImmediate("login", { metadata: { method: "email" } });
           return;
         } catch (retryError: any) {
           throw new Error(retryError.message || "Đăng nhập thất bại");
@@ -128,6 +166,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       await cognitoSignUp(email, password, { name });
+      // Track register activity
+      trackActivityImmediate("register", { metadata: { method: "email" } });
     } catch (error: any) {
       throw new Error(error.message || "Đăng ký thất bại");
     }
@@ -145,14 +185,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * Sign out
+   * Sign out - always clears local state even if API fails
    */
   const signOut = async () => {
+    // Track logout before signing out
+    trackActivityImmediate("logout");
     try {
       await cognitoSignOut();
-      setUser(null);
     } catch (error) {
       console.error("[Auth] Sign out failed:", error);
+    } finally {
+      // Always clear user state, even if Cognito signOut fails
+      // This ensures user is logged out on client side
+      setUser(null);
     }
   };
 
@@ -167,6 +212,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * Update user avatar (for smooth UX without refetching)
+   */
+  const updateUserAvatar = useCallback((avatarUrl: string) => {
+    setUser((prev) => (prev ? { ...prev, avatar: avatarUrl } : null));
+  }, []);
+
   const value: AuthContextType = {
     user,
     loading,
@@ -176,6 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     signInWithGoogle,
     refreshAuth: checkAuth,
+    updateUserAvatar,
     isAuthenticated: !!user,
   };
 

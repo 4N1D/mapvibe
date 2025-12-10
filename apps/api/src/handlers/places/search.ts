@@ -4,7 +4,6 @@ import { success, badRequest, error } from "../../middlewares/response";
 
 interface SearchBody {
   query: string;
-  district?: string;
   limit?: number;
   offset?: number;
 }
@@ -22,21 +21,20 @@ export const handler: Handler = {
         return badRequest("Invalid JSON body");
       }
 
-      const { query, district, limit = 20, offset = 0 } = body;
+      const { query, limit = 20, offset = 0 } = body;
 
       if (!query || query.length < 2) {
         return badRequest("Query must be at least 2 characters");
       }
 
       // Full-text search with ILIKE
-      let searchQuery = db
+      const places = await db
         .selectFrom("restaurants")
         .select([
           "id",
           "name_vi",
           "slug",
           "address",
-          "district",
           "geo_lat",
           "geo_lng",
           "cuisine_types",
@@ -51,13 +49,8 @@ export const handler: Handler = {
         )
         .orderBy("rating_overall", "desc")
         .limit(Math.min(limit, 100))
-        .offset(offset);
-
-      if (district) {
-        searchQuery = searchQuery.where("district", "=", district);
-      }
-
-      const places = await searchQuery.execute();
+        .offset(offset)
+        .execute();
 
       return success({
         query,

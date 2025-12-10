@@ -3,8 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url?: string): string | undefined => {
+  if (!url) return url;
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
 interface PhotosTabProps {
-  restaurantId: number;
+  slug?: string;
+  showFilters?: boolean;
 }
 
 type DisplayCategory = Exclude<PhotoCategory, "menu">;
@@ -13,17 +21,52 @@ const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   all: "Tất cả",
   food: "Thức ăn",
   view: "Không gian",
-  comment: "Bình luận",
+  review: "Nhận xét",
 };
 
-const fetchPhotos = async (restaurantId: number, category: string, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/photos/restaurant/${restaurantId}?page=${page}&limit=15&category=${category}`
-  );
-  return response.data;
+interface PhotosApiResponse {
+  restaurant_id: string;
+  photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+    photo_type: string;
+    menu_name?: string;
+  }>;
+  counts: Record<string, number>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
+const fetchPhotos = async (slug: string, category: string, page: number) => {
+  const offset = (page - 1) * 15;
+  const type = category === "all" ? "" : category;
+  const url = `/restaurants/${slug}/photos?limit=15&offset=${offset}${type ? `&type=${type}` : ""}`;
+  const response = await apiClient.get<PhotosApiResponse>(url);
+  
+  // Transform API response to expected format
+  const data = response.data;
+  const photos = data.photos.map(p => ({
+    id: p.id,
+    url: fixCdnUrl(p.s3_url) || p.s3_url,
+    thumbnail_url: fixCdnUrl(p.s3_thumbnail_url),
+    category: p.photo_type as any,
+    caption: p.menu_name,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination.total || photos.length) / 15),
+    category_counts: {
+      all: Object.values(data.counts || {}).reduce((a, b) => a + b, 0),
+      food: data.counts?.food || 0,
+      view: data.counts?.view || 0,
+      review: data.counts?.review || 0,
+    },
+  };
 };
 
-export function PhotosTab({ restaurantId }: PhotosTabProps) {
+export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabProps) {
   const [category, setCategory] = useState<DisplayCategory>("all");
   const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
@@ -31,28 +74,37 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["photos", restaurantId, category],
-    queryFn: () => fetchPhotos(restaurantId, category, 1),
+    queryKey: ["photos", slug, category],
+    queryFn: () => fetchPhotos(slug!, category, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
     select: (data) => {
-      const { menu: _, ...counts } = data.category_counts;
-      return { ...data, category_counts: counts };
+      if (showFilters) {
+        const { menu: _, ...counts } = data.category_counts;
+        return { ...data, category_counts: counts };
+      }
+      return data;
     },
   });
 
-  const photos = page === 1 ? (data?.photos || []) : allPhotos;
-  const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, comment: 0 };
+  const photos = page === 1 ? data?.photos || [] : allPhotos;
+  const categoryCounts = data?.category_counts || { all: 0, food: 0, view: 0, review: 0 };
 
-  if (data && page === 1 && hasMore !== (data.page < data.total_pages)) {
+  if (data && page === 1 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchPhotos(restaurantId, category, nextPage);
-      setAllPhotos(page === 1 ? [...(data?.photos || []), ...response.photos] : [...allPhotos, ...response.photos]);
+      const response = await fetchPhotos(slug, category, nextPage);
+      setAllPhotos(
+        page === 1
+          ? [...(data?.photos || []), ...response.photos]
+          : [...allPhotos, ...response.photos]
+      );
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
     } catch (error) {
@@ -72,24 +124,28 @@ export function PhotosTab({ restaurantId }: PhotosTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
-            disabled={isFetching}
-            className={`rounded-full border px-4 py-1.5 text-sm transition ${
-              category === cat
-                ? "border-primary-500 bg-primary-50 text-primary-600"
-                : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-            } disabled:opacity-50`}
-          >
-            {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
-          </button>
-        ))}
-      </div>
+      {showFilters && (
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              disabled={isFetching}
+              className={`rounded-full border px-4 py-1.5 text-sm transition ${
+                category === cat
+                  ? "border-primary-500 bg-primary-50 text-primary-600"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+              } disabled:opacity-50`}
+            >
+              {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}>
+      <div
+        className={`relative rounded-lg bg-white p-4 shadow-sm transition-opacity ${isFetching ? "opacity-60" : ""}`}
+      >
         {photos.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Chưa có ảnh nào trong danh mục này.</p>
         ) : (

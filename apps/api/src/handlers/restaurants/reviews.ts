@@ -1,8 +1,9 @@
-import crypto from 'crypto';
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
-import { recalculateRestaurantRatings } from '../../utils/rating';
+import crypto from "crypto";
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, notFound, badRequest, error } from "../../middlewares/response";
+import { recalculateRestaurantRatings } from "../../utils/rating";
+import { getUserIdFromEvent } from "../../utils/auth";
 
 interface CreateReviewBody {
   author_id: string;
@@ -24,68 +25,162 @@ export const listHandler: Handler = {
       const slug = event.pathParameters?.slug;
 
       if (!slug) {
-        return badRequest('Restaurant slug is required');
+        return badRequest("Restaurant slug is required");
       }
 
       // Get restaurant by slug
       const restaurant = await db
-        .selectFrom('restaurants')
-        .select(['id'])
-        .where('slug', '=', slug)
+        .selectFrom("restaurants")
+        .select(["id"])
+        .where("slug", "=", slug)
         .executeTakeFirst();
 
       if (!restaurant) {
-        return notFound('Restaurant not found');
+        return notFound("Restaurant not found");
       }
 
       const params = event.queryStringParameters || {};
-      const limit = Math.min(parseInt(params.limit || '20'), 100);
-      const offset = parseInt(params.offset || '0');
-      const sortBy = params.sort_by || 'created_at';
-      const sortOrder = params.sort_order === 'asc' ? 'asc' : 'desc';
+      const limit = Math.min(parseInt(params.limit || "20"), 100);
+      const offset = parseInt(params.offset || "0");
+      const sortBy = params.sort_by || "created_at";
+      const sortOrder = params.sort_order === "asc" ? "asc" : "desc";
 
       // Build query
       let query = db
-        .selectFrom('restaurant_reviews')
-        .innerJoin('users', 'users.id', 'restaurant_reviews.author_id')
+        .selectFrom("restaurant_reviews")
+        .innerJoin("users", "users.id", "restaurant_reviews.author_id")
         .select([
-          'restaurant_reviews.id',
-          'restaurant_reviews.text',
-          'restaurant_reviews.photos',
-          'restaurant_reviews.rating_service',
-          'restaurant_reviews.rating_location',
-          'restaurant_reviews.rating_price',
-          'restaurant_reviews.rating_quality',
-          'restaurant_reviews.rating_ambiance',
-          'restaurant_reviews.rating_overall',
-          'restaurant_reviews.upvote_count',
-          'restaurant_reviews.comment_count',
-          'restaurant_reviews.created_at',
-          'users.id as author_id',
-          'users.display_name as author_name',
-          'users.avatar as author_avatar',
+          "restaurant_reviews.id",
+          "restaurant_reviews.text",
+          "restaurant_reviews.photos",
+          "restaurant_reviews.rating_service",
+          "restaurant_reviews.rating_location",
+          "restaurant_reviews.rating_price",
+          "restaurant_reviews.rating_quality",
+          "restaurant_reviews.rating_ambiance",
+          "restaurant_reviews.rating_overall",
+          "restaurant_reviews.upvote_count",
+          "restaurant_reviews.comment_count",
+          "restaurant_reviews.created_at",
+          "users.id as author_id",
+          "users.display_name as author_name",
+          "users.avatar as author_avatar",
         ])
-        .where('restaurant_reviews.restaurant_id', '=', restaurant.id);
+        .where("restaurant_reviews.restaurant_id", "=", restaurant.id);
 
       // Apply sorting
-      if (sortBy === 'upvote_count') {
-        query = query.orderBy('restaurant_reviews.upvote_count', sortOrder);
+      if (sortBy === "upvote_count") {
+        query = query.orderBy("restaurant_reviews.upvote_count", sortOrder);
       } else {
-        query = query.orderBy('restaurant_reviews.created_at', sortOrder);
+        query = query.orderBy("restaurant_reviews.created_at", sortOrder);
       }
 
-      const reviews = await query.limit(limit).offset(offset).execute();
+      const rawReviews = await query.limit(limit).offset(offset).execute();
+
+      // Collect all photo IDs from all reviews first
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              
+              // Check if it's already a URL
+              if (typeof firstItem === "string" && 
+                  (firstItem.startsWith("http://") || firstItem.startsWith("https://"))) {
+                // Already URLs - store directly
+                reviewPhotoMap.set(review.id, photosData);
+              } else {
+                // Photo IDs - collect for batch lookup
+                const ids = photosData.filter((id: unknown) => typeof id === "string");
+                reviewPhotoMap.set(review.id, ids);
+                allPhotoIds.push(...ids);
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Batch lookup all photo URLs
+      const photoUrlMap = new Map<string, string>();
+      if (allPhotoIds.length > 0) {
+        const uniqueIds = [...new Set(allPhotoIds)];
+        const photoRecords = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url"])
+          .where("id", "in", uniqueIds)
+          .execute();
+        
+        for (const p of photoRecords) {
+          photoUrlMap.set(p.id, p.s3_url);
+        }
+      }
+
+      // Build reviews with resolved photo URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photoUrls: string[] = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (firstItem.startsWith("http://") || firstItem.startsWith("https://")) {
+            // Already URLs
+            photoUrls = photoData;
+          } else {
+            // Map IDs to URLs
+            photoUrls = photoData
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+          }
+        }
+
+        return {
+          ...review,
+          photos: photoUrls,
+        };
+      });
+
+      // Get current user's likes if authenticated
+      const userId = getUserIdFromEvent(event);
+      let userLikedReviewIds: Set<string> = new Set();
+      
+      if (userId && reviews.length > 0) {
+        const reviewIds = reviews.map(r => r.id);
+        const userLikes = await db
+          .selectFrom("likes")
+          .select(["target_id"])
+          .where("user_id", "=", userId)
+          .where("target_type", "=", "review")
+          .where("target_id", "in", reviewIds)
+          .execute();
+        
+        userLikedReviewIds = new Set(userLikes.map(l => l.target_id));
+      }
+
+      // Add user_has_liked field to each review
+      const reviewsWithLikeStatus = reviews.map(review => ({
+        ...review,
+        user_has_liked: userLikedReviewIds.has(review.id),
+      }));
 
       // Get total count
       const countResult = await db
-        .selectFrom('restaurant_reviews')
-        .select((eb) => eb.fn.count('id').as('total'))
-        .where('restaurant_id', '=', restaurant.id)
+        .selectFrom("restaurant_reviews")
+        .select((eb) => eb.fn.count("id").as("total"))
+        .where("restaurant_id", "=", restaurant.id)
         .executeTakeFirst();
 
       return success({
         restaurant_id: restaurant.id,
-        reviews,
+        reviews: reviewsWithLikeStatus,
         pagination: {
           limit,
           offset,
@@ -93,7 +188,7 @@ export const listHandler: Handler = {
         },
       });
     } catch (err) {
-      console.error('[restaurants/reviews/list] Error:', err);
+      console.error("[restaurants/reviews/list] Error:", err);
       return error((err as Error).message);
     }
   },
@@ -107,25 +202,25 @@ export const createHandler: Handler = {
       const slug = event.pathParameters?.slug;
 
       if (!slug) {
-        return badRequest('Restaurant slug is required');
+        return badRequest("Restaurant slug is required");
       }
 
       // Get restaurant by slug
       const restaurant = await db
-        .selectFrom('restaurants')
-        .select(['id'])
-        .where('slug', '=', slug)
+        .selectFrom("restaurants")
+        .select(["id"])
+        .where("slug", "=", slug)
         .executeTakeFirst();
 
       if (!restaurant) {
-        return notFound('Restaurant not found');
+        return notFound("Restaurant not found");
       }
 
       let body: CreateReviewBody;
       try {
-        body = JSON.parse(event.body || '{}');
+        body = JSON.parse(event.body || "{}");
       } catch {
-        return badRequest('Invalid JSON body');
+        return badRequest("Invalid JSON body");
       }
 
       const {
@@ -142,48 +237,55 @@ export const createHandler: Handler = {
 
       // Validate required fields
       if (!author_id) {
-        return badRequest('author_id is required');
+        return badRequest("author_id is required");
       }
 
       if (!text || text.trim().length === 0) {
-        return badRequest('text is required');
+        return badRequest("text is required");
       }
 
       // Validate ratings (1-10 scale)
-      const ratings = [rating_service, rating_location, rating_price, rating_quality, rating_ambiance, rating_overall];
+      const ratings = [
+        rating_service,
+        rating_location,
+        rating_price,
+        rating_quality,
+        rating_ambiance,
+        rating_overall,
+      ];
       for (const rating of ratings) {
-        if (typeof rating !== 'number' || rating < 1 || rating > 10) {
-          return badRequest('All ratings must be numbers between 1 and 10');
+        if (typeof rating !== "number" || rating < 1 || rating > 10) {
+          return badRequest("All ratings must be numbers between 1 and 10");
         }
       }
 
       // Verify author exists
       const author = await db
-        .selectFrom('users')
-        .select('id')
-        .where('id', '=', author_id)
+        .selectFrom("users")
+        .select("id")
+        .where("id", "=", author_id)
         .executeTakeFirst();
 
       if (!author) {
-        return badRequest('Invalid author_id: user does not exist');
+        return badRequest("Invalid author_id: user does not exist");
       }
 
       // Check if user already has a review for this restaurant
       const existingReview = await db
-        .selectFrom('restaurant_reviews')
-        .select('id')
-        .where('restaurant_id', '=', restaurant.id)
-        .where('author_id', '=', author_id)
+        .selectFrom("restaurant_reviews")
+        .select("id")
+        .where("restaurant_id", "=", restaurant.id)
+        .where("author_id", "=", author_id)
         .executeTakeFirst();
 
       if (existingReview) {
-        return badRequest('User has already reviewed this restaurant');
+        return badRequest("User has already reviewed this restaurant");
       }
 
       // Create review and increment restaurant.review_count
       const result = await db.transaction().execute(async (trx) => {
         const [review] = await trx
-          .insertInto('restaurant_reviews')
+          .insertInto("restaurant_reviews")
           .values({
             id: crypto.randomUUID(),
             restaurant_id: restaurant.id,
@@ -204,12 +306,12 @@ export const createHandler: Handler = {
 
         // Increment review_count on restaurant
         await trx
-          .updateTable('restaurants')
+          .updateTable("restaurants")
           .set((eb) => ({
-            review_count: eb('review_count', '+', 1),
+            review_count: eb("review_count", "+", 1),
             updated_at: new Date(),
           }))
-          .where('id', '=', restaurant.id)
+          .where("id", "=", restaurant.id)
           .execute();
 
         return review;
@@ -218,12 +320,12 @@ export const createHandler: Handler = {
       // Trigger background rating recalculation
       // This runs async and updates the restaurant's average ratings
       recalculateRestaurantRatings(restaurant.id).catch((err) => {
-        console.error('[restaurants/reviews/create] Rating recalculation error:', err);
+        console.error("[restaurants/reviews/create] Rating recalculation error:", err);
       });
 
       return success({ review: result }, 201);
     } catch (err) {
-      console.error('[restaurants/reviews/create] Error:', err);
+      console.error("[restaurants/reviews/create] Error:", err);
       return error((err as Error).message);
     }
   },

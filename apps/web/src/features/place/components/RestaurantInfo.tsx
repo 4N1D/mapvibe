@@ -1,12 +1,16 @@
+import { useState } from "react";
 import {
   MapPin,
   DollarSign,
   Clock,
   Share2,
   Bookmark,
+  BookmarkCheck,
   PhoneCall,
   MessageSquare,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import { apiClient } from "@/lib/axios";
 
 interface DetailedRating {
   label: string;
@@ -15,11 +19,13 @@ interface DetailedRating {
 
 interface RestaurantInfoProps {
   name: string;
+  slug?: string;
+  restaurantId?: string;
   address: string;
-  phone: string;
-  priceRange: string;
-  hours: string;
-  rating: number;
+  phone?: string;
+  priceRange?: string;
+  hours?: string;
+  rating?: number;
   reviewCount?: number;
   isOpen?: boolean;
   categories?: string[];
@@ -30,24 +36,73 @@ interface RestaurantInfoProps {
 
 export function RestaurantInfo({
   name,
+  slug,
+  restaurantId,
   address,
   phone,
   priceRange,
   hours,
-  rating,
+  rating = 0,
   reviewCount = 0,
   isOpen = true,
-  categories = ["Café/Dessert", "Đài Loan", "Sinh viên", "Cặp đôi"],
-  detailedRatings = [
-    { label: "Vị trí", score: 7.7 },
-    { label: "Không gian", score: 7.4 },
-    { label: "Chất lượng", score: 7.4 },
-    { label: "Phục vụ", score: 7.2 },
-    { label: "Giá cả", score: 6.8 },
-  ],
-  breadcrumbs = ["Hà Nội", "Quận Ba Đình", "Khu vực Công viên Thủ Lệ"], // Added as per instruction
+  categories = [],
+  detailedRatings = [],
+  breadcrumbs = [],
   onCommentClick,
 }: RestaurantInfoProps) {
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleCall = () => {
+    if (phone) {
+      window.location.href = `tel:${phone}`;
+    } else {
+      toast.error("Chưa có số điện thoại");
+    }
+  };
+
+  const handleSave = async () => {
+    if (!restaurantId) {
+      toast.error("Không thể lưu");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiClient.post(`/restaurants/${restaurantId}/save`);
+      setIsSaved(!isSaved);
+      toast.success(isSaved ? "Đã bỏ lưu" : "Đã lưu vào bộ sưu tập");
+    } catch {
+      toast.error("Vui lòng đăng nhập để lưu");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = `${name} - MapVibe`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // User cancelled or error
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success("Đã sao chép link");
+    }
+  };
+
+  const getRatingLabel = (r: number) => {
+    if (r >= 9.0) return "Xuất sắc";
+    if (r >= 8.0) return "Tuyệt vời";
+    if (r >= 7.0) return "Rất ngon";
+    if (r >= 5.0) return "Hương vị tốt";
+    return "Chưa đánh giá";
+  };
+
   return (
     <div className="flex h-full flex-col justify-between">
       <div>
@@ -60,44 +115,34 @@ export function RestaurantInfo({
           {/* Header: Title & Ratings */}
           <div className="flex items-start justify-between gap-4">
             {/* Left: Title & Categories */}
-            <div>
-              <div className="mb-3 flex items-center gap-3">
-                <span className="rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
-                  Yêu thích
-                </span>
-                <h1 className="text-2xl font-bold leading-tight text-gray-900 md:text-4xl">
-                  {name}
-                </h1>
-              </div>
-
-              <div className="mb-5 text-sm font-medium text-gray-500">{categories.join(" • ")}</div>
+            <div className="flex-1">
+              <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 md:text-4xl">
+                {name}
+              </h1>
+              {categories.length > 0 && (
+                <div className="mb-5 text-sm font-medium text-gray-500">
+                  {categories.join(" • ")}
+                </div>
+              )}
             </div>
 
-            {/* Right: Ratings (Compact) - Now inside Main Info */}
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex items-center gap-2">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-lg font-bold text-white shadow-md ring-4 ring-emerald-50">
-                  {rating}
-                </div>
-                <div className="hidden flex-col items-start sm:flex">
-                  <span className="text-xs font-semibold uppercase text-emerald-600">
-                    {rating >= 9.0
-                      ? "Xuất sắc"
-                      : rating >= 8.0
-                        ? "Tuyệt vời"
-                        : rating >= 7.0
-                          ? "Rất ngon"
-                          : "Hương vị tốt"}
-                  </span>
-                  <span className="text-xs text-gray-500">{reviewCount} đánh giá</span>
-                </div>
+            {/* Right: Ratings (Compact) */}
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="flex aspect-square h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-lg font-bold text-white shadow-md ring-4 ring-emerald-50">
+                {Number(rating || 0).toFixed(1)}
+              </div>
+              <div className="hidden flex-col items-start sm:flex">
+                <span className="text-sm font-semibold uppercase text-emerald-600">
+                  {getRatingLabel(Number(rating || 0))}
+                </span>
+                <span className="text-xs text-gray-500">{reviewCount} đánh giá</span>
               </div>
             </div>
           </div>
 
           {/* Details */}
           <div className="space-y-2.5 text-sm">
-            <div className="hover:text-primary-500 flex items-start gap-3 text-gray-700 transition-colors">
+            <div className="flex items-start gap-3 text-gray-700 transition-colors hover:text-primary-500">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
               <span className="line-clamp-2">{address}</span>
             </div>
@@ -142,26 +187,38 @@ export function RestaurantInfo({
       {/* Action Buttons */}
       <div className="mt-6 flex gap-3 border-t border-gray-100 pt-4">
         <button
-          title={phone}
-          className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
+          onClick={handleCall}
+          title={phone || "Chưa có số điện thoại"}
+          className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500 lg:flex-1"
         >
           <PhoneCall className="h-4 w-4" />
-          Gọi điện thoại
+          <span className="hidden sm:inline">Gọi điện thoại</span>
         </button>
-        <button className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
-          <Bookmark className="h-4 w-4" />
-          Lưu vào Bộ sưu tập
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition lg:flex-1 ${
+            isSaved
+              ? "border-primary-500 bg-primary-50 text-primary-600"
+              : "border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-primary-500"
+          } disabled:opacity-50`}
+        >
+          {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+          <span className="hidden sm:inline">{isSaved ? "Đã lưu" : "Lưu"}</span>
         </button>
         <button
           onClick={onCommentClick}
-          className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1"
+          className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500 lg:flex-1"
         >
           <MessageSquare className="h-4 w-4" />
-          Bình luận
+          <span className="hidden sm:inline">Bình luận</span>
         </button>
-        <button className="hover:text-primary-500 flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 lg:flex-1">
+        <button
+          onClick={handleShare}
+          className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-primary-500 lg:flex-1"
+        >
           <Share2 className="h-4 w-4" />
-          Chia sẻ
+          <span className="hidden sm:inline">Chia sẻ</span>
         </button>
       </div>
     </div>

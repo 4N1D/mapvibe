@@ -1,7 +1,35 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@mapvibe/ui-components";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Share2, MapPin, Clock, DollarSign } from "lucide-react";
 import { HotReview } from "@mapvibe/types";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@mapvibe/ui-components";
+import toast from "react-hot-toast";
+import { apiClient } from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
+import { stripHtml } from "@/utils/text";
+
+function formatPriceRange(priceMin?: number | null, priceMax?: number | null): string | null {
+  if (!priceMin && !priceMax) return null;
+  if (priceMin && priceMax) {
+    return `${priceMin.toLocaleString("vi-VN")}đ - ${priceMax.toLocaleString("vi-VN")}đ`;
+  }
+  if (priceMin) return `Từ ${priceMin.toLocaleString("vi-VN")}đ`;
+  if (priceMax) return `Đến ${priceMax.toLocaleString("vi-VN")}đ`;
+  return null;
+}
+
+function formatOpeningHours(openingHours?: string | null): string | null {
+  if (!openingHours) return null;
+  try {
+    const hours = typeof openingHours === "string" ? JSON.parse(openingHours) : openingHours;
+    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const today = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+    return hours[today] || null;
+  } catch {
+    return typeof openingHours === "string" ? openingHours : null;
+  }
+}
 
 interface ReviewCardProps {
   data?: HotReview;
@@ -10,15 +38,60 @@ interface ReviewCardProps {
   formatTime?: (date: string) => string;
 }
 
-export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardProps) {
+export function ReviewCard({ data, loading, tags: _tags = [], formatTime }: ReviewCardProps) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [liked, setLiked] = useState(data?.user_has_liked || false);
+  const [likeCount, setLikeCount] = useState(data?.upvote_count || 0);
+
+  const handleCardClick = () => {
+    if (data) {
+      navigate(`/post/${data.id}`);
+    }
+  };
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để thích bài viết");
+      navigate("/login");
+      return;
+    }
+    if (!data) return;
+
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!wasLiked);
+    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+
+    try {
+      await apiClient.post("/reviews/vote", {
+        user_id: user.sub,
+        review_post_id: data.id,
+        vote_type: "upvote",
+      });
+    } catch (error) {
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      console.error("Failed to like review:", error);
+      toast.error("Không thể thích bài viết. Vui lòng thử lại.");
+    }
+  };
+
+  const handleComment = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data) {
+      navigate(`/post/${data.id}#comments`);
+    }
+  };
+
   if (loading) {
     return (
-      <Card className="h-full flex flex-col overflow-hidden">
+      <Card className="flex h-full flex-col overflow-hidden">
         {/* Image skeleton */}
         <Skeleton className="h-48 w-full rounded-none" />
 
         <CardContent className="flex flex-1 flex-col p-4">
-
           {/* Text skeleton */}
           <SkeletonText lines={3} />
 
@@ -43,8 +116,39 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
 
   if (!data) return null;
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/review/${data.id}`;
+    const shareText = `${stripHtml(data.text).substring(0, 100)}...`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Review từ ${data.author_name || data.author_id}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // User cancelled or error occurred
+        console.log("Share cancelled or failed:", err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Đã sao chép link vào clipboard!");
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        toast.error("Không thể chia sẻ. Vui lòng thử lại.");
+      }
+    }
+  };
+
   return (
-    <Card className="h-full flex flex-col cursor-pointer overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
+    <Card
+      className="flex h-full cursor-pointer flex-col overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg"
+      onClick={handleCardClick}
+    >
       {/* Image */}
       <div className="relative h-48 bg-gray-200">
         {data.photos.length > 0 ? (
@@ -90,19 +194,58 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
       </div>
 
       <CardContent className="flex flex-1 flex-col p-4">
-        {/* Review content */}
-        <p className="line-clamp-3 text-sm text-gray-600">{data.text}</p>
+        {/* Restaurant info - always show */}
+        <div className="mb-3 rounded-lg bg-gradient-to-r from-slate-50 to-gray-50 p-3 ring-1 ring-gray-100">
+          <h3 className="font-bold text-gray-900 line-clamp-1">
+            {data.restaurant_name || "Địa điểm chưa xác định"}
+          </h3>
+          {data.restaurant_address && (
+            <div className="mt-2 flex items-start gap-2 rounded-md bg-white/70 px-2.5 py-1.5">
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-500" />
+              <p className="text-xs leading-relaxed text-gray-600 line-clamp-2">
+                {data.restaurant_address}
+              </p>
+            </div>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {formatPriceRange(data.price_min, data.price_max) && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                <DollarSign className="h-3.5 w-3.5" />
+                {formatPriceRange(data.price_min, data.price_max)}
+              </span>
+            )}
+            {formatOpeningHours(data.opening_hours) && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+                <Clock className="h-3.5 w-3.5" />
+                {formatOpeningHours(data.opening_hours)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Review content - secondary */}
+        <p className="line-clamp-2 text-sm text-gray-600">{stripHtml(data.text)}</p>
 
         {/* Reviewer info */}
         <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
-              <span className="text-xs font-medium text-gray-600">
-                {(data.author_name || data.author_id).charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {data.author_avatar ? (
+              <img
+                src={data.author_avatar}
+                alt={data.author_name || "Avatar"}
+                className="h-6 w-6 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300">
+                <span className="text-xs font-medium text-gray-600">
+                  {(data.author_name || data.author_id).charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div>
-              <p className="text-xs font-medium text-gray-900">{data.author_name || data.author_id}</p>
+              <p className="text-xs font-medium text-gray-900">
+                {data.author_name || data.author_id}
+              </p>
               <p className="text-xs text-gray-500">
                 {formatTime ? formatTime(data.created_at) : data.created_at}
               </p>
@@ -111,14 +254,30 @@ export function ReviewCard({ data, loading, tags = [], formatTime }: ReviewCardP
 
           {/* Engagement */}
           <div className="flex items-center gap-3 text-gray-500">
-            <span className="flex items-center gap-1 text-xs">
-              <Heart className="h-3 w-3" />
-              {data.upvote_count}
-            </span>
-            <span className="flex items-center gap-1 text-xs">
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100 ${liked ? "text-red-500" : ""}`}
+              title="Thích"
+            >
+              <Heart className={`h-3 w-3 ${liked ? "fill-current" : ""}`} />
+              {likeCount}
+            </button>
+            <button
+              onClick={handleComment}
+              className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"
+              title="Bình luận"
+            >
               <MessageCircle className="h-3 w-3" />
               {data.comment_count}
-            </span>
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 rounded-full p-1 text-xs transition hover:bg-gray-100"
+              title="Chia sẻ"
+            >
+              <Share2 className="h-3 w-3" />
+              {data.share_count || 0}
+            </button>
           </div>
         </div>
       </CardContent>

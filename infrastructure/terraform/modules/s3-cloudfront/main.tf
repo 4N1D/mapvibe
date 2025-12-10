@@ -180,6 +180,110 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
   }
 
+  # Cache behavior for /avatars/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/avatars/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /backgrounds/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/backgrounds/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /menu/* → Photos bucket (restaurant menus)
+  ordered_cache_behavior {
+    path_pattern     = "/menu/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /food/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/food/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /view/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/view/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /review/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/review/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /user_avatar/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/user_avatar/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Cache behavior for /user_background/* → Photos bucket
+  ordered_cache_behavior {
+    path_pattern     = "/user_background/*"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-Photos"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
   # SPA support: redirect 403/404 to index.html
   custom_error_response {
     error_code            = 403

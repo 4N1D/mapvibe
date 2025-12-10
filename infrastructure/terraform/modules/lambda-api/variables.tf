@@ -49,3 +49,9 @@ variable "sqs_embedding_queue_arn" {
   type        = string
   default     = ""
 }
+
+variable "cognito_user_pool_id" {
+  description = "Cognito User Pool ID for admin operations"
+  type        = string
+  default     = ""
+}

@@ -130,6 +130,7 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+>>>>>>> Stashed changes
 #Lambda response query
 response.json
 

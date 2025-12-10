@@ -7,18 +7,18 @@ export const handler: Handler = {
     try {
       const db = await getDb();
 
-      // Get ID from path parameters
-      const id = event.pathParameters?.id;
+      // Get ID or slug from path parameters
+      const idOrSlug = event.pathParameters?.id;
 
-      if (!id) {
-        return badRequest("Place ID is required");
+      if (!idOrSlug) {
+        return badRequest("Place ID or slug is required");
       }
 
-      // Get place
+      // Get place by ID or slug
       const place = await db
         .selectFrom("restaurants")
         .selectAll()
-        .where("id", "=", id)
+        .where((eb) => eb.or([eb("id", "=", idOrSlug), eb("slug", "=", idOrSlug)]))
         .executeTakeFirst();
 
       if (!place) {
@@ -37,7 +37,7 @@ export const handler: Handler = {
           "users.display_name as author_name",
           "users.avatar as author_avatar",
         ])
-        .where("restaurant_reviews.restaurant_id", "=", id)
+        .where("restaurant_reviews.restaurant_id", "=", place.id)
         .orderBy("restaurant_reviews.created_at", "desc")
         .limit(5)
         .execute();
@@ -46,7 +46,7 @@ export const handler: Handler = {
       const photos = await db
         .selectFrom("photos")
         .select(["id", "s3_url", "s3_thumbnail_url", "photo_type"])
-        .where("restaurant_id", "=", id)
+        .where("restaurant_id", "=", place.id)
         .where("is_safe", "=", true)
         .orderBy("display_order", "asc")
         .limit(10)

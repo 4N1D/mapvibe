@@ -8,6 +8,8 @@ import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import create_engine, text
 
+from jwt_utils import require_auth
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -42,14 +44,18 @@ db_url = get_db_url()
 engine = create_engine(db_url, pool_size=1, max_overflow=0) if db_url else None
 
 
-def call_bedrock_retry(messages: List[Dict[str, Any]], max_retries: int = 3):
+def call_bedrock_retry(messages: List[Dict[str, Any]], system_prompt: str = None, max_retries: int = 3):
     for i in range(max_retries):
         try:
-            response = bedrock_client.converse(
-                modelId=MODEL_CHAT,
-                messages=messages,
-                inferenceConfig={"temperature": 0.2},
-            )
+            params = {
+                "modelId": MODEL_CHAT,
+                "messages": messages,
+                "inferenceConfig": {"temperature": 0.2},
+            }
+            if system_prompt:
+                params["system"] = [{"text": system_prompt}]
+            
+            response = bedrock_client.converse(**params)
             usage = response.get("usage", {})
             logger.info(
                 f"[BEDROCK] In: {usage.get('inputTokens', 0)} tok | Out: {usage.get('outputTokens', 0)} tok"
@@ -119,14 +125,14 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
         comments = conn.execute(
             text(
                 """
-                SELECT c.id, c.text, c.upvote_count, c.created_at
+                SELECT c.id, c.text, c.like_count, c.created_at
                 FROM comments c
                 JOIN review_posts rp ON c.review_post_id = rp.id
                 WHERE rp.location_address_id = :loc
                   AND rp.status = 'pending'
                   AND c.status = 'pending'
-                  AND c.upvote_count > 0
-                ORDER BY c.upvote_count DESC, c.created_at DESC
+                  AND c.like_count > 0
+                ORDER BY c.like_count DESC, c.created_at DESC
                 LIMIT 10
                 """
             ),
@@ -146,7 +152,7 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
         return {
             "id": row.id,
             "text": normalize_text(row.text, limit=400),
-            "upvote_count": int(row.upvote_count or 0),
+            "like_count": int(row.like_count or 0),
             "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
         }
 
@@ -176,13 +182,13 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
         comments = conn.execute(
             text(
                 """
-                SELECT c.id, c.text, c.upvote_count, c.created_at
+                SELECT c.id, c.text, c.like_count, c.created_at
                 FROM comments c
                 JOIN restaurant_reviews rr ON c.restaurant_review_id = rr.id
                 WHERE rr.restaurant_id = :rest_id
-                  AND c.upvote_count > 0
+                  AND c.like_count > 0
                   AND c.status = 'published'
-                ORDER BY c.upvote_count DESC, c.created_at DESC
+                ORDER BY c.like_count DESC, c.created_at DESC
                 LIMIT 10
                 """
             ),
@@ -202,11 +208,55 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
         return {
             "id": row.id,
             "text": normalize_text(row.text, limit=400),
-            "upvote_count": int(row.upvote_count or 0),
+            "like_count": int(row.like_count or 0),
             "created_at": row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at),
         }
 
     return [serialize_review(r) for r in reviews], [serialize_comment(c) for c in comments]
+
+
+def normalize_cuisine_types(cuisine_types: Any) -> List[Dict[str, str]]:
+    """
+    Normalize cuisine_types thành array of objects với format:
+    [{"name": "...", "description": "..."}, ...]
+    """
+    normalized = []
+    
+    if cuisine_types is None:
+        return []
+    
+    # Nếu là string, thử parse JSON
+    if isinstance(cuisine_types, str):
+        try:
+            parsed = json.loads(cuisine_types)
+            if isinstance(parsed, list):
+                cuisine_types = parsed
+            else:
+                return []
+        except:
+            return []
+    
+    # Xử lý list
+    if isinstance(cuisine_types, list):
+        for item in cuisine_types:
+            if isinstance(item, dict):
+                # Object format: {"name": "...", "description": "..."}
+                name = item.get("name", "").strip() if item.get("name") else ""
+                description = item.get("description", "").strip() if item.get("description") else ""
+                
+                if name:  # Chỉ thêm nếu có name
+                    normalized.append({
+                        "name": name,
+                        "description": description  # Có thể rỗng
+                    })
+            elif isinstance(item, str) and item.strip():
+                # String format - convert thành object
+                normalized.append({
+                    "name": item.strip(),
+                    "description": ""
+                })
+    
+    return normalized
 
 
 def build_prompt(
@@ -222,20 +272,39 @@ def build_prompt(
     reviews_str = "\n".join(reviews_lines) if reviews_lines else "None"
 
     comments_str = "\n".join(
-        [f"- Comment {c['id']} (upvotes {c['upvote_count']}): {c['text']}" for c in comments]
+        [f"- Comment {c['id']} (likes {c['like_count']}): {c['text']}" for c in comments]
     ) or "None"
 
     system_prompt = (
         "Bạn là hệ thống tổng hợp dữ liệu nhà hàng. "
         "Dùng thông tin dưới đây để suy luận các trường. "
         "Chỉ trả về JSON với các thuộc tính: "
-        "name_vi, slug, address, district, ward, phone, website, geo_lat, geo_lng, "
+        "name_vi, slug, address, ward, phone, website, geo_lat, geo_lng, "
         "business_type, cuisine_types, price_min, price_max, opening_hours, "
         "description, features. "
         "Nếu thiếu thông tin, trả về null cho field đó (features và cuisine_types: mảng, có thể rỗng). "
         "price_min/price_max là integer. opening_hours phải ở format 'HH:MM - HH:MM' hoặc null. "
         "Không tự bịa địa chỉ hay toạ độ nếu không có căn cứ. "
-        "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments."
+        "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments.\n\n"
+        "QUAN TRỌNG về cuisine_types (mảng JSON array của objects):\n"
+        "- cuisine_types phải là mảng các objects, mỗi object có 2 trường bắt buộc: 'name' và 'description'\n"
+        "- Format ví dụ CHÍNH XÁC:\n"
+        "  [\n"
+        "    {\"name\": \"BUFFET LẨU BĂNG CHUYỀN\", \"description\": \"Bao gồm các loại hải sản, thịt, rau củ và nấm.\"},\n"
+        "    {\"name\": \"LẨU ĐA DẠNG NƯỚC DÙNG\", \"description\": \"Các lựa chọn nước lẩu như lẩu thảo mộc, lẩu kim chi, lẩu miso và nhiều loại khác.\"},\n"
+        "    {\"name\": \"CHẾ BIẾN THEO YÊU CẦU\", \"description\": \"Thực khách có thể tự tay chế biến món ăn theo sở thích cá nhân.\"},\n"
+        "    {\"name\": \"ẨM THỰC NHẬT BẢN\", \"description\": \"Không chỉ có lẩu, nhà hàng còn phục vụ nhiều món ăn theo phong cách Nhật Bản.\"},\n"
+        "    {\"name\": \"NƯỚC CHẤM ĐA DẠNG\", \"description\": \"Nhiều loại nước chấm phong phú để khách tự pha chế.\"}\n"
+        "  ]\n"
+        "- Hãy trích xuất từ reviews/comments:\n"
+        "  + name: Tên loại hình ẩm thực (3-6 từ, viết HOA, VD: \"BUFFET LẨU BĂNG CHUYỀN\")\n"
+        "  + description: Mô tả chi tiết về loại hình đó (1-2 câu, giải thích rõ ràng từ thông tin trong reviews)\n"
+        "- Mỗi object PHẢI có cả 'name' và 'description', không được thiếu.\n"
+        "- name viết HOA, ngắn gọn (3-6 từ).\n"
+        "- description là 1-2 câu mô tả chi tiết, trích xuất từ reviews/comments.\n"
+        "- Nếu không tìm thấy thông tin cụ thể, trả về mảng rỗng [].\n"
+        "- Không lặp lại thông tin đã có trong business_type.\n"
+        "- Ưu tiên các thông tin được nhắc đến nhiều lần trong reviews/comments."
     )
 
     status_text = "pending" if source_type == "pending" else "approved"
@@ -247,10 +316,8 @@ Top comment (top 10 upvote, status {status_text}):
 
 Hãy tổng hợp và trả JSON."""
 
-    return [
-        {"role": "system", "content": [{"text": system_prompt}]},
-        {"role": "user", "content": [{"text": user_prompt}]},
-    ]
+    messages = [{"role": "user", "content": [{"text": user_prompt}]}]
+    return messages, system_prompt
 
 
 def aggregate(location_address_id: str):
@@ -275,8 +342,8 @@ def aggregate(location_address_id: str):
             f"Invalid location status: {status}. Expected 'pending' or 'approved' with restaurant_id"
         )
 
-    messages = build_prompt(reviews, comments, source_type)
-    response = call_bedrock_retry(messages)
+    messages, system_prompt = build_prompt(reviews, comments, source_type)
+    response = call_bedrock_retry(messages, system_prompt)
     if not response:
         raise Exception("Bedrock returned empty response")
 
@@ -288,9 +355,20 @@ def aggregate(location_address_id: str):
 
     try:
         payload = json.loads(output_text)
+        
+        # Validate và normalize cuisine_types thành array of objects
+        if "cuisine_types" in payload:
+            payload["cuisine_types"] = normalize_cuisine_types(payload["cuisine_types"])
+            logger.info(f"✅ Normalized cuisine_types: {len(payload['cuisine_types'])} items")
+            if payload["cuisine_types"]:
+                logger.info(f"   Sample: {payload['cuisine_types'][0]}")
+        else:
+            payload["cuisine_types"] = []
+            logger.info("⚠️ cuisine_types not found in payload, setting to empty array")
+            
     except json.JSONDecodeError:
         logger.warning("LLM output is not valid JSON, wrapping as string")
-        payload = {"raw": output_text}
+        payload = {"raw": output_text, "cuisine_types": []}
 
     return {
         "location_address_id": location_address_id,
@@ -304,6 +382,13 @@ def aggregate(location_address_id: str):
 
 def lambda_handler(event, context):
     try:
+        # JWT Authentication check
+        is_authenticated, user_id, error_response = require_auth(event)
+        if not is_authenticated:
+            return error_response
+        
+        logger.info(f"✅ Authenticated user: {user_id}")
+        
         if event.get("body"):
             body = json.loads(event["body"])
         else:
@@ -331,4 +416,3 @@ def lambda_handler(event, context):
             "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
             "body": json.dumps({"error": str(e)}),
         }
-

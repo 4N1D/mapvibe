@@ -1,4 +1,4 @@
-import { getDb } from '../../services/db';
+import { getDb } from "../../services/db";
 
 export interface CognitoTriggerEvent {
   version: string;
@@ -52,19 +52,19 @@ export async function handleCognitoTrigger(
   try {
     switch (triggerSource) {
       // 1. Post Confirmation - Tạo user khi đăng ký email
-      case 'PostConfirmation_ConfirmSignUp':
+      case "PostConfirmation_ConfirmSignUp":
         await createUserRecord(userAttributes);
         break;
 
       // 2. Post Authentication - Update last_login mỗi lần đăng nhập
-      case 'PostAuthentication_Authentication':
+      case "PostAuthentication_Authentication":
         await handlePostAuthentication(userAttributes);
         break;
 
       // 3. Pre Token Generation V1 - Sync user + thêm roles vào token
-      case 'TokenGeneration_HostedAuth':
-      case 'TokenGeneration_Authentication':
-      case 'TokenGeneration_RefreshTokens':
+      case "TokenGeneration_HostedAuth":
+      case "TokenGeneration_Authentication":
+      case "TokenGeneration_RefreshTokens":
         event = await handlePreTokenGeneration(event);
         break;
 
@@ -72,14 +72,14 @@ export async function handleCognitoTrigger(
         console.log(`[Cognito] Unhandled trigger: ${triggerSource}`);
     }
   } catch (err) {
-    console.error('[Cognito] Error in trigger:', err);
+    console.error("[Cognito] Error in trigger:", err);
   }
 
   return event;
 }
 
 async function handlePostAuthentication(
-  userAttributes: CognitoTriggerEvent['request']['userAttributes']
+  userAttributes: CognitoTriggerEvent["request"]["userAttributes"]
 ): Promise<void> {
   const db = await getDb();
   const userId = userAttributes.sub;
@@ -91,17 +91,15 @@ async function handlePostAuthentication(
 
   // Update last_login
   await db
-    .updateTable('users')
+    .updateTable("users")
     .set({ last_login_at: new Date(), updated_at: new Date() })
-    .where('id', '=', userId)
+    .where("id", "=", userId)
     .execute();
 
   console.log(`[Cognito] PostAuth: Updated last_login for ${userId}`);
 }
 
-async function handlePreTokenGeneration(
-  event: CognitoTriggerEvent
-): Promise<CognitoTriggerEvent> {
+async function handlePreTokenGeneration(event: CognitoTriggerEvent): Promise<CognitoTriggerEvent> {
   const { userAttributes } = event.request;
   const userId = userAttributes.sub;
 
@@ -111,18 +109,30 @@ async function handlePreTokenGeneration(
   // 2. Lấy roles từ DB
   const db = await getDb();
   const dbUser = await db
-    .selectFrom('users')
-    .select(['roles'])
-    .where('id', '=', userId)
+    .selectFrom("users")
+    .select(["roles"])
+    .where("id", "=", userId)
     .executeTakeFirst();
 
-  const roles = dbUser?.roles ? JSON.parse(dbUser.roles as string) : ['user'];
+  // Handle roles: could be string, array, null, or undefined
+  let roles: string[] = ["user"];
+  if (dbUser?.roles) {
+    if (typeof dbUser.roles === "string") {
+      try {
+        roles = JSON.parse(dbUser.roles);
+      } catch {
+        roles = ["user"];
+      }
+    } else if (Array.isArray(dbUser.roles)) {
+      roles = dbUser.roles;
+    }
+  }
 
   // 3. Thêm custom claims vào token
   event.response = {
     claimsOverrideDetails: {
       claimsToAddOrOverride: {
-        'custom:roles': JSON.stringify(roles),
+        "custom:roles": JSON.stringify(roles),
       },
     },
   };
@@ -133,25 +143,23 @@ async function handlePreTokenGeneration(
 }
 
 async function createUserRecord(
-  userAttributes: CognitoTriggerEvent['request']['userAttributes']
+  userAttributes: CognitoTriggerEvent["request"]["userAttributes"]
 ): Promise<void> {
   const db = await getDb();
 
   const userId = userAttributes.sub;
   const email = userAttributes.email;
   const displayName =
-    userAttributes.name ||
-    userAttributes.preferred_username ||
-    email.split('@')[0];
+    userAttributes.name || userAttributes.preferred_username || email.split("@")[0];
   const avatar = userAttributes.picture || null;
-  const emailVerified = userAttributes.email_verified === 'true';
+  const emailVerified = userAttributes.email_verified === "true";
 
   console.log(`[Cognito] Creating user: ${email} (${userId})`);
 
   const existingUser = await db
-    .selectFrom('users')
-    .select('id')
-    .where('id', '=', userId)
+    .selectFrom("users")
+    .select("id")
+    .where("id", "=", userId)
     .executeTakeFirst();
 
   if (existingUser) {
@@ -160,15 +168,15 @@ async function createUserRecord(
   }
 
   await db
-    .insertInto('users')
+    .insertInto("users")
     .values({
       id: userId,
       email,
       display_name: displayName,
       avatar,
       email_verified: emailVerified,
-      account_status: 'active',
-      roles: JSON.stringify(['user']),
+      account_status: "active",
+      roles: JSON.stringify(["user"]),
       reputation: 0,
       created_at: new Date(),
       updated_at: new Date(),
@@ -179,16 +187,16 @@ async function createUserRecord(
 }
 
 async function createUserRecordIfNotExists(
-  userAttributes: CognitoTriggerEvent['request']['userAttributes']
+  userAttributes: CognitoTriggerEvent["request"]["userAttributes"]
 ): Promise<void> {
   const db = await getDb();
 
   const userId = userAttributes.sub;
 
   const existingUser = await db
-    .selectFrom('users')
-    .select('id')
-    .where('id', '=', userId)
+    .selectFrom("users")
+    .select("id")
+    .where("id", "=", userId)
     .executeTakeFirst();
 
   if (!existingUser) {
@@ -197,9 +205,9 @@ async function createUserRecordIfNotExists(
   }
 
   await db
-    .updateTable('users')
+    .updateTable("users")
     .set({ last_login_at: new Date(), updated_at: new Date() })
-    .where('id', '=', userId)
+    .where("id", "=", userId)
     .execute();
 
   console.log(`[Cognito] User exists, updated last_login: ${userId}`);

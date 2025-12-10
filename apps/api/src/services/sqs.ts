@@ -31,7 +31,9 @@ export async function sendEmbeddingJob(restaurantId: string): Promise<boolean> {
     });
 
     const response = await sqsClient.send(command);
-    console.log(`[SQS] ✅ Sent embedding job for restaurant ${restaurantId}, MessageId: ${response.MessageId}`);
+    console.log(
+      `[SQS] ✅ Sent embedding job for restaurant ${restaurantId}, MessageId: ${response.MessageId}`
+    );
     return true;
   } catch (error) {
     console.error(`[SQS] ❌ Failed to send embedding job for restaurant ${restaurantId}:`, error);
@@ -39,4 +41,3 @@ export async function sendEmbeddingJob(restaurantId: string): Promise<boolean> {
     return false;
   }
 }
-

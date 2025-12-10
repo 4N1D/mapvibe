@@ -1,43 +1,93 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RestaurantPhoto, RestaurantPhotosResponse } from "@mapvibe/types";
 import { apiClient } from "@/lib/axios";
 
-interface MenuTabProps {
-  restaurantId: number;
-}
-
-const fetchMenuPhotos = async (restaurantId: number, page: number) => {
-  const response = await apiClient.get<RestaurantPhotosResponse>(
-    `/photos/restaurant/${restaurantId}?page=${page}&limit=12&category=menu`
-  );
-  return response.data;
+// Helper function to fix CDN URL (replace wrong domain with correct one)
+const fixCdnUrl = (url?: string): string | undefined => {
+  if (!url) return url;
+  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
 };
 
-export function MenuTab({ restaurantId }: MenuTabProps) {
-  const [localPhotos, setLocalPhotos] = useState<RestaurantPhoto[]>([]);
+interface MenuTabProps {
+  slug?: string;
+  restaurantId?: string | number;
+}
+
+interface MenuPhoto {
+  id: string;
+  url: string;
+  thumbnail_url?: string;
+  menu_name?: string;
+}
+
+interface MenuApiResponse {
+  restaurant_id: string;
+  menu_photos: Array<{
+    id: string;
+    s3_url: string;
+    s3_thumbnail_url?: string;
+    menu_name?: string;
+  }>;
+  pagination: { limit: number; offset: number; total: number };
+}
+
+const fetchMenuPhotos = async (slug: string, page: number) => {
+  const offset = (page - 1) * 12;
+  const response = await apiClient.get<MenuApiResponse>(
+    `/restaurants/${slug}/menu?limit=12&offset=${offset}`
+  );
+  
+  const data = response.data;
+  const photos: MenuPhoto[] = (data.menu_photos || []).map(p => ({
+    id: p.id,
+    url: fixCdnUrl(p.s3_url) || p.s3_url,
+    thumbnail_url: fixCdnUrl(p.s3_thumbnail_url),
+    menu_name: p.menu_name,
+  }));
+  
+  return {
+    photos,
+    page,
+    total_pages: Math.ceil((data.pagination?.total || photos.length) / 12),
+  };
+};
+
+export function MenuTab({ slug, restaurantId }: MenuTabProps) {
+  const [localPhotos, setLocalPhotos] = useState<MenuPhoto[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["menu-photos", restaurantId],
-    queryFn: () => fetchMenuPhotos(restaurantId, 1),
+    queryKey: ["menu-photos", slug || restaurantId],
+    queryFn: () => fetchMenuPhotos(slug!, 1),
     placeholderData: (prev) => prev,
+    enabled: !!slug,
   });
 
-  const photos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+  // If no slug provided, show message
+  if (!slug) {
+    return (
+      <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+        <p className="py-8 text-center text-gray-500">Chưa có ảnh thực đơn nào.</p>
+      </div>
+    );
+  }
 
-  if (data && localPhotos.length === 0 && hasMore !== (data.page < data.total_pages)) {
+  const photos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
+
+  if (data && localPhotos.length === 0 && hasMore !== data.page < data.total_pages) {
     setHasMore(data.page < data.total_pages);
   }
 
   const loadMore = async () => {
+    if (!slug) return;
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const response = await fetchMenuPhotos(restaurantId, nextPage);
-      const currentPhotos = localPhotos.length > 0 ? localPhotos : (data?.photos || []);
+      const response = await fetchMenuPhotos(slug, nextPage);
+      const currentPhotos = localPhotos.length > 0 ? localPhotos : data?.photos || [];
       setLocalPhotos([...currentPhotos, ...response.photos]);
       setHasMore(response.page < response.total_pages);
       setPage(nextPage);
@@ -55,18 +105,21 @@ export function MenuTab({ restaurantId }: MenuTabProps) {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {photos.map((photo) => (
-            <div key={photo.id} className="group">
+            <div
+              key={photo.id}
+              className="group"
+            >
               <div className="relative aspect-[3/4] cursor-pointer overflow-hidden rounded-lg bg-gray-100">
                 <img
                   src={photo.thumbnail_url || photo.url}
-                  alt={photo.caption || "Thực đơn"}
+                  alt={photo.menu_name || "Thực đơn"}
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   loading="lazy"
                 />
                 <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
               </div>
-              {photo.caption && (
-                <p className="mt-2 text-sm font-medium text-gray-700">{photo.caption}</p>
+              {photo.menu_name && (
+                <p className="mt-2 text-center text-sm font-medium text-gray-700">{photo.menu_name}</p>
               )}
             </div>
           ))}

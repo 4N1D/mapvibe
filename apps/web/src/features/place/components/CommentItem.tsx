@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Heart, MessageCircle, Flag } from "lucide-react";
 import { Comment } from "@mapvibe/types";
+import { apiClient } from "@/lib/axios";
 import { CommentForm } from "./CommentForm";
 import { ReportModal } from "./ReportModal";
+import toast from "react-hot-toast";
 
 interface CommentItemProps {
   comment: Comment;
@@ -14,6 +16,9 @@ interface CommentItemProps {
   formatTime: (date: string) => string;
   depth?: number;
   rootParentId?: string;
+  initialLiked?: boolean;
+  onLikeChange?: (commentId: string, liked: boolean) => void;
+  isLiked?: (commentId: string) => boolean;
 }
 
 export function CommentItem({
@@ -26,26 +31,89 @@ export function CommentItem({
   formatTime,
   depth = 0,
   rootParentId,
+  initialLiked = false,
+  onLikeChange,
+  isLiked,
 }: CommentItemProps) {
-  const [liked, setLiked] = useState(false);
+  // Calculate liked status from isLiked function or initialLiked prop
+  const computedLiked = isLiked ? isLiked(comment.id) : initialLiked;
+  const [liked, setLiked] = useState(computedLiked);
   const [likeCount, setLikeCount] = useState(comment.like_count);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const isOptimisticUpdateRef = useRef(false);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+  // Update liked state when computedLiked changes (from isLiked function or initialLiked)
+  // But skip if we're in the middle of an optimistic update
+  useEffect(() => {
+    if (!isOptimisticUpdateRef.current) {
+      setLiked((prevLiked) => {
+        if (prevLiked !== computedLiked) {
+          console.log(`[CommentItem] Updating liked status for comment ${comment.id}: ${prevLiked} -> ${computedLiked}`);
+        }
+        return computedLiked;
+      });
+    }
+  }, [computedLiked, comment.id]);
+
+  const handleLike = async () => {
+    // Optimistic update
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    isOptimisticUpdateRef.current = true;
+    setLiked(!wasLiked);
+    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+
+    try {
+      // Choose endpoint based on comment type (restaurant vs review post)
+      const endpoint = comment.restaurant_id
+        ? `/restaurants/comments/${comment.id}/like`
+        : `/reviews/comments/${comment.id}/like`;
+      const response = await apiClient.post<{ liked: boolean; like_count: number }>(endpoint);
+
+      // Update with actual response from server
+      setLiked(response.data.liked);
+      setLikeCount(response.data.like_count);
+      
+      // Notify parent component about like change
+      if (onLikeChange) {
+        onLikeChange(comment.id, response.data.liked);
+      }
+      
+      // Reset optimistic update flag after a short delay to allow parent state to update
+      setTimeout(() => {
+        isOptimisticUpdateRef.current = false;
+      }, 100);
+    } catch (error) {
+      // Rollback on error
+      isOptimisticUpdateRef.current = false;
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      console.error("Failed to like comment:", error);
+      toast.error("Không thể like comment. Vui lòng thử lại.");
+    }
   };
 
   const handleReport = async (reason: string, details?: string) => {
     try {
       setReportLoading(true);
-      // TODO: Call API to submit report
-      console.log("Report submitted:", { commentId: comment.id, reason, details });
-      alert("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
-    } catch (error) {
+      // Choose endpoint based on comment type (restaurant vs review post)
+      const endpoint = comment.restaurant_id
+        ? `/restaurants/comments/${comment.id}/report`
+        : `/reviews/comments/${comment.id}/report`;
+      await apiClient.post(endpoint, {
+        reason,
+        details,
+      });
+      toast.success("Đã gửi báo cáo. Cảm ơn bạn đã phản hồi!");
+      setIsReportModalOpen(false);
+    } catch (error: any) {
       console.error("Failed to submit report:", error);
-      alert("Không thể gửi báo cáo. Vui lòng thử lại.");
+      if (error.response?.status === 400 && error.response?.data?.message?.includes("already reported")) {
+        toast.error("Bạn đã báo cáo comment này rồi.");
+      } else {
+        toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
+      }
     } finally {
       setReportLoading(false);
     }
@@ -63,20 +131,22 @@ export function CommentItem({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gray-300 text-sm font-medium text-gray-600">
-              {comment.author_name.charAt(0).toUpperCase()}
+              {(comment.author_name || "U").charAt(0).toUpperCase()}
             </div>
           )}
         </div>
 
         <div className="flex-1">
           <div className="mb-1">
-            <span className="font-semibold text-gray-900">{comment.author_name}</span>
+            <span className="font-semibold text-gray-900">
+              {comment.author_name || "Người dùng"}
+            </span>
             <span className="ml-2 text-sm text-gray-400">{formatTime(comment.created_at)}</span>
           </div>
 
           <p className="mb-2 text-gray-700">
             {comment.reply_to_name && (
-              <span className="text-primary-500 mr-1 font-semibold">@{comment.reply_to_name}</span>
+              <span className="mr-1 font-semibold text-primary-500">@{comment.reply_to_name}</span>
             )}
             {comment.content}
           </p>
@@ -91,8 +161,10 @@ export function CommentItem({
             </button>
 
             <button
-              onClick={() => onReply(comment.id, comment.author_name, rootParentId || comment.id)}
-              className="hover:text-primary-500 flex items-center gap-1 transition"
+              onClick={() =>
+                onReply(comment.id, comment.author_name || "Người dùng", rootParentId || comment.id)
+              }
+              className="flex items-center gap-1 transition hover:text-primary-500"
             >
               <MessageCircle className="h-4 w-4" />
               <span>{depth === 0 ? comment.replies?.length || 0 : ""}</span>
@@ -119,7 +191,7 @@ export function CommentItem({
             <div className="mt-3">
               <CommentForm
                 onSubmit={onSubmitReply}
-                replyingTo={{ id: comment.id, name: comment.author_name }}
+                replyingTo={{ id: comment.id, name: comment.author_name || "Người dùng" }}
                 onCancelReply={onCancelReply}
                 loading={submitting}
               />
@@ -142,6 +214,9 @@ export function CommentItem({
               formatTime={formatTime}
               depth={depth + 1}
               rootParentId={rootParentId || comment.id}
+              initialLiked={isLiked ? isLiked(reply.id) : false}
+              onLikeChange={onLikeChange}
+              isLiked={isLiked}
             />
           ))}
         </div>

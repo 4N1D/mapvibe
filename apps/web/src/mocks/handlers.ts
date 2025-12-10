@@ -94,8 +94,19 @@ const reviewsStore = { data: generateRestaurantReviews(12) };
 
 // Generate mock restaurant photos
 const generateRestaurantPhotos = (count: number) => {
-  const categories: Array<"food" | "view" | "comment" | "menu"> = ["food", "view", "comment", "menu"];
-  const menuCaptions = ["Thực đơn lẩu", "Thực đơn đồ uống", "Thực đơn tráng miệng", "Thực đơn chính", "Thực đơn combo"];
+  const categories: Array<"food" | "view" | "comment" | "menu"> = [
+    "food",
+    "view",
+    "comment",
+    "menu",
+  ];
+  const menuCaptions = [
+    "Thực đơn lẩu",
+    "Thực đơn đồ uống",
+    "Thực đơn tráng miệng",
+    "Thực đơn chính",
+    "Thực đơn combo",
+  ];
   return Array.from({ length: count }, (_, i) => ({
     id: `photo-${i + 1}`,
     url: `https://images.unsplash.com/photo-${1546069901 + i * 500}-ba9599a7e63c?w=800`,

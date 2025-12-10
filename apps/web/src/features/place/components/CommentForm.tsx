@@ -28,7 +28,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
           Vui lòng{" "}
           <a
             href="/login"
-            className="text-primary-500 font-medium hover:underline"
+            className="font-medium text-primary-500 hover:underline"
           >
             đăng nhập
           </a>{" "}
@@ -60,9 +60,17 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
 
       <div className="flex gap-3">
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200">
-          <div className="flex h-full w-full items-center justify-center bg-gray-300 text-sm font-medium text-gray-600">
-            {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
-          </div>
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.name || "Avatar"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gray-300 text-sm font-medium text-gray-600">
+              {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
 
         <input

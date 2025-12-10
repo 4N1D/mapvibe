@@ -131,6 +131,7 @@ export interface HotReview {
   id: string;
   author_id: string;
   author_name: string;
+  author_avatar?: string;
   restaurant_id: string | null;
   text: string;
   photos: ReviewPhoto[];
@@ -142,6 +143,12 @@ export interface HotReview {
   created_at: string;
   score: string;
   tag: "hot" | "new" | "normal" | "trending";
+  restaurant_name?: string | null;
+  restaurant_address?: string | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  opening_hours?: string | null;
+  user_has_liked?: boolean;
 }
 
 export interface HotReviewsResponse {
@@ -157,7 +164,8 @@ export interface Comment {
   author_id: string;
   author_name: string;
   author_avatar?: string;
-  restaurant_id: string;
+  restaurant_id?: string;
+  review_post_id?: string;
   content: string;
   like_count: number;
   created_at: string;
@@ -167,7 +175,8 @@ export interface Comment {
 }
 
 export interface CommentsResponse {
-  restaurant_id: string;
+  restaurant_id?: string;
+  review_post_id?: string;
   total: number;
   page: number;
   limit: number;
@@ -179,11 +188,11 @@ export interface CommentsResponse {
 // Restaurant Review Types (for ReviewsTab)
 // ============================================
 export interface ReviewRatings {
-  quality: number;    // Chất lượng (1-10)
-  service: number;    // Dịch vụ (1-10)
-  location: number;   // Vị trí (1-10)
-  price: number;      // Giá cả (1-10)
-  ambiance: number;   // Không gian (1-10)
+  quality: number; // Chất lượng (1-10)
+  service: number; // Dịch vụ (1-10)
+  location: number; // Vị trí (1-10)
+  price: number; // Giá cả (1-10)
+  ambiance: number; // Không gian (1-10)
 }
 
 export interface RestaurantReview {
@@ -194,7 +203,7 @@ export interface RestaurantReview {
   restaurant_id: number;
   content: string;
   ratings: ReviewRatings;
-  overall_rating: number;  // Average of all ratings
+  overall_rating: number; // Average of all ratings
   photos: ReviewPhoto[];
   like_count: number;
   comment_count: number;
@@ -213,7 +222,7 @@ export interface RestaurantReviewsResponse {
 // ============================================
 // Restaurant Photo Types (for PhotosTab)
 // ============================================
-export type PhotoCategory = "all" | "food" | "view" | "comment" | "menu";
+export type PhotoCategory = "all" | "food" | "view" | "review" | "menu";
 
 export interface RestaurantPhoto {
   id: string;

@@ -1,7 +1,7 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, error } from '../../middlewares/response';
-import { sql } from 'kysely';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, error } from "../../middlewares/response";
+import { sql } from "kysely";
 
 const EXPIRY_DAYS = 14;
 
@@ -13,7 +13,7 @@ interface CleanupResult {
 }
 
 export const handler: Handler = {
-  async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
+  async handle(_event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
       const db = await getDb();
 
@@ -30,7 +30,7 @@ export const handler: Handler = {
 
       if (expiredLocations.rows.length === 0) {
         return success({
-          message: 'No expired pending locations found',
+          message: "No expired pending locations found",
           cleaned_up: 0,
           results: [],
         });
@@ -38,7 +38,7 @@ export const handler: Handler = {
 
       const cleanupResults: CleanupResult[] = [];
 
-      for (const location of expiredLocations.rows as any[]) {
+      for (const location of expiredLocations.rows as { id: string; restaurant_name: string | null }[]) {
         const locationId = location.id;
 
         await db.transaction().execute(async (trx) => {
@@ -48,7 +48,7 @@ export const handler: Handler = {
             WHERE location_address_id = ${locationId}
           `.execute(trx);
 
-          const reviewIds = (reviews.rows as any[]).map(r => r.id);
+          const reviewIds = (reviews.rows as { id: string }[]).map((r) => r.id);
           let photosDeleted = 0;
 
           // Delete photos linked only to these reviews
@@ -95,7 +95,7 @@ export const handler: Handler = {
         results: cleanupResults,
       });
     } catch (err) {
-      console.error('[reviews/cleanup-expired] Error:', err);
+      console.error("[reviews/cleanup-expired] Error:", err);
       return error((err as Error).message);
     }
   },

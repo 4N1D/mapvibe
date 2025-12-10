@@ -3,7 +3,7 @@ import { Button, cn } from "@mapvibe/ui-components";
 import { Link } from "react-router-dom";
 import { LoginModal } from "../auth/LoginModal";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, Settings, ChevronDown } from "lucide-react";
+import { LogOut, Settings, ChevronDown, User } from "lucide-react";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -92,12 +92,20 @@ export function Header() {
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200"
                   >
-                    {/* Avatar Circle */}
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white">
-                      <span className="text-sm font-semibold">
-                        {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                      </span>
-                    </div>
+                    {/* Avatar */}
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name || "Avatar"}
+                        className="h-8 w-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white">
+                        <span className="text-sm font-semibold">
+                          {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     {/* Name */}
                     <span className="text-sm font-medium text-gray-700">
                       {user?.name || user?.email?.split("@")[0]}
@@ -116,12 +124,12 @@ export function Header() {
                       </div>
 
                       <Link
-                        to="/settings"
+                        to="/profile"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        <Settings className="h-4 w-4" />
-                        Cài đặt tài khoản
+                        <User className="h-4 w-4" />
+                        Hồ sơ của tôi
                       </Link>
 
                       <button
@@ -194,7 +202,7 @@ export function Header() {
                   Trang chủ
                 </Link>
                 <Link
-                  to="/explore"
+                  to="/suggest"
                   className="rounded-lg px-3 py-2 font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Đề xuất địa điểm
@@ -212,17 +220,33 @@ export function Header() {
                 {isAuthenticated ? (
                   <>
                     <div className="flex items-center gap-3 px-3 py-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white">
-                        <span className="text-sm font-semibold">
-                          {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                        </span>
-                      </div>
+                      {user?.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.name || "Avatar"}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white">
+                          <span className="text-sm font-semibold">
+                            {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <div className="text-sm font-medium text-gray-900">{user?.name}</div>
                         <div className="text-xs text-gray-500">{user?.email}</div>
                       </div>
                     </div>
 
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User className="h-4 w-4" />
+                      Hồ sơ của tôi
+                    </Link>
                     <Link
                       to="/settings"
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

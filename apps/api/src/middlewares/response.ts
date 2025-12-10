@@ -35,4 +35,8 @@ export function unauthorized(message = "Unauthorized"): APIGatewayResponse {
   return error(message, 401);
 }
 
+export function forbidden(message = "Forbidden"): APIGatewayResponse {
+  return error(message, 403);
+}
+
 export { corsHeaders };

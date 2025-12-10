@@ -1,6 +1,6 @@
-import type { APIGatewayEvent, APIGatewayResponse, Handler } from '../../types';
-import { getDb } from '../../services/db';
-import { success, notFound, badRequest, error } from '../../middlewares/response';
+import type { APIGatewayEvent, APIGatewayResponse, Handler } from "../../types";
+import { getDb } from "../../services/db";
+import { success, notFound, badRequest, error } from "../../middlewares/response";
 
 export const handler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -9,18 +9,50 @@ export const handler: Handler = {
       const slug = event.pathParameters?.slug;
 
       if (!slug) {
-        return badRequest('Restaurant slug is required');
+        return badRequest("Restaurant slug is required");
       }
 
-      // Get restaurant by slug with all static and aggregated information
+      // Query 1: Get restaurant by slug
       const restaurant = await db
-        .selectFrom('restaurants')
+        .selectFrom("restaurants")
         .selectAll()
-        .where('slug', '=', slug)
+        .where("slug", "=", slug)
         .executeTakeFirst();
 
       if (!restaurant) {
-        return notFound('Restaurant not found');
+        return notFound("Restaurant not found");
+      }
+
+      // Query 2: Get images from photos table (all types, no limit)
+      const photos = await db
+        .selectFrom("photos")
+        .select(["s3_url"])
+        .where("restaurant_id", "=", restaurant.id)
+        .where("is_safe", "=", true)
+        .orderBy("display_order", "asc")
+        .orderBy("created_at", "desc")
+        .execute();
+
+      // Extract image URLs
+      const images = photos.map((p) => p.s3_url);
+
+      // Parse JSON fields if they are strings
+      let cuisineTypes = restaurant.cuisine_types;
+      if (typeof cuisineTypes === "string") {
+        try {
+          cuisineTypes = JSON.parse(cuisineTypes);
+        } catch {
+          cuisineTypes = null;
+        }
+      }
+
+      let features = restaurant.features;
+      if (typeof features === "string") {
+        try {
+          features = JSON.parse(features);
+        } catch {
+          features = null;
+        }
       }
 
       return success({
@@ -28,7 +60,6 @@ export const handler: Handler = {
         name: restaurant.name_vi,
         slug: restaurant.slug,
         address: restaurant.address,
-        district: restaurant.district,
         ward: restaurant.ward,
         phone: restaurant.phone,
         opening_hours: restaurant.opening_hours,
@@ -38,17 +69,21 @@ export const handler: Handler = {
         rating_price: restaurant.rating_price,
         rating_ambiance: restaurant.rating_ambiance,
         rating_quality: restaurant.rating_quality,
+        rating_service: restaurant.rating_service,
+        rating_location: restaurant.rating_location,
         review_count: restaurant.review_count,
-        features: restaurant.features,
-        cuisine_types: restaurant.cuisine_types,
+        features: features,
+        cuisine_types: cuisineTypes,
         price_min: restaurant.price_min,
         price_max: restaurant.price_max,
+        description: restaurant.description,
         status: restaurant.status,
+        images: images,
         created_at: restaurant.created_at,
         updated_at: restaurant.updated_at,
       });
     } catch (err) {
-      console.error('[restaurants/info] Error:', err);
+      console.error("[restaurants/info] Error:", err);
       return error((err as Error).message);
     }
   },

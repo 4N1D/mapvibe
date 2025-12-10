@@ -251,10 +251,7 @@ export const handler: Handler = {
             .selectFrom("photos")
             .select(["id"])
             .where((eb) =>
-              eb.or([
-                eb("s3_url", "=", photo.url),
-                eb("s3_thumbnail_url", "=", photo.url),
-              ])
+              eb.or([eb("s3_url", "=", photo.url), eb("s3_thumbnail_url", "=", photo.url)])
             )
             .executeTakeFirst();
 
@@ -362,9 +359,12 @@ export const handler: Handler = {
         for (const photoRecord of newPhotoRecords) {
           // Determine if the URL is already a CDN URL or needs to be stored as-is
           let s3Url = photoRecord.url;
-          
+
           // If not already a CDN URL, construct one (assuming the URL contains the S3 key)
-          if (!photoRecord.url.includes(CLOUDFRONT_DOMAIN) && !photoRecord.url.includes(S3_PHOTOS_BUCKET)) {
+          if (
+            !photoRecord.url.includes(CLOUDFRONT_DOMAIN) &&
+            !photoRecord.url.includes(S3_PHOTOS_BUCKET)
+          ) {
             // Keep the original URL as s3_url for now
             s3Url = photoRecord.url;
           }

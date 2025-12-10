@@ -79,7 +79,6 @@ export function SuggestPlaceForm() {
     food: null,
     view: null,
     menu: null,
-    review: null,
   });
 
   // Location search state
@@ -358,9 +357,11 @@ export function SuggestPlaceForm() {
       const opening_hours: Record<string, string> = {};
       if (formData.openTime && formData.closeTime) {
         const timeRange = `${formData.openTime} - ${formData.closeTime}`;
-        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-          opening_hours[day] = timeRange;
-        });
+        ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].forEach(
+          (day) => {
+            opening_hours[day] = timeRange;
+          }
+        );
       }
 
       // Call API
@@ -446,9 +447,7 @@ export function SuggestPlaceForm() {
 
         {/* Name input with autocomplete */}
         <div className="relative">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Tên địa điểm
-          </label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Tên địa điểm</label>
           <div className="relative">
             <input
               ref={nameInputRef}
@@ -662,7 +661,7 @@ export function SuggestPlaceForm() {
 
         <div>
           <label className="mb-4 block text-sm font-medium text-gray-700">Hình ảnh</label>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-3 gap-4">
             {PHOTO_TYPES.map((photoType) => (
               <div key={photoType.id}>
                 <label className="mb-2 block text-sm font-medium text-gray-600">

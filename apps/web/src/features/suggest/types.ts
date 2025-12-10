@@ -25,7 +25,7 @@ export interface LocationSuggestion {
   opening_hours?: Record<string, string> | null;
 }
 
-export type PhotoType = "food" | "view" | "menu" | "review";
+export type PhotoType = "food" | "view" | "menu";
 
 export interface PhotoUploadItem {
   id: string;
@@ -39,7 +39,6 @@ export const PHOTO_TYPES: { id: PhotoType; label: string }[] = [
   { id: "food", label: "Món ăn" },
   { id: "view", label: "Không gian" },
   { id: "menu", label: "Menu" },
-  { id: "review", label: "Nhận xét" },
 ];
 
 export interface Province {

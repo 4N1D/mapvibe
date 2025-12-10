@@ -198,7 +198,8 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
 
 // Helper function to fix CDN URL (replace wrong domain with correct one)
 const fixCdnUrl = (url: string): string => {
-  const correctCdnDomain = import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  const correctCdnDomain =
+    import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
   // Replace any cloudfront domain with the correct one
   return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
 };
@@ -346,21 +347,21 @@ const mapFeatureToLabel = (featureId: string): string => {
     air_conditioning: "Có máy lạnh và điều hòa", // API có thể trả về air_conditioning
     takeaway: "Cho mua về",
     parking: "Có chỗ đậu xe",
-    
+
     // Thanh toán và dịch vụ
     card_payment: "Trả bằng thẻ",
     car_parking: "Có chỗ đậu ôtô",
     reservation: "Nên đặt trước",
     outdoor_seating: "Có bàn ngoài trời",
     private_room: "Có phòng riêng",
-    
+
     // Tiện ích đặc biệt
     kids_play_area: "Có chỗ chơi cho trẻ em",
     free_motorbike_parking: "Giữ xe máy miễn phí",
     tipping: "Tip cho nhân viên",
     smoking_area: "Có khu vực hút thuốc",
     membership_card: "Có thẻ thành viên",
-    
+
     // Dịch vụ bổ sung
     vat_invoice: "Có xuất hóa đơn đỏ",
     heater: "Có lò sưởi",
@@ -424,136 +425,133 @@ export function PostDetailPage() {
       return;
     }
 
-    const fetchPost = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // First try to fetch review detail by ID directly (using the detail API endpoint)
-        // The slug parameter could be either a review ID (like RP_27a12ea0af) or a generated slug
-        // We always try to fetch by ID first since that's the most reliable way
-        try {
-          console.log(`[PostDetailPage] Attempting to fetch review with ID/slug: ${slug}`);
-          const detailResponse = await apiClient.get<{ review: ReviewFromAPI }>(`/reviews/${slug}`);
-          if (detailResponse.data?.review) {
-            console.log("[PostDetailPage] Successfully fetched review detail from API:", detailResponse.data.review);
-            console.log("[PostDetailPage] Review photos:", detailResponse.data.review.photos);
-            const mappedPost = mapReviewToPostDetail(detailResponse.data.review);
-            console.log("[PostDetailPage] Mapped post images:", mappedPost.images);
-            setPost(mappedPost);
-            setLocalUpvotes(mappedPost.stats.likes);
-            setLocalDownvotes(mappedPost.stats.dislikes);
-            setImageError(false);
-            setLoading(false);
-            return;
+        // 1. Logic to fetch post details (Direct + Fallback)
+        const fetchPostDetail = async (): Promise<PostDetail> => {
+          let fetchedPost: PostDetail | null = null;
+
+          // Attempt 1: Review by ID/Slug
+          try {
+            console.log(`[PostDetailPage] Attempting to fetch review with ID/slug: ${slug}`);
+            const detailResponse = await apiClient.get<{ review: ReviewFromAPI }>(
+              `/reviews/${slug}`
+            );
+            if (detailResponse.data?.review) {
+              fetchedPost = mapReviewToPostDetail(detailResponse.data.review);
+            }
+          } catch (detailError: any) {
+            // If direct fetch fails, check if we should fallback
+            console.log(
+              "[PostDetailPage] Direct fetch failed:",
+              detailError.response?.status,
+              detailError.message
+            );
+            if (detailError.response?.status !== 404 && slug.startsWith("RP_")) {
+              throw detailError;
+            }
           }
-        } catch (detailError: any) {
-          // If direct fetch fails, log the error and try fallback
-          console.log("[PostDetailPage] Direct fetch failed:", detailError.response?.status, detailError.message);
-          
-          // If slug looks like a review ID (starts with RP_) and we got a non-404 error, don't fallback
-          // This means the review ID format is correct but there's another issue
-          if (detailError.response?.status !== 404 && slug.startsWith("RP_")) {
-            console.error("[PostDetailPage] Review ID format looks correct but fetch failed:", detailError);
-            throw detailError;
-          }
-          
-          // For 404 or non-review-ID slugs, continue to fallback
+
+          if (fetchedPost) return fetchedPost;
+
+          // Attempt 2: Fallback to listing
           console.log("[PostDetailPage] Falling back to reviews list search");
-        }
+          const response = await apiClient.get<ReviewsResponse>("/reviews", {
+            params: { limit: 100, offset: 0 },
+          });
+          const reviews = response.data?.reviews || [];
+          const foundReview = reviews.find((review) => {
+            const reviewSlug = generateSlug(review.location_name, review.id);
+            return reviewSlug === slug || review.id === slug;
+          });
 
-        // Fallback: Fetch reviews from API and find by slug
-        const response = await apiClient.get<ReviewsResponse>("/reviews", {
-          params: {
-            limit: 100,
-            offset: 0,
-          },
-        });
+          if (foundReview) {
+            return mapReviewToPostDetail(foundReview);
+          }
 
-        const reviews = response.data?.reviews || [];
+          throw new Error("Không tìm thấy bài review");
+        };
 
-        // Find review by slug or ID
-        const foundReview = reviews.find((review) => {
-          const reviewSlug = generateSlug(review.location_name, review.id);
-          return reviewSlug === slug || review.id === slug;
-        });
+        // 2. Logic to fetch User ID & Votes (Parallel)
+        const fetchUserAndVotes = async () => {
+          if (!isAuthenticated) return { userId: null, votes: [] };
 
-        if (foundReview) {
-          const mappedPost = mapReviewToPostDetail(foundReview);
-          setPost(mappedPost);
-          setLocalUpvotes(mappedPost.stats.likes);
-          setLocalDownvotes(mappedPost.stats.dislikes);
+          const userPromise = !userId
+            ? apiClient
+                .get<{ user: { id: string } }>("/users/me")
+                .then((res) => res.data.user.id)
+                .catch((err) => {
+                  console.error("[PostDetailPage] Failed to get user profile:", err);
+                  return user?.sub || null;
+                })
+            : Promise.resolve(userId);
+
+          const votesPromise = apiClient
+            .get<{
+              votes: Array<{
+                review_post_id: string;
+                vote_type: "upvote" | "downvote";
+                created_at: string;
+              }>;
+            }>(`/users/me/votes?t=${new Date().getTime()}`) // Cache busting
+            .then((res) => res.data.votes)
+            .catch((err) => {
+              console.error("[PostDetailPage] Failed to fetch vote history:", err);
+              return [];
+            });
+
+          const [fetchedUserId, fetchedVotes] = await Promise.all([userPromise, votesPromise]);
+          return { userId: fetchedUserId, votes: fetchedVotes };
+        };
+
+        // Execute both major tasks in parallel
+        const [postResult, userResult] = await Promise.all([
+          fetchPostDetail(),
+          fetchUserAndVotes(),
+        ]);
+
+        // Update State
+        if (postResult) {
+          setPost(postResult);
+          setLocalUpvotes(postResult.stats.likes);
+          setLocalDownvotes(postResult.stats.dislikes);
           setImageError(false);
-        } else {
-          setError("Không tìm thấy bài review");
+
+          if (userResult.userId) {
+            setUserId(userResult.userId);
+          }
+
+          if (userResult.votes.length > 0) {
+            // Robust ID comparison
+            const vote = userResult.votes.find(
+              (v) => String(v.review_post_id) === String(postResult.id)
+            );
+            setVoteStatus(vote ? (vote.vote_type === "upvote" ? "upvoted" : "downvoted") : null);
+          } else {
+            setVoteStatus(null);
+          }
         }
-      } catch (err) {
-        console.error("[PostDetailPage] Failed to fetch review:", err);
-        const error = err as { response?: { data?: { message?: string } }; message?: string };
-        setError(error.response?.data?.message || error.message || "Không thể tải bài review");
+      } catch (err: any) {
+        console.error("[PostDetailPage] Failed to fetch data:", err);
+        const errorMessage =
+          err.response?.data?.message || err.message || "Không thể tải bài review";
+        setError(errorMessage);
+        setVoteStatus(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPost();
-  }, [slug]);
+    fetchData();
+  }, [slug, isAuthenticated]);
 
   // Reset image error khi post thay đổi
   useEffect(() => {
     setImageError(false);
   }, [post?.id]);
-
-  // Fetch user_id once when component mounts
-  useEffect(() => {
-    if (isAuthenticated && user && !userId) {
-      const fetchUserId = async () => {
-        try {
-          const profileResponse = await apiClient.get<{ user: { id: string } }>("/users/me");
-          setUserId(profileResponse.data.user.id);
-        } catch (err) {
-          console.error("[PostDetailPage] Failed to get user profile:", err);
-          // Fallback to using sub
-          setUserId(user.sub);
-        }
-      };
-      fetchUserId();
-    }
-  }, [isAuthenticated, user, userId]);
-
-  // Fetch vote history to set initial vote status
-  useEffect(() => {
-    if (isAuthenticated && post && userId) {
-      const fetchVoteHistory = async () => {
-        try {
-          const response = await apiClient.get<{
-            votes: Array<{
-              review_post_id: string;
-              vote_type: "upvote" | "downvote";
-              created_at: string;
-            }>;
-          }>("/users/me/votes");
-
-          // Find vote for current post
-          const vote = response.data.votes.find((v) => v.review_post_id === post.id);
-          if (vote) {
-            setVoteStatus(vote.vote_type === "upvote" ? "upvoted" : "downvoted");
-          } else {
-            setVoteStatus(null);
-          }
-        } catch (err) {
-          console.error("[PostDetailPage] Failed to fetch vote history:", err);
-          // If error, keep voteStatus as null (default)
-        }
-      };
-      fetchVoteHistory();
-    } else if (!isAuthenticated) {
-      // Reset vote status if user is not authenticated
-      setVoteStatus(null);
-    }
-  }, [isAuthenticated, post?.id, userId]);
-
-
 
   const handleVote = async (voteType: "upvote" | "downvote") => {
     if (!isAuthenticated || !user || !post) {
@@ -738,7 +736,10 @@ export function PostDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <MapVibeLoader size="lg" text="Đang tải bài viết..." />
+        <MapVibeLoader
+          size="lg"
+          text="Đang tải bài viết..."
+        />
       </div>
     );
   }
@@ -1105,19 +1106,11 @@ export function PostDetailPage() {
             </main>
 
             <aside className="hidden lg:block">
-              <DirectionSidebar
-                address={post.address}
-                lat={post.lat ?? undefined}
-                lng={post.lng ?? undefined}
-              />
+              <DirectionSidebar address={post.address} />
             </aside>
 
             <div className="block lg:hidden">
-              <DirectionSidebar
-                address={post.address}
-                lat={post.lat ?? undefined}
-                lng={post.lng ?? undefined}
-              />
+              <DirectionSidebar address={post.address} />
             </div>
           </div>
         )}
@@ -1139,7 +1132,10 @@ export function PostDetailPage() {
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
                       loading="lazy"
                       onError={(e) => {
-                        console.error(`[PostDetailPage] Failed to load image ${index + 1}:`, imageUrl);
+                        console.error(
+                          `[PostDetailPage] Failed to load image ${index + 1}:`,
+                          imageUrl
+                        );
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
@@ -1153,16 +1149,15 @@ export function PostDetailPage() {
           </div>
         )}
 
-        {activeTab === "thuc-don" && (
-          post.restaurantSlug ? (
+        {activeTab === "thuc-don" &&
+          (post.restaurantSlug ? (
             <MenuTab slug={post.restaurantSlug} />
           ) : (
             <div className="rounded-lg bg-white p-8 text-center shadow-sm">
               <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
               <p className="mt-4 text-gray-500">Chưa có thực đơn cho địa điểm này.</p>
             </div>
-          )
-        )}
+          ))}
       </section>
     </div>
   );

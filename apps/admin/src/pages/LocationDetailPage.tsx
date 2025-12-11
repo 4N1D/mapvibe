@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
+import { getFeatureLabel, ALL_FEATURES } from "@/utils/format";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { apiClient } from "../lib/api";
 import { Breadcrumbs, Skeleton } from "../components/ui";
 import { useConfirm } from "../hooks/useConfirm";
+
+const fixCdnUrl = (url: string): string => {
+  const correctCdnDomain =
+    import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
 
 interface ReviewPost {
   id: string;
@@ -96,6 +103,8 @@ export default function LocationDetailPage() {
         apiClient.get(`/admin/locations/${id}`),
         apiClient.get(`/admin/locations/${id}/reviews`),
       ]);
+
+      console.log("Posts API response:", postsRes.data.reviews);
 
       const loc = locationRes.data.location || locationRes.data;
       setLocation(loc);
@@ -599,9 +608,10 @@ export default function LocationDetailPage() {
                       </span>
                     )}
                   </div>
-                  <p className="line-clamp-2 text-sm text-gray-600">
-                    {post.text.replace(/<[^>]*>/g, "")}
-                  </p>
+                  <div
+                    className="line-clamp-2 text-sm text-gray-600"
+                    dangerouslySetInnerHTML={{ __html: post.text }}
+                  />
                 </button>
               ))}
             </div>
@@ -697,50 +707,62 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div className="p-6">
-                  <div
-                    className="text-base leading-relaxed text-gray-800 [&>p:last-child]:mb-0 [&>p]:mb-2"
-                    dangerouslySetInnerHTML={{ __html: selectedPost.text }}
-                  />
+                  <div>
+                    <p className="font-bold">Giới thiệu</p>
+                    <div
+                      className="text-base leading-relaxed text-gray-800 [&>p:last-child]:mb-0 [&>p]:mb-2"
+                      dangerouslySetInnerHTML={{ __html: selectedPost.text }}
+                    />
+                  </div>
 
-                  {selectedPost.features && Object.keys(selectedPost.features).length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="mb-2 text-sm font-medium text-gray-700">Đặc điểm đề cập</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(selectedPost.features)
-                          .filter(([, value]) => Boolean(value))
-                          .map(([key]) => (
+                  {selectedPost.features &&
+                    (Array.isArray(selectedPost.features)
+                      ? selectedPost.features.length > 0
+                      : Object.keys(selectedPost.features).length > 0) && (
+                      <div className="mt-4">
+                        <h4 className="mb-2 font-bold text-gray-700">Tiện ích</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {ALL_FEATURES.filter((feature) => {
+                            if (Array.isArray(selectedPost.features)) {
+                              return selectedPost.features.includes(feature);
+                            }
+                            return selectedPost.features?.[feature];
+                          }).map((feature) => (
                             <span
-                              key={key}
+                              key={feature}
                               className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
                             >
-                              {key.replace(/_/g, " ")}
+                              {getFeatureLabel(feature)}
                             </span>
                           ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {selectedPost.photos && selectedPost.photos.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="mb-3 text-sm font-medium text-gray-700">
+                      <h4 className="mb-3 text-sm font-bold text-gray-700">
                         Ảnh ({selectedPost.photos.length})
                       </h4>
                       <div className="grid grid-cols-3 gap-3">
-                        {selectedPost.photos.map((photo, i) => (
-                          <a
-                            key={i}
-                            href={photo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="aspect-square overflow-hidden rounded-lg bg-gray-100 transition-opacity hover:opacity-90"
-                          >
-                            <img
-                              src={photo}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          </a>
-                        ))}
+                        {selectedPost.photos.map((photo, i) => {
+                          const fixedUrl = fixCdnUrl(photo);
+                          return (
+                            <a
+                              key={i}
+                              href={fixedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="aspect-square overflow-hidden rounded-lg bg-gray-100 transition-opacity hover:opacity-90"
+                            >
+                              <img
+                                src={fixedUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -890,28 +912,26 @@ export default function LocationDetailPage() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">Tiện ích</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {["wifi", "parking", "air_con", "credit_card", "delivery", "outdoor"].map(
-                      (feature) => (
-                        <label
-                          key={feature}
-                          className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 transition-colors ${
-                            formData.features.includes(feature)
-                              ? "border-primary-500 bg-primary-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.features.includes(feature)}
-                            onChange={() => toggleFeature(feature)}
-                            className="sr-only"
-                          />
-                          <span className="text-sm capitalize text-gray-700">
-                            {feature.replace("_", " ")}
-                          </span>
-                        </label>
-                      )
-                    )}
+                    {ALL_FEATURES.map((feature) => (
+                      <label
+                        key={feature}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 transition-colors ${
+                          formData.features.includes(feature)
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.features.includes(feature)}
+                          onChange={() => toggleFeature(feature)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm capitalize text-gray-700">
+                          {getFeatureLabel(feature)}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 

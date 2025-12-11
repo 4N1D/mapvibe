@@ -32,8 +32,19 @@ export function useUserPhotos(): UseUserPhotosReturn {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get<{ photos: PhotoItem[] }>("/users/me/photos");
-      const items = response.data?.photos || [];
+      interface ApiPhoto {
+        id: string;
+        s3_url: string;
+        s3_thumbnail_url?: string;
+        created_at: string;
+      }
+      const response = await apiClient.get<{ photos: ApiPhoto[] }>("/users/me/photos");
+      const items: PhotoItem[] = (response.data?.photos || []).map((p) => ({
+        id: p.id,
+        url: p.s3_url,
+        thumbnail_url: p.s3_thumbnail_url,
+        created_at: p.created_at,
+      }));
       setPhotos(buildPhotoGroups(items));
     } catch (err) {
       console.error("[useUserPhotos] Failed to fetch:", err);

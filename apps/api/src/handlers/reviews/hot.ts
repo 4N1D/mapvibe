@@ -70,14 +70,19 @@ export const handler: Handler = {
       `;
 
       const whereClause = restaurantId
-        ? sql` WHERE rp.restaurant_id = ${restaurantId} AND (
+        ? sql` WHERE rp.restaurant_id = ${restaurantId} 
+            AND (la.status IS NULL OR la.status != 'rejected')
+            AND (rp.status IS NULL OR rp.status != 'hidden')
+            AND (
             (rp.upvote_count * 2.0)
             + (rp.comment_count * 1.5)
             + (rp.share_count * 2.0)
             + (rp.view_count * 0.2)
             - (rp.downvote_count * 1.0)
           ) > 0 `
-        : sql` WHERE (
+        : sql` WHERE (la.status IS NULL OR la.status != 'rejected')
+            AND (rp.status IS NULL OR rp.status != 'hidden')
+            AND (
             (rp.upvote_count * 2.0)
             + (rp.comment_count * 1.5)
             + (rp.share_count * 2.0)

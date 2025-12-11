@@ -5,11 +5,14 @@ import { adminApi } from "../lib/api";
 import { Breadcrumbs, SkeletonCard } from "../components/ui";
 import { useConfirm } from "../hooks/useConfirm";
 
-type FilterType = "all" | "reported" | "hidden";
+type FilterType = "all" | "reported" | "hidden" | "rejected";
+
+const WEB_URL = import.meta.env.VITE_WEB_URL || "http://localhost:5173";
 
 export default function ReviewsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -56,13 +59,31 @@ export default function ReviewsPage() {
     updateMutation.mutate({ id, action });
   };
 
-  const reviews = data?.data?.reviews || [];
+  const allReviews = data?.data?.reviews || [];
   const pagination = data?.data?.pagination || { total: 0 };
+
+  // Filter reviews by search term
+  const reviews = search.trim()
+    ? allReviews.filter((r: Record<string, unknown>) => {
+        const searchLower = search.toLowerCase();
+        const text = ((r.text as string) || "").toLowerCase();
+        const authorName = ((r.author_name as string) || "").toLowerCase();
+        const authorEmail = ((r.author_email as string) || "").toLowerCase();
+        const placeName = ((r.place_name as string) || "").toLowerCase();
+        return (
+          text.includes(searchLower) ||
+          authorName.includes(searchLower) ||
+          authorEmail.includes(searchLower) ||
+          placeName.includes(searchLower)
+        );
+      })
+    : allReviews;
 
   const filterCounts = {
     all: pagination.total,
     reported: reviews.filter((r: Record<string, unknown>) => (r.report_count as number) > 0).length,
     hidden: reviews.filter((r: Record<string, unknown>) => r.status === "hidden").length,
+    rejected: reviews.filter((r: Record<string, unknown>) => r.status === "rejected").length,
   };
 
   return (
@@ -82,8 +103,8 @@ export default function ReviewsPage() {
 
         {/* Filter Tabs */}
         <div className="flex rounded-lg bg-gray-100 p-1">
-          {(["all", "reported", "hidden"] as const).map((f) => {
-            const labels = { all: "Tất cả", reported: "Bị báo cáo", hidden: "Đã ẩn" };
+          {(["all", "reported", "hidden", "rejected"] as const).map((f) => {
+            const labels = { all: "Tất cả", reported: "Bị báo cáo", hidden: "Đã ẩn", rejected: "Bị từ chối" };
             return (
               <button
                 key={f}
@@ -107,6 +128,32 @@ export default function ReviewsPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          placeholder="Tìm kiếm theo nội dung, tên tác giả, email, địa điểm..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="block w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-500 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Loading */}
@@ -154,6 +201,7 @@ export default function ReviewsPage() {
               review={review}
               onAction={(action, confirm) => handleAction(review.id as string, action, confirm)}
               isUpdating={updateMutation.isPending}
+              viewUrl={`${WEB_URL}/post/${review.id}`}
             />
           ))}
         </div>
@@ -193,10 +241,12 @@ function ReviewCard({
   review,
   onAction,
   isUpdating,
+  viewUrl,
 }: {
   review: Record<string, unknown>;
   onAction: (action: string, confirm?: boolean) => void;
   isUpdating: boolean;
+  viewUrl: string;
 }) {
   const reportCount = (review.report_count as number) || 0;
   const status = (review.status as string) || "active";
@@ -250,15 +300,14 @@ function ReviewCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {status !== "approved" && status !== "active" && (
-              <ActionButton
-                onClick={() => onAction("approve")}
-                disabled={isUpdating}
-                variant="success"
-              >
-                Duyệt
-              </ActionButton>
-            )}
+            <a
+              href={viewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Xem
+            </a>
             {status !== "hidden" && (
               <ActionButton
                 onClick={() => onAction("hide", true)}
@@ -289,7 +338,10 @@ function ReviewCard({
 
         {/* Content */}
         <div className="mt-4">
-          <p className="whitespace-pre-wrap text-gray-700">{review.text as string}</p>
+          <div
+            className="prose prose-sm max-w-none text-gray-700 [&>p]:mb-0"
+            dangerouslySetInnerHTML={{ __html: review.text as string }}
+          />
         </div>
 
         {/* Photos */}
@@ -409,15 +461,26 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: "bg-green-100 text-green-800",
     approved: "bg-green-100 text-green-800",
+    published: "bg-green-100 text-green-800",
     hidden: "bg-yellow-100 text-yellow-800",
+    rejected: "bg-orange-100 text-orange-800",
     deleted: "bg-red-100 text-red-800",
+  };
+
+  const labels: Record<string, string> = {
+    active: "Hoạt động",
+    approved: "Đã duyệt",
+    published: "Đã xuất bản",
+    hidden: "Đã ẩn",
+    rejected: "Bị từ chối",
+    deleted: "Đã xóa",
   };
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || styles.active}`}
     >
-      {status}
+      {labels[status] || status}
     </span>
   );
 }

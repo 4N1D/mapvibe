@@ -5,6 +5,48 @@ import { success, badRequest, unauthorized, notFound, error } from "../../middle
 import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
 import { sql } from "kysely";
 
+// Helper to extract photo IDs from photos JSON
+function extractPhotoIds(photos: unknown): string[] {
+  if (!photos) return [];
+
+  let photosData = photos;
+  if (typeof photosData === "string") {
+    try {
+      photosData = JSON.parse(photosData);
+    } catch {
+      return [];
+    }
+  }
+
+  const photoIds: string[] = [];
+
+  if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+    const categories = photosData as Record<string, unknown[]>;
+    for (const category of Object.values(categories)) {
+      if (Array.isArray(category)) {
+        for (const item of category) {
+          if (typeof item === "string") {
+            photoIds.push(item);
+          } else if (item && typeof item === "object" && "id" in item) {
+            photoIds.push((item as { id: string }).id);
+          }
+        }
+      }
+    }
+  }
+  else if (Array.isArray(photosData)) {
+    for (const p of photosData) {
+      if (typeof p === "string") {
+        photoIds.push(p);
+      } else if (p && typeof p === "object" && "id" in p) {
+        photoIds.push((p as { id: string }).id);
+      }
+    }
+  }
+
+  return photoIds;
+}
+
 // GET /admin/reviews - List all reviews with filters
 export const listReviewsHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -29,11 +71,13 @@ export const listReviewsHandler: Handler = {
       const _sortOrder = params.sort_order === "asc" ? "asc" : "desc";
 
       // Build query based on status filter
-      let whereClause = sql``;
+      let whereClause = sql`WHERE 1=1`;
       if (status === "reported") {
         whereClause = sql`WHERE rp.report_count > 0`;
       } else if (status === "hidden") {
         whereClause = sql`WHERE rp.status = 'hidden'`;
+      } else if (status === "rejected") {
+        whereClause = sql`WHERE rp.status = 'rejected'`;
       }
 
       const result = await sql`
@@ -70,8 +114,80 @@ export const listReviewsHandler: Handler = {
         .select(sql<number>`count(*)::int`.as("total"))
         .executeTakeFirst();
 
+      // Process photos to get URLs
+      interface ReviewRow {
+        id: string;
+        photos?: unknown;
+        [key: string]: unknown;
+      }
+      const rawReviews = result.rows as ReviewRow[];
+      
+      // Collect all photo IDs
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              if (typeof firstItem === "string") {
+                if (firstItem.startsWith("http")) {
+                  reviewPhotoMap.set(review.id, photosData);
+                } else {
+                  reviewPhotoMap.set(review.id, photosData);
+                  allPhotoIds.push(...photosData.filter((id: unknown) => typeof id === "string"));
+                }
+              } else if (firstItem?.url) {
+                reviewPhotoMap.set(review.id, photosData.map((p: { url: string }) => p.url));
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Fetch photo URLs from database
+      const photoUrlMap = new Map<string, string>();
+      const uniquePhotoIds = [...new Set(allPhotoIds)].filter(id => !id.startsWith("http"));
+      if (uniquePhotoIds.length > 0) {
+        const photosFromDb = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniquePhotoIds)
+          .execute();
+
+        for (const photo of photosFromDb) {
+          photoUrlMap.set(photo.id, photo.s3_thumbnail_url || photo.s3_url);
+        }
+      }
+
+      // Build reviews with resolved URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photos: string[] = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (typeof firstItem === "string" && firstItem.startsWith("http")) {
+            photos = photoData as string[];
+          } else {
+            photos = (photoData as string[])
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+          }
+        }
+
+        return { ...review, photos };
+      });
+
       return success({
-        reviews: result.rows,
+        reviews,
         pagination: {
           total: countResult?.total || 0,
           limit,
@@ -158,16 +274,28 @@ export const updateReviewHandler: Handler = {
         return badRequest("Invalid JSON body");
       }
 
-      const { action, reason } = body;
+      const { action } = body;
       if (!action) {
-        return badRequest("Action required (approve, hide, delete, restore)");
+        return badRequest("Action required (hide, delete, restore)");
       }
 
       const db = await getDb();
-      const updateData: Record<string, unknown> = { updated_at: new Date() };
 
       // Handle delete action separately (hard delete)
       if (action === "delete") {
+        // Get the review first to know the location_address_id
+        const review = await db
+          .selectFrom("review_posts")
+          .select(["id", "location_address_id"])
+          .where("id", "=", reviewId)
+          .executeTakeFirst();
+
+        if (!review) {
+          return notFound("Review not found");
+        }
+
+        const locationAddressId = review.location_address_id;
+
         // Delete in transaction to ensure data integrity
         await db.transaction().execute(async (trx) => {
           // 1. Get all comment IDs for this review
@@ -218,6 +346,41 @@ export const updateReviewHandler: Handler = {
             .deleteFrom("review_posts")
             .where("id", "=", reviewId)
             .execute();
+
+          // 8. Check if location_address has any other reviews, if not delete it
+          if (locationAddressId) {
+            const remainingReviews = await trx
+              .selectFrom("review_posts")
+              .select("id")
+              .where("location_address_id", "=", locationAddressId)
+              .executeTakeFirst();
+
+            if (!remainingReviews) {
+              // No more reviews for this location, check if it's linked to a restaurant
+              const locationAddress = await trx
+                .selectFrom("location_addresses")
+                .select(["id", "restaurant_id"])
+                .where("id", "=", locationAddressId)
+                .executeTakeFirst();
+
+              // Only delete if not linked to a restaurant
+              if (locationAddress && !locationAddress.restaurant_id) {
+                // Delete photos linked to location_address
+                await trx
+                  .deleteFrom("photos")
+                  .where("location_address_id", "=", locationAddressId)
+                  .execute();
+
+                // Delete the location_address
+                await trx
+                  .deleteFrom("location_addresses")
+                  .where("id", "=", locationAddressId)
+                  .execute();
+
+                console.log(`[admin/reviews/:id] Deleted orphaned location_address: ${locationAddressId}`);
+              }
+            }
+          }
         });
 
         return success({
@@ -226,38 +389,45 @@ export const updateReviewHandler: Handler = {
         });
       }
 
-      switch (action) {
-        case "approve":
-          updateData.status = "published";
-          updateData.report_count = 0;
-          break;
-        case "hide":
-          updateData.status = "hidden";
-          updateData.hidden_reason = reason || "Violated community guidelines";
-          break;
-        case "restore":
-          updateData.status = "published";
-          updateData.hidden_reason = null;
-          break;
-        default:
-          return badRequest("Invalid action. Use: approve, hide, delete, restore");
+      // Handle hide action - set status='hidden' (soft hide, still visible in admin)
+      if (action === "hide") {
+        const updated = await db
+          .updateTable("review_posts")
+          .set({ status: "hidden", updated_at: new Date() } as Record<string, unknown>)
+          .where("id", "=", reviewId)
+          .returningAll()
+          .executeTakeFirst();
+
+        if (!updated) {
+          return notFound("Review not found");
+        }
+
+        return success({
+          message: "Review hidden successfully",
+          review: updated,
+        });
       }
 
-      const updated = await db
-        .updateTable("review_posts")
-        .set(updateData)
-        .where("id", "=", reviewId)
-        .returningAll()
-        .executeTakeFirst();
+      // Handle restore action - set status back to 'published'
+      if (action === "restore") {
+        const updated = await db
+          .updateTable("review_posts")
+          .set({ status: "published", updated_at: new Date() } as Record<string, unknown>)
+          .where("id", "=", reviewId)
+          .returningAll()
+          .executeTakeFirst();
 
-      if (!updated) {
-        return notFound("Review not found");
+        if (!updated) {
+          return notFound("Review not found");
+        }
+
+        return success({
+          message: "Review restored successfully",
+          review: updated,
+        });
       }
 
-      return success({
-        message: `Review ${action}d successfully`,
-        review: updated,
-      });
+      return badRequest("Invalid action. Use: hide, delete, restore");
     } catch (err) {
       console.error("[admin/reviews/:id] Error:", err);
       return error((err as Error).message);
@@ -408,6 +578,78 @@ export const getLocationReviewsHandler: Handler = {
         OFFSET ${offset}
       `.execute(db);
 
+      // Process reviews to resolve photo URLs
+      const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
+      const reviewIds = rawReviews.map((r) => r.id);
+      const reviewPhotosMap = new Map<string, string[]>();
+
+      if (reviewIds.length > 0) {
+        const photosFromTable = await db
+          .selectFrom("photos")
+          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url"])
+          .where("review_post_id", "in", reviewIds)
+          .orderBy("created_at", "asc")
+          .execute();
+
+        for (const photo of photosFromTable) {
+          if (photo.review_post_id) {
+            const url = photo.s3_thumbnail_url || photo.s3_url;
+            if (url) {
+              const existing = reviewPhotosMap.get(photo.review_post_id) || [];
+              existing.push(url);
+              reviewPhotosMap.set(photo.review_post_id, existing);
+            }
+          }
+        }
+      }
+
+      // Fallback to photos column
+      const reviewsNeedingJsonPhotos = rawReviews.filter(
+        (r) => !reviewPhotosMap.has(r.id) && r.photos
+      );
+
+      if (reviewsNeedingJsonPhotos.length > 0) {
+        const allPhotoIds: string[] = [];
+        const reviewPhotoIdsMap = new Map<string, string[]>();
+
+        for (const review of reviewsNeedingJsonPhotos) {
+          const photoIds = extractPhotoIds(review.photos);
+          if (photoIds.length > 0) {
+            reviewPhotoIdsMap.set(review.id, photoIds);
+            allPhotoIds.push(...photoIds);
+          }
+        }
+
+        if (allPhotoIds.length > 0) {
+          const uniqueIds = [...new Set(allPhotoIds)];
+          const photoRecords = await db
+            .selectFrom("photos")
+            .select(["id", "s3_url", "s3_thumbnail_url"])
+            .where("id", "in", uniqueIds)
+            .execute();
+
+          const photoUrlMap = new Map<string, string>();
+          for (const p of photoRecords) {
+            photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+          }
+
+          for (const [reviewId, photoIds] of reviewPhotoIdsMap) {
+            const photos = photoIds
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+            
+            if (photos.length > 0) {
+              reviewPhotosMap.set(reviewId, photos);
+            }
+          }
+        }
+      }
+
+      const reviews = rawReviews.map((review) => ({
+        ...review,
+        photos: reviewPhotosMap.get(review.id) || [],
+      }));
+
       const countResult = await sql`
         SELECT count(*)::int as total
         FROM review_posts
@@ -415,7 +657,7 @@ export const getLocationReviewsHandler: Handler = {
       `.execute(db);
 
       return success({
-        reviews: result.rows,
+        reviews,
         pagination: {
           total: (countResult.rows[0] as { total: number } | undefined)?.total || 0,
           limit,
@@ -502,21 +744,30 @@ export const updateLocationHandler: Handler = {
       }
 
       if (action === "reject") {
-        // Just update status for rejection
-        const updated = await db
-          .updateTable("location_addresses")
-          .set({
-            status: "rejected",
-            rejection_reason: reason || null,
-            updated_at: new Date(),
-          })
-          .where("id", "=", locationId)
-          .returningAll()
-          .executeTakeFirst();
+        // Hard delete: remove review_posts and location_addresses
+        // Execute each delete separately and ignore errors for missing tables
+        const deleteQueries = [
+          sql`DELETE FROM votes WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM comments WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM photos WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM review_posts WHERE location_address_id = ${locationId}`,
+          sql`DELETE FROM photos WHERE location_address_id = ${locationId}`,
+        ];
+
+        for (const query of deleteQueries) {
+          try {
+            await query.execute(db);
+          } catch (e) {
+            console.log(`[admin/locations/:id] Query skipped:`, e);
+          }
+        }
+
+        // Delete the location_address itself
+        await sql`DELETE FROM location_addresses WHERE id = ${locationId}`.execute(db);
 
         return success({
-          message: "Location rejected successfully",
-          location: updated,
+          message: "Location and all related data deleted successfully",
+          location: { id: locationId },
         });
       }
 

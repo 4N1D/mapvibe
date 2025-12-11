@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { Pool } = require("pg");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
 let pool = null;
+let lambdaClient = null;
 
 async function getPool() {
   if (pool) return pool;
@@ -39,6 +41,13 @@ exports.handler = async (event) => {
 
   const db = await getPool();
 
+  // Initialize Lambda client if Rekognition Lambda is configured
+  const rekognitionLambdaName = process.env.REKOGNITION_LAMBDA_NAME;
+  if (rekognitionLambdaName && !lambdaClient) {
+    // AWS_REGION is automatically available in Lambda runtime
+    lambdaClient = new LambdaClient({});
+  }
+
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
     const s3Key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
@@ -60,6 +69,32 @@ exports.handler = async (event) => {
       console.log(`[S3 Trigger] Updated photo: ${result.rows[0].id}`);
     } else {
       console.log(`[S3 Trigger] No photo record found for: ${cdnUrl}`);
+    }
+
+    // Invoke Rekognition Lambda for review photos
+    if (rekognitionLambdaName && s3Key.startsWith("review/")) {
+      try {
+        const invokeCommand = new InvokeCommand({
+          FunctionName: rekognitionLambdaName,
+          InvocationType: "Event", // Async invocation
+          Payload: JSON.stringify({
+            Records: [
+              {
+                s3: {
+                  bucket: { name: bucket },
+                  object: { key: s3Key },
+                },
+              },
+            ],
+          }),
+        });
+
+        await lambdaClient.send(invokeCommand);
+        console.log(`[S3 Trigger] Invoked Rekognition Lambda for: ${s3Key}`);
+      } catch (error) {
+        console.error(`[S3 Trigger] Failed to invoke Rekognition Lambda:`, error);
+        // Don't throw - continue processing other records
+      }
     }
   }
 

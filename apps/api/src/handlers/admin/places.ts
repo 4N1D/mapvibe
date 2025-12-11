@@ -3,6 +3,7 @@ import { getDb } from "../../services/db";
 import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
 import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
 import { sql } from "kysely";
+import { sendEmbeddingJob } from "../../services/sqs";
 
 // GET /admin/places - List all places with filters
 export const listPlacesHandler: Handler = {
@@ -199,6 +200,12 @@ export const updatePlaceHandler: Handler = {
         return notFound("Place not found");
       }
 
+      // Gửi message vào SQS để trigger Lambda Embedding khi restaurant được update
+      // Không await để không block response
+      sendEmbeddingJob(placeId).catch((err) => {
+        console.error("[admin/places/:id] Failed to send embedding job:", err);
+      });
+
       return success({ place: updated });
     } catch (err) {
       console.error("[admin/places/:id] Error:", err);
@@ -207,7 +214,7 @@ export const updatePlaceHandler: Handler = {
   },
 };
 
-// DELETE /admin/places/:id - Delete place
+// DELETE /admin/places/:id - Delete place (hard delete)
 export const deletePlaceHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -228,21 +235,121 @@ export const deletePlaceHandler: Handler = {
 
       const db = await getDb();
 
-      // Soft delete by setting status to 'deleted'
-      const deleted = await db
-        .updateTable("restaurants")
-        .set({ status: "deleted", updated_at: new Date() })
+      // Check if place exists first
+      const existing = await db
+        .selectFrom("restaurants")
+        .select(["id", "name_vi"])
         .where("id", "=", placeId)
-        .returningAll()
         .executeTakeFirst();
 
-      if (!deleted) {
+      if (!existing) {
         return notFound("Place not found");
       }
 
-      return success({ message: "Place deleted successfully", place: deleted });
+      console.log(`[admin/places/:id] Cascade deleting place: ${placeId}, name: ${existing.name_vi}`);
+
+      // CASCADE DELETE: restaurant → location_addresses → review_posts
+      // Step 1: Delete data related to review_posts (via restaurant_id OR via location_address_id)
+      const deleteReviewRelatedQueries = [
+        // Delete votes for reviews linked directly to restaurant
+        sql`DELETE FROM votes WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        // Delete votes for reviews linked via location_addresses
+        sql`DELETE FROM votes WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
+        // Delete comments for reviews linked directly to restaurant
+        sql`DELETE FROM comments WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        // Delete comments for reviews linked via location_addresses
+        sql`DELETE FROM comments WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
+        // Delete photos for reviews linked directly to restaurant
+        sql`DELETE FROM photos WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        // Delete photos for reviews linked via location_addresses
+        sql`DELETE FROM photos WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
+      ];
+
+      for (const query of deleteReviewRelatedQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Step 2: Delete review_posts (both direct and via location_addresses)
+      const deleteReviewPostsQueries = [
+        sql`DELETE FROM review_posts WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM review_posts WHERE location_address_id IN (
+          SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+        )`,
+      ];
+
+      for (const query of deleteReviewPostsQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Step 3: Delete photos linked to location_addresses
+      try {
+        await sql`DELETE FROM photos WHERE location_address_id IN (
+          SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+        )`.execute(db);
+      } catch (e) {
+        console.log(`[admin/places/:id] Query skipped:`, e);
+      }
+
+      // Step 4: Delete other restaurant-related data
+      const deleteRestaurantRelatedQueries = [
+        sql`DELETE FROM photos WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM restaurant_reviews WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM favorites WHERE restaurant_id = ${placeId}`,
+      ];
+
+      for (const query of deleteRestaurantRelatedQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Step 5: Get location_address IDs before deleting restaurant
+      const locationIds = await sql`
+        SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+      `.execute(db);
+      const locationAddressIds = (locationIds.rows as { id: string }[]).map(r => r.id);
+
+      // Step 6: Delete the restaurant itself (must be before location_addresses due to created_from_location_id FK)
+      await sql`DELETE FROM restaurants WHERE id = ${placeId}`.execute(db);
+
+      // Step 7: Delete location_addresses (after restaurant is deleted)
+      if (locationAddressIds.length > 0) {
+        for (const locId of locationAddressIds) {
+          try {
+            await sql`DELETE FROM location_addresses WHERE id = ${locId}`.execute(db);
+          } catch (e) {
+            console.log(`[admin/places/:id] Failed to delete location_address ${locId}:`, e);
+          }
+        }
+      }
+
+      console.log(`[admin/places/:id] Delete result: success`);
+
+      return success({ message: "Place deleted successfully", place: { id: placeId, name_vi: existing.name_vi } });
     } catch (err) {
-      console.error("[admin/places/:id] Error:", err);
+      console.error("[admin/places/:id DELETE] Error:", err);
       return error((err as Error).message);
     }
   },

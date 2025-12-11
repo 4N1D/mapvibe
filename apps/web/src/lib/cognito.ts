@@ -1,4 +1,6 @@
 import { Amplify } from "aws-amplify";
+import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
+import { defaultStorage } from "aws-amplify/utils";
 import {
   signIn as amplifySignIn,
   signUp as amplifySignUp,
@@ -12,6 +14,8 @@ import {
   resetPassword as amplifyResetPassword,
   confirmResetPassword as amplifyConfirmResetPassword,
 } from "aws-amplify/auth";
+
+cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
 
 Amplify.configure({
   Auth: {

@@ -608,9 +608,10 @@ export default function LocationDetailPage() {
                       </span>
                     )}
                   </div>
-                  <p className="line-clamp-2 text-sm text-gray-600">
-                    {post.text.replace(/<[^>]*>/g, "")}
-                  </p>
+                  <div
+                    className="line-clamp-2 text-sm text-gray-600"
+                    dangerouslySetInnerHTML={{ __html: post.text }}
+                  />
                 </button>
               ))}
             </div>

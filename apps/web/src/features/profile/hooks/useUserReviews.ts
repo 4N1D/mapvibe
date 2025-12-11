@@ -28,8 +28,11 @@ export function useUserReviews(): UseUserReviewsReturn {
         setError(null);
 
         const currentOffset = reset ? 0 : offset;
+        interface ApiReview extends Omit<UserReview, 'photos'> {
+          photos?: Array<{ url: string }> | string[];
+        }
         const response = await apiClient.get<{
-          reviews: UserReview[];
+          reviews: ApiReview[];
           total: number;
           limit: number;
           offset: number;
@@ -37,7 +40,11 @@ export function useUserReviews(): UseUserReviewsReturn {
           params: { limit: LIMIT, offset: currentOffset },
         });
 
-        const newReviews = response.data?.reviews || [];
+        // Map photos from [{url: "..."}] to ["..."]
+        const newReviews: UserReview[] = (response.data?.reviews || []).map((r) => ({
+          ...r,
+          photos: r.photos?.map((p) => (typeof p === 'string' ? p : p.url)) || [],
+        }));
 
         if (reset) {
           setReviews(newReviews);

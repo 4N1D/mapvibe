@@ -459,11 +459,29 @@ def aggregate(location_address_id: str):
     }
 
 
+CORS_HEADERS = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+}
+
+
 def lambda_handler(event, context):
     # Log immediately - before any try-catch
     log_print("=" * 50)
     log_print("🚀 Lambda function started")
     log_print(f"📥 Event received: {type(event)}")
+    
+    # Handle CORS preflight request
+    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method", "")
+    if http_method == "OPTIONS":
+        log_print("✅ CORS preflight request - returning 200")
+        return {
+            "statusCode": 200,
+            "headers": CORS_HEADERS,
+            "body": "",
+        }
     
     try:
         # Log event details (safe version)
@@ -498,7 +516,7 @@ def lambda_handler(event, context):
             log_print(f"❌ Failed to parse request body: {e}", "ERROR")
             return {
                 "statusCode": 400,
-                "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+                "headers": CORS_HEADERS,
                 "body": json.dumps({"error": "Invalid JSON in request body"}),
             }
         
@@ -509,7 +527,7 @@ def lambda_handler(event, context):
             log_print("❌ Missing location_address_id", "ERROR")
             return {
                 "statusCode": 400,
-                "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+                "headers": CORS_HEADERS,
                 "body": json.dumps({"error": "location_address_id is required"}),
             }
 
@@ -519,7 +537,7 @@ def lambda_handler(event, context):
         
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "headers": CORS_HEADERS,
             "body": json.dumps(result),
         }
     except ValueError as e:
@@ -529,7 +547,7 @@ def lambda_handler(event, context):
         log_print(f"Traceback: {error_trace}", "ERROR")
         return {
             "statusCode": 400,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "headers": CORS_HEADERS,
             "body": json.dumps({"error": str(e)}),
         }
     except Exception as e:
@@ -539,7 +557,7 @@ def lambda_handler(event, context):
         log_print(f"Traceback: {error_trace}", "ERROR")
         return {
             "statusCode": 500,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "headers": CORS_HEADERS,
             "body": json.dumps({"error": str(e), "message": "An unexpected error occurred"}),
         }
     finally:

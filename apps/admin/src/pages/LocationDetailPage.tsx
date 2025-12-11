@@ -140,9 +140,19 @@ export default function LocationDetailPage() {
 
     setIsAggregating(true);
     try {
-      const response = await apiClient.post("/reviews/aggregate-pending", {
-        location_address_id: id,
-      });
+      // Use Lambda Function URL directly to bypass API Gateway 30s timeout
+      const AGGREGATE_LAMBDA_URL = "https://bjukpevd6hzhpyzjaca4juknf40xqait.lambda-url.us-east-1.on.aws/";
+      const session = await import("aws-amplify/auth").then(m => m.fetchAuthSession());
+      const token = session.tokens?.idToken?.toString();
+      
+      const response = await fetch(AGGREGATE_LAMBDA_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ location_address_id: id }),
+      }).then(res => res.json().then(data => ({ data })));
 
       console.log("Raw response:", response);
       console.log("Response data:", response.data);

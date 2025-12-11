@@ -1,3 +1,4 @@
+import { Image } from "antd";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RestaurantPhoto, RestaurantPhotosResponse, PhotoCategory } from "@mapvibe/types";
@@ -45,12 +46,13 @@ const fetchPhotos = async (slug: string, category: string, page: number) => {
   
   // Transform API response to expected format
   const data = response.data;
-  const photos = data.photos.map(p => ({
+  const photos = data.photos.map((p) => ({
     id: p.id,
     url: fixCdnUrl(p.s3_url) || p.s3_url,
     thumbnail_url: fixCdnUrl(p.s3_thumbnail_url),
     category: p.photo_type as any,
     caption: p.menu_name,
+    created_at: new Date().toISOString(),
   }));
   
   return {
@@ -62,11 +64,12 @@ const fetchPhotos = async (slug: string, category: string, page: number) => {
       food: data.counts?.food || 0,
       view: data.counts?.view || 0,
       review: data.counts?.review || 0,
+      menu: data.counts?.menu || 0,
     },
   };
 };
 
-export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabProps) {
+export function PhotosTab({ slug, showFilters = true }: PhotosTabProps) {
   const [category, setCategory] = useState<DisplayCategory>("all");
   const [allPhotos, setAllPhotos] = useState<RestaurantPhoto[]>([]);
   const [page, setPage] = useState(1);
@@ -149,22 +152,25 @@ export function PhotosTab({ restaurantId, slug, showFilters = true }: PhotosTabP
         {photos.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Chưa có ảnh nào trong danh mục này.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-            {photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-gray-100"
-              >
-                <img
-                  src={photo.thumbnail_url || photo.url}
-                  alt={photo.caption || "Ảnh nhà hàng"}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/20" />
-              </div>
-            ))}
-          </div>
+          <Image.PreviewGroup>
+            <div className="gap-2" style={{ columnCount: 5, columnGap: "8px" }}>
+              {photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative mb-2 overflow-hidden rounded-lg bg-gray-100"
+                  style={{ breakInside: "avoid" }}
+                >
+                  <Image
+                    width="100%"
+                    src={photo.thumbnail_url || photo.url}
+                    alt={photo.caption || "Ảnh nhà hàng"}
+                    className="h-full w-full object-contain transition duration-300 hover:scale-110"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </Image.PreviewGroup>
         )}
 
         {hasMore && (

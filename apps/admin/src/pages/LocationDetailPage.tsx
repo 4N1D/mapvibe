@@ -6,6 +6,12 @@ import { apiClient } from "../lib/api";
 import { Breadcrumbs, Skeleton } from "../components/ui";
 import { useConfirm } from "../hooks/useConfirm";
 
+const fixCdnUrl = (url: string): string => {
+  const correctCdnDomain =
+    import.meta.env.VITE_CLOUDFRONT_URL || "https://dxuh8yivsgocq.cloudfront.net";
+  return url.replace(/https:\/\/d[a-z0-9]+\.cloudfront\.net/i, correctCdnDomain);
+};
+
 interface ReviewPost {
   id: string;
   author_name: string;
@@ -700,17 +706,20 @@ export default function LocationDetailPage() {
                 </div>
 
                 <div className="p-6">
-                  <div
-                    className="text-base leading-relaxed text-gray-800 [&>p:last-child]:mb-0 [&>p]:mb-2"
-                    dangerouslySetInnerHTML={{ __html: selectedPost.text }}
-                  />
+                  <div>
+                    <p className="font-bold">Giới thiệu</p>
+                    <div
+                      className="text-base leading-relaxed text-gray-800 [&>p:last-child]:mb-0 [&>p]:mb-2"
+                      dangerouslySetInnerHTML={{ __html: selectedPost.text }}
+                    />
+                  </div>
 
                   {selectedPost.features &&
                     (Array.isArray(selectedPost.features)
                       ? selectedPost.features.length > 0
                       : Object.keys(selectedPost.features).length > 0) && (
                       <div className="mt-4">
-                        <h4 className="mb-2 text-sm font-medium text-gray-700">Đặc điểm đề cập</h4>
+                        <h4 className="mb-2 font-bold text-gray-700">Tiện ích</h4>
                         <div className="flex flex-wrap gap-2">
                           {ALL_FEATURES.filter((feature) => {
                             if (Array.isArray(selectedPost.features)) {
@@ -731,25 +740,28 @@ export default function LocationDetailPage() {
 
                   {selectedPost.photos && selectedPost.photos.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="mb-3 text-sm font-medium text-gray-700">
+                      <h4 className="mb-3 text-sm font-bold text-gray-700">
                         Ảnh ({selectedPost.photos.length})
                       </h4>
                       <div className="grid grid-cols-3 gap-3">
-                        {selectedPost.photos.map((photo, i) => (
-                          <a
-                            key={i}
-                            href={photo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="aspect-square overflow-hidden rounded-lg bg-gray-100 transition-opacity hover:opacity-90"
-                          >
-                            <img
-                              src={photo}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          </a>
-                        ))}
+                        {selectedPost.photos.map((photo, i) => {
+                          const fixedUrl = fixCdnUrl(photo);
+                          return (
+                            <a
+                              key={i}
+                              href={fixedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="aspect-square overflow-hidden rounded-lg bg-gray-100 transition-opacity hover:opacity-90"
+                            >
+                              <img
+                                src={fixedUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

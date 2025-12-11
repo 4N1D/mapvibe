@@ -4,6 +4,7 @@ import { getDb } from "../../services/db";
 import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
 import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
 import { sql } from "kysely";
+import { sendEmbeddingJob } from "../../services/sqs";
 
 // Helper to extract photo IDs from photos JSON
 function extractPhotoIds(photos: unknown): string[] {
@@ -840,6 +841,12 @@ export const updateLocationHandler: Handler = {
         } as Record<string, unknown>)
         .where("location_address_id", "=", locationId)
         .execute();
+
+      // Gửi message vào SQS để trigger Lambda Embedding
+      // Không await để không block response
+      sendEmbeddingJob(restaurant.id).catch((err) => {
+        console.error("[admin/locations/:id] Failed to send embedding job:", err);
+      });
 
       return success({
         message: "Location approved and restaurant created successfully",

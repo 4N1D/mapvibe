@@ -207,7 +207,7 @@ export const updatePlaceHandler: Handler = {
   },
 };
 
-// DELETE /admin/places/:id - Delete place
+// DELETE /admin/places/:id - Delete place (hard delete)
 export const deletePlaceHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
     try {
@@ -228,21 +228,48 @@ export const deletePlaceHandler: Handler = {
 
       const db = await getDb();
 
-      // Soft delete by setting status to 'deleted'
-      const deleted = await db
-        .updateTable("restaurants")
-        .set({ status: "deleted", updated_at: new Date() })
+      // Check if place exists first
+      const existing = await db
+        .selectFrom("restaurants")
+        .select(["id", "name_vi"])
         .where("id", "=", placeId)
-        .returningAll()
         .executeTakeFirst();
 
-      if (!deleted) {
+      if (!existing) {
         return notFound("Place not found");
       }
 
-      return success({ message: "Place deleted successfully", place: deleted });
+      console.log(`[admin/places/:id] Hard deleting place: ${placeId}, name: ${existing.name_vi}`);
+
+      // Hard delete - execute each delete separately
+      // Delete related data first (ignore errors for missing tables)
+      const deleteQueries = [
+        sql`DELETE FROM votes WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        sql`DELETE FROM comments WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        sql`DELETE FROM photos WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        sql`DELETE FROM review_posts WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM photos WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM restaurant_reviews WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM favorites WHERE restaurant_id = ${placeId}`,
+        sql`UPDATE location_addresses SET restaurant_id = NULL WHERE restaurant_id = ${placeId}`,
+      ];
+
+      for (const query of deleteQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Delete the restaurant itself
+      await sql`DELETE FROM restaurants WHERE id = ${placeId}`.execute(db);
+
+      console.log(`[admin/places/:id] Delete result: success`);
+
+      return success({ message: "Place deleted successfully", place: { id: placeId, name_vi: existing.name_vi } });
     } catch (err) {
-      console.error("[admin/places/:id] Error:", err);
+      console.error("[admin/places/:id DELETE] Error:", err);
       return error((err as Error).message);
     }
   },

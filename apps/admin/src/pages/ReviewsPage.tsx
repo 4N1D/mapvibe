@@ -5,7 +5,7 @@ import { adminApi } from "../lib/api";
 import { Breadcrumbs, SkeletonCard } from "../components/ui";
 import { useConfirm } from "../hooks/useConfirm";
 
-type FilterType = "all" | "reported" | "hidden";
+type FilterType = "all" | "reported" | "hidden" | "rejected";
 
 export default function ReviewsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
@@ -63,6 +63,7 @@ export default function ReviewsPage() {
     all: pagination.total,
     reported: reviews.filter((r: Record<string, unknown>) => (r.report_count as number) > 0).length,
     hidden: reviews.filter((r: Record<string, unknown>) => r.status === "hidden").length,
+    rejected: reviews.filter((r: Record<string, unknown>) => r.status === "rejected").length,
   };
 
   return (
@@ -82,8 +83,8 @@ export default function ReviewsPage() {
 
         {/* Filter Tabs */}
         <div className="flex rounded-lg bg-gray-100 p-1">
-          {(["all", "reported", "hidden"] as const).map((f) => {
-            const labels = { all: "Tất cả", reported: "Bị báo cáo", hidden: "Đã ẩn" };
+          {(["all", "reported", "hidden", "rejected"] as const).map((f) => {
+            const labels = { all: "Tất cả", reported: "Bị báo cáo", hidden: "Đã ẩn", rejected: "Bị từ chối" };
             return (
               <button
                 key={f}
@@ -409,15 +410,26 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: "bg-green-100 text-green-800",
     approved: "bg-green-100 text-green-800",
+    published: "bg-green-100 text-green-800",
     hidden: "bg-yellow-100 text-yellow-800",
+    rejected: "bg-orange-100 text-orange-800",
     deleted: "bg-red-100 text-red-800",
+  };
+
+  const labels: Record<string, string> = {
+    active: "Hoạt động",
+    approved: "Đã duyệt",
+    published: "Đã xuất bản",
+    hidden: "Đã ẩn",
+    rejected: "Bị từ chối",
+    deleted: "Đã xóa",
   };
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || styles.active}`}
     >
-      {status}
+      {labels[status] || status}
     </span>
   );
 }

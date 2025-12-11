@@ -143,17 +143,45 @@ export default function PendingLocationsPage() {
     const toastId = toast.loading(`Đang xử lý ${selectedIds.size} địa điểm...`);
 
     try {
-      await Promise.all(
-        Array.from(selectedIds).map((id) => apiClient.patch(`/admin/locations/${id}`, { action }))
-      );
-      toast.success(
-        `Đã ${action === "approve" ? "duyệt" : "từ chối"} ${selectedIds.size} địa điểm`,
-        { id: toastId }
-      );
+      const selectedLocations = locations.filter((loc) => selectedIds.has(loc.id));
+      
+      // Process sequentially to avoid race conditions
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const loc of selectedLocations) {
+        try {
+          const payload: Record<string, unknown> = { action };
+          
+          // For approve action, include required restaurant info
+          if (action === "approve") {
+            payload.name_vi = loc.restaurant_name || "Địa điểm chưa có tên";
+          }
+          
+          await apiClient.patch(`/admin/locations/${loc.id}`, payload);
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to ${action} location ${loc.id}:`, err);
+          failCount++;
+        }
+      }
+      
+      if (failCount === 0) {
+        toast.success(
+          `Đã ${action === "approve" ? "duyệt" : "từ chối"} ${successCount} địa điểm`,
+          { id: toastId }
+        );
+      } else {
+        toast.error(
+          `${action === "approve" ? "Duyệt" : "Từ chối"} ${successCount} thành công, ${failCount} thất bại`,
+          { id: toastId }
+        );
+      }
+      
       setSelectedIds(new Set());
       loadPendingLocations();
     } catch (error) {
-      toast.error(`Không thể ${action === "approve" ? "duyệt" : "từ chối"} một số địa điểm`, {
+      toast.error(`Không thể ${action === "approve" ? "duyệt" : "từ chối"} địa điểm`, {
         id: toastId,
       });
     }

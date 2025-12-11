@@ -1,6 +1,6 @@
 import { Image } from "antd";
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ThumbsUp,
@@ -374,6 +374,7 @@ const mapFeatureToLabel = (featureId: string): string => {
 
 export function PostDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [activeTab, setActiveTab] = useState<string>("gioi-thieu");
@@ -762,17 +763,16 @@ export function PostDetailPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Back button */}
-      <Link
-        to="/nearby"
+      <button
         onClick={() => {
-          // Đánh dấu rằng đang quay lại từ PostDetailPage
           sessionStorage.setItem("returningFromPostDetail", "true");
+          navigate(-1);
         }}
         className="mb-4 inline-flex items-center gap-2 text-gray-600 hover:text-primary-500"
       >
         <ArrowLeft className="h-4 w-4" />
         Quay lại
-      </Link>
+      </button>
 
       {/* Main Content Area: Gallery & Info */}
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">

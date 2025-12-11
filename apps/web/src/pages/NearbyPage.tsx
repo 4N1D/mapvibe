@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useLayoutEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "motion/react";
@@ -380,6 +380,7 @@ interface PostCardProps {
 }
 
 function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [localUpvotes, setLocalUpvotes] = useState(post.stats.upvotes);
   const [localDownvotes, setLocalDownvotes] = useState(post.stats.downvotes);
@@ -582,10 +583,17 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
     }
   };
 
+  const handleCardClick = () => {
+    sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
+    sessionStorage.setItem("nearbyPostId", post.id);
+    navigate(`/post/${post.id}`);
+  };
+
   return (
     <div
-      className="rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="cursor-pointer rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
       data-post-id={post.id}
+      onClick={handleCardClick}
     >
       <div className="p-4">
         <div className="flex items-center gap-3">
@@ -644,21 +652,10 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
 
         <p className="mt-3 line-clamp-3 text-sm text-gray-700">{stripHtml(post.description)}</p>
 
-        <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
-          <Link
-            to={`/post/${post.id}`}
-            onClick={() => {
-              // Lưu scroll position và post ID trước khi navigate
-              sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
-              sessionStorage.setItem("nearbyPostId", post.id);
-            }}
-            className="font-medium bg-gradient-to-r from-primary-500 to-purple-500 bg-clip-text text-transparent hover:from-primary-600 hover:to-purple-600 transition-all"
-          >
-            Xem chi tiết →
-          </Link>
+        <div className="mt-3 flex items-center justify-end text-xs text-gray-600">
           <div className="flex items-center gap-3">
             <motion.button
-              onClick={() => handleVote("upvote")}
+              onClick={(e) => { e.stopPropagation(); handleVote("upvote"); }}
               disabled={!isAuthenticated}
               className={`flex h-[28px] items-center justify-center gap-1 rounded-full px-2 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 voteStatus === "upvoted"
@@ -691,7 +688,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
               {localUpvotes}
             </motion.button>
             <motion.button
-              onClick={() => handleVote("downvote")}
+              onClick={(e) => { e.stopPropagation(); handleVote("downvote"); }}
               disabled={!isAuthenticated}
               className={`flex min-h-[28px] items-center justify-center gap-1 rounded-full px-2 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 voteStatus === "downvoted"
@@ -725,8 +722,8 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
             </motion.button>
             <Link
               to={`/post/${post.id}#comments`}
-              onClick={() => {
-                // Lưu scroll position và post ID trước khi navigate
+              onClick={(e) => {
+                e.stopPropagation();
                 sessionStorage.setItem("nearbyScrollPosition", window.scrollY.toString());
                 sessionStorage.setItem("nearbyPostId", post.id);
               }}
@@ -736,7 +733,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
               {post.stats.comments}
             </Link>
             <button
-              onClick={handleShare}
+              onClick={(e) => { e.stopPropagation(); handleShare(); }}
               className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
               title="Chia sẻ"
             >

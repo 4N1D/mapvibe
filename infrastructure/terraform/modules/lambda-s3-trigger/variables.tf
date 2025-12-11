@@ -40,3 +40,9 @@ variable "cloudfront_domain" {
   type        = string
   description = "CloudFront domain for CDN URLs"
 }
+
+variable "rekognition_lambda_name" {
+  type        = string
+  description = "Rekognition Lambda function name to invoke"
+  default     = ""
+}

@@ -50,6 +50,11 @@ resource "aws_iam_role_policy" "lambda" {
         Effect   = "Allow"
         Action   = ["s3:GetObject"]
         Resource = "${var.s3_bucket_arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = var.rekognition_lambda_name != "" ? "arn:aws:lambda:${var.aws_region}:*:function:${var.rekognition_lambda_name}" : "*"
       }
     ]
   })
@@ -76,11 +81,12 @@ resource "aws_lambda_function" "s3_trigger" {
 
   environment {
     variables = {
-      DB_HOST           = var.db_host
-      DB_PORT           = "5432"
-      DB_NAME           = var.db_name
-      DB_SECRET_ARN     = var.db_secret_arn
-      CLOUDFRONT_DOMAIN = var.cloudfront_domain
+      DB_HOST                = var.db_host
+      DB_PORT                = "5432"
+      DB_NAME                = var.db_name
+      DB_SECRET_ARN          = var.db_secret_arn
+      CLOUDFRONT_DOMAIN      = var.cloudfront_domain
+      REKOGNITION_LAMBDA_NAME = var.rekognition_lambda_name
     }
   }
 

@@ -303,10 +303,89 @@ class SearchPayload(BaseModel):
 
 # --- 4. RAG SERVICE (CORE LOGIC CỦA BẠN) ---
 class RAGService:
+    # Cache tool_spec ở class level để không tạo lại mỗi lần
+    _TOOL_SPEC = None
+    
     def __init__(self, session_id: str, history: List[Dict]):
         self.session_id = session_id
         self.history = history
         self.bedrock = bedrock_client
+
+    @classmethod
+    def _get_tool_spec(cls):
+        """Lấy tool_spec, tạo 1 lần và cache lại"""
+        if cls._TOOL_SPEC is None:
+            cls._TOOL_SPEC = {
+                "tools": [{
+                    "toolSpec": {
+                        "name": "extract_filters",
+                        "description": "Trích xuất nhu cầu tìm kiếm.",
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {
+                                    "search_text": {"type": "string"},
+                                    "district": {"type": "string", "description": "Tên Quận/Huyện đã chuẩn hóa. QUY TẮC: 1. Viết tắt: 'Q1' -> 'Quận 1', 'Q.3' -> 'Quận 3'. 2. Tên chữ: 'Tân Bình', 'Thủ Đức' -> Giữ nguyên. 3. ĐẶC BIỆT: Nếu user nói 'Sài Gòn', 'TPHCM', 'Thành phố' hoặc không nói rõ quận -> Trả về NULL (để tìm toàn thành phố)."},
+                                    "min_price": {"type": "integer", "description": "Giá thấp nhất (VND). Nếu user nhập '50k', hãy convert thành 50000. Nếu user KHÔNG nói ngân sách cụ thể thì đừng quan tâm đến giá ."},
+                                    "max_price": {"type": "integer", "description": "Giá cao nhất (VND). Lưu ý: 'k' = 000. VD: '40k' -> 40000. QUAN TRỌNG: Nếu user KHÔNG nói ngân sách cụ thể thì đừng quan tâm đến giá."},
+                                    "is_open_now": {"type": "boolean"},
+                                    "search_strategy": {"type": "string", "enum": ["precise", "semantic"]},
+                                    "exclude_keywords": {"type": "array", "items": {"type": "string"},"description": """
+                                    Danh sách từ khóa user muốn loại trừ. 
+                                    QUAN TRỌNG: Hãy tư duy mở rộng (Brainstorm). 
+                                    Ví dụ: Nếu user cấm 'hải sản', hãy thêm cả: ['hải sản', 'sushi', 'sashimi', 'cua', 'tôm', 'cá', 'ốc'].
+                                    Nếu user cấm 'ngọt', thêm: ['ngọt', 'chè', 'bánh', 'trà sữa'].
+                                    """},
+                                    "exclude_districts": {"type": "array","items": {"type": "string"},"description": "Danh sách quận user KHÔNG MUỐN đến. VD: User nói 'trừ Q1, Q3' -> ['Quận 1', 'Quận 3']."},
+                                    "target_categories": {"type": "array","items": {"type": "string"},"description": """
+                                    Danh sách các loại hình quán user ĐANG TÌM.
+                                    QUAN TRỌNG: 
+                                    1. Nếu user tìm 'cafe', 'nước', 'trà sữa',... -> CHỈ lấy ['Cà phê', 'Trà sữa', 'Giải khát',...]. TUYỆT ĐỐI KHÔNG thêm 'Quán ăn', 'Nhà hàng'...
+                                    2. Nếu user tìm 'ăn', 'cơm',... -> Lấy ['Nhà hàng', 'Quán ăn', 'Món Việt', ...].
+                                    3. Nếu user tìm 'nhậu' -> Lấy ['Quán nhậu', 'Beer', 'Bar',...].
+                                    4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay',...) -> CHỈ lấy business_type đó.
+                                    (VD: Tìm 'BBQ' -> ['Nướng', 'Buffet', 'Grill']. KHÔNG lấy 'phở', 'cơm',...).
+                                    Hãy chọn business_type sát nhất với từ khóa của user.
+                                    5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo',...) -> CHỈ lấy business_type chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
+                                    6. Nếu user tìm 'Bar', 'Pub', 'Club', 'Quẩy' -> 
+                                    - Lấy ['Bar', 'Pub', 'Club', 'Nightlife', 'Lounge'].
+                                    7. LOGIC ĐẶC BIỆT KHI USER TIÊU CỰC (Chửi thề, buồn, chán):
+                                    - Nếu user đang bực bội/chửi (mood='negative'), hãy TỰ ĐỘNG gợi ý các món 'Giải sầu' phù hợp:
+                                        + ['Quán nhậu', 'Bia', 'Bar',...] (để xả stress).
+                                        + ['Đồ ngọt', 'Trà sữa', 'Bánh',...] (để user thấy ngọt ngào hơn).
+                                        + ['Lẩu', 'Nướng',...] (ăn cho đã cơn thèm).
+                                    - Đừng trả về danh sách trống khi user chửi bậy. Hãy lấp đầy bằng các món trên.                      
+                                    """},
+                                    "mood": {
+                                        "type": "string",
+                                        "enum": ["neutral", "negative"],
+                                        "description": "Nếu user chửi thề, dùng từ ngữ tiêu cực, than vãn, buồn bã -> Đặt là 'negative'. Còn lại là 'neutral'."
+                                    },
+                                    "rating_service_min": {"type": "number", "description": "Rating service tối thiểu (1.0-10.0). VD: User nói 'service tốt' -> 7.0, 'service xuất sắc' -> 8.5. Nếu không đề cập thì null."},
+                                    "rating_service_max": {"type": "number", "description": "Rating service tối đa (1.0-10.0). VD: User nói 'service từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
+                                    "rating_location_min": {"type": "number", "description": "Rating location tối thiểu (1.0-10.0). VD: User nói 'vị trí đẹp', 'location tốt' -> 7.0. Nếu không đề cập thì null."},
+                                    "rating_location_max": {"type": "number", "description": "Rating location tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                    "rating_price_min": {"type": "number", "description": "Rating price tối thiểu (1.0-10.0). VD: User nói 'giá hợp lý' -> 6.0, 'giá tốt' -> 7.0. Lưu ý: rating_price cao = giá rẻ/hợp lý. Nếu không đề cập thì null."},
+                                    "rating_price_max": {"type": "number", "description": "Rating price tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                    "rating_quality_min": {"type": "number", "description": "Rating quality tối thiểu (1.0-10.0). VD: User nói 'chất lượng tốt', 'món ngon' -> 7.0. Nếu không đề cập thì null."},
+                                    "rating_quality_max": {"type": "number", "description": "Rating quality tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                    "rating_ambiance_min": {"type": "number", "description": "Rating ambiance tối thiểu (1.0-10.0). VD: User nói 'không gian đẹp', 'ambiance tốt' -> 7.0. Nếu không đề cập thì null."},
+                                    "rating_ambiance_max": {"type": "number", "description": "Rating ambiance tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                    "rating_overall_min": {"type": "number", "description": "Rating tổng thể tối thiểu (1.0-10.0). VD: User nói 'rating trên 8', 'quán tốt' -> 8.0, 'quán xuất sắc' -> 9.0. Nếu không đề cập thì null."},
+                                    "rating_overall_max": {"type": "number", "description": "Rating tổng thể tối đa (1.0-10.0). VD: User nói 'rating từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
+                                    "min_rating_count": {"type": "integer", "description": "Số lượng rating tối thiểu. VD: User nói 'quán có nhiều đánh giá', 'nhiều người rate' -> 20. Nếu không đề cập thì null."},
+                                    "min_review_count": {"type": "integer", "description": "Số lượng review tối thiểu. VD: User nói 'quán nhiều review', 'nhiều người review' -> 50. Nếu không đề cập thì null."},
+                                    "min_favorite_count": {"type": "integer", "description": "Số lượng favorite tối thiểu. VD: User nói 'quán được yêu thích', 'nhiều người thích' -> 10. Nếu không đề cập thì null."},
+                                    "min_view_count": {"type": "integer", "description": "Số lượng view tối thiểu. VD: User nói 'quán nhiều người xem', 'phổ biến' -> 100. Nếu không đề cập thì null."}               
+                                },
+                                "required": ["search_text", "search_strategy"]
+                            }
+                        }
+                    }
+                }]
+            }
+            logger.info("[TOOL_SPEC] Initialized and cached tool_spec")
+        return cls._TOOL_SPEC
 
     @staticmethod
     def _validate_rating_value(value: float, field_name: str) -> Optional[float]:
@@ -339,6 +418,115 @@ class RAGService:
         except (ValueError, TypeError):
             logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid integer, ignoring")
             return None
+
+    def _summarize_context(self, session_history: List[Dict], max_messages: int = 10) -> str:
+        """
+        Dùng LLM để tóm tắt context từ history thành keywords/entities ngắn gọn
+        Chỉ giữ lại thông tin quan trọng cho search
+        """
+        if not session_history:
+            return ""
+        
+        # Lấy các message gần nhất (user + assistant để hiểu context)
+        recent_messages = session_history[-max_messages * 2:]  # *2 vì có cả user và assistant
+        
+        if not recent_messages:
+            return ""
+        
+        # Tạo context string từ messages
+        context_text = ""
+        for msg in recent_messages:
+            role = msg.get("role", "")
+            content = msg.get("content", [])
+            if isinstance(content, list) and len(content) > 0:
+                text = content[0].get("text", "")
+                if text:
+                    context_text += f"{role}: {text}\n"
+        
+        if not context_text.strip():
+            return ""
+        
+        # Dùng LLM Haiku để tóm tắt context
+        summarize_prompt = f"""Bạn là context summarizer. Nhiệm vụ của bạn là tóm tắt lịch sử hội thoại thành keywords/entities ngắn gọn để dùng cho search engine.
+
+LỊCH SỬ HỘI THOẠI:
+{context_text}
+
+Hãy tóm tắt thành format ngắn gọn:
+- Keywords quan trọng (tên món, loại quán, địa điểm)
+- Entities (quận, huyện, đặc điểm)
+- Filters đã đề cập (giá, rating, giờ mở cửa)
+
+Format: "Keywords: [keywords] | Filters: [filters] | Location: [location]"
+
+CHỈ giữ lại thông tin QUAN TRỌNG và LIÊN QUAN. Loại bỏ thông tin không cần thiết.
+Nếu không có thông tin quan trọng, trả về chuỗi rỗng.
+"""
+        
+        try:
+            messages = [{"role": "user", "content": [{"text": summarize_prompt}]}]
+            response = self.call_bedrock_retry(
+                model_id=MODEL_INTENT,
+                messages=messages,
+                system_prompts=[{"text": "Bạn là context summarizer chuyên nghiệp. Tóm tắt ngắn gọn, chính xác."}]
+            )
+            
+            summary = response['output']['message']['content'][0]['text'].strip()
+            logger.info(f"[CONTEXT SUMMARY] {summary[:200]}...")
+            return summary
+        except Exception as e:
+            logger.warning(f"[CONTEXT SUMMARY ERROR] Failed to summarize context: {e}, using empty context")
+            return ""
+
+    def _rewrite_query_for_search(self, current_query: str, context_summary: str) -> str:
+        """
+        Dùng LLM để rewrite query hiện tại dựa trên context thành search query tối ưu
+        Tự động detect topic change và loại bỏ context không liên quan
+        """
+        if not context_summary:
+            # Không có context, trả về query gốc
+            return current_query
+        
+        rewrite_prompt = f"""Bạn là search query optimizer. Nhiệm vụ của bạn là rewrite query hiện tại dựa trên context để tạo ra search query tối ưu.
+
+CONTEXT (từ các query trước):
+{context_summary}
+
+QUERY HIỆN TẠI:
+{current_query}
+
+QUAN TRỌNG:
+1. Nếu query hiện tại ĐỔI TOPIC (VD: từ "đồ ăn" sang "đồ uống"), CHỈ giữ context LIÊN QUAN đến query mới, LOẠI BỎ context cũ không liên quan.
+2. Nếu query hiện tại TIẾP TỤC topic cũ, KẾT HỢP context với query hiện tại.
+3. Chỉ giữ lại:
+   - Keywords quan trọng (tên món, loại quán, địa điểm)
+   - Entities (quận, huyện, đặc điểm)
+   - Filters quan trọng (giá, rating)
+
+LOẠI BỎ:
+- Từ dư thừa ("này", "có gì", "thì", "mà", "vậy", ...)
+- Câu hỏi không cần thiết
+- Từ lặp lại
+- Context không liên quan đến query hiện tại
+
+Output CHỈ là search query đã được rewrite, KHÔNG giải thích, KHÔNG thêm từ nào khác.
+Nếu query hiện tại hoàn toàn mới và không liên quan context, chỉ trả về query hiện tại đã được làm sạch.
+"""
+        
+        try:
+            messages = [{"role": "user", "content": [{"text": rewrite_prompt}]}]
+            response = self.call_bedrock_retry(
+                model_id=MODEL_INTENT,
+                messages=messages,
+                system_prompts=[{"text": "Bạn là search query optimizer. Rewrite query ngắn gọn, chính xác, chỉ output query không giải thích."}]
+            )
+            
+            rewritten = response['output']['message']['content'][0]['text'].strip()
+            logger.info(f"[QUERY REWRITE] '{current_query}' -> '{rewritten}'")
+            return rewritten
+        except Exception as e:
+            logger.warning(f"[QUERY REWRITE ERROR] Failed to rewrite query: {e}, using original query")
+            return current_query
 
     def _concatenate_previous_queries(self, session_history: List[Dict], current_query: str, max_queries: int = 10) -> str:
         """Nối các query trước đó trong session với query hiện tại"""
@@ -439,85 +627,37 @@ class RAGService:
             logger.error(f"[UNEXPECTED ERROR] Embedding Error: {e}")
             return None
 
-    def parse_intent(self, user_input: str) -> Dict[str, Any]:
+    def parse_intent(self, user_input: str, context_summary: str = "") -> Dict[str, Any]:
         """
-        Dùng CLAUDE HAIKU + Tool Use
+        Dùng CLAUDE HAIKU + Tool Use để parse intent từ query đã được rewrite
+        Query đã được rewrite nên không cần full history, chỉ cần query hiện tại
         """
         current_time = datetime.now(VN_TZ).strftime("%H:%M")
         
-        tool_spec = {
-            "tools": [{
-                "toolSpec": {
-                    "name": "extract_filters",
-                    "description": "Trích xuất nhu cầu tìm kiếm.",
-                    "inputSchema": {
-                        "json": {
-                            "type": "object",
-                            "properties": {
-                                "search_text": {"type": "string"},
-                                "district": {"type": "string", "description": "Tên Quận/Huyện đã chuẩn hóa. QUY TẮC: 1. Viết tắt: 'Q1' -> 'Quận 1', 'Q.3' -> 'Quận 3'. 2. Tên chữ: 'Tân Bình', 'Thủ Đức' -> Giữ nguyên. 3. ĐẶC BIỆT: Nếu user nói 'Sài Gòn', 'TPHCM', 'Thành phố' hoặc không nói rõ quận -> Trả về NULL (để tìm toàn thành phố)."},
-                                "min_price": {"type": "integer", "description": "Giá thấp nhất (VND). Nếu user nhập '50k', hãy convert thành 50000. Nếu user KHÔNG nói ngân sách cụ thể thì đừng quan tâm đến giá ."},
-                                "max_price": {"type": "integer", "description": "Giá cao nhất (VND). Lưu ý: 'k' = 000. VD: '40k' -> 40000. QUAN TRỌNG: Nếu user KHÔNG nói ngân sách cụ thể thì đừng quan tâm đến giá."},
-                                "is_open_now": {"type": "boolean"},
-                                "search_strategy": {"type": "string", "enum": ["precise", "semantic"]},
-                                "exclude_keywords": {"type": "array", "items": {"type": "string"},"description": """
-                                Danh sách từ khóa user muốn loại trừ. 
-                                QUAN TRỌNG: Hãy tư duy mở rộng (Brainstorm). 
-                                Ví dụ: Nếu user cấm 'hải sản', hãy thêm cả: ['hải sản', 'sushi', 'sashimi', 'cua', 'tôm', 'cá', 'ốc'].
-                                Nếu user cấm 'ngọt', thêm: ['ngọt', 'chè', 'bánh', 'trà sữa'].
-                                """},
-                                "exclude_districts": {"type": "array","items": {"type": "string"},"description": "Danh sách quận user KHÔNG MUỐN đến. VD: User nói 'trừ Q1, Q3' -> ['Quận 1', 'Quận 3']."},
-                                "target_categories": {"type": "array","items": {"type": "string"},"description": """
-                                Danh sách các loại hình quán user ĐANG TÌM.
-                                QUAN TRỌNG: 
-                                1. Nếu user tìm 'cafe', 'nước', 'trà sữa',... -> CHỈ lấy ['Cà phê', 'Trà sữa', 'Giải khát',...]. TUYỆT ĐỐI KHÔNG thêm 'Quán ăn', 'Nhà hàng'...
-                                2. Nếu user tìm 'ăn', 'cơm',... -> Lấy ['Nhà hàng', 'Quán ăn', 'Món Việt', ...].
-                                3. Nếu user tìm 'nhậu' -> Lấy ['Quán nhậu', 'Beer', 'Bar',...].
-                                4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay',...) -> CHỈ lấy business_type đó.
-                                (VD: Tìm 'BBQ' -> ['Nướng', 'Buffet', 'Grill']. KHÔNG lấy 'phở', 'cơm',...).
-                                Hãy chọn business_type sát nhất với từ khóa của user.
-                                5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo',...) -> CHỈ lấy business_type chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
-                                6. Nếu user tìm 'Bar', 'Pub', 'Club', 'Quẩy' -> 
-                                - Lấy ['Bar', 'Pub', 'Club', 'Nightlife', 'Lounge'].
-                                7. LOGIC ĐẶC BIỆT KHI USER TIÊU CỰC (Chửi thề, buồn, chán):
-                                - Nếu user đang bực bội/chửi (mood='negative'), hãy TỰ ĐỘNG gợi ý các món 'Giải sầu' phù hợp:
-                                    + ['Quán nhậu', 'Bia', 'Bar',...] (để xả stress).
-                                    + ['Đồ ngọt', 'Trà sữa', 'Bánh',...] (để user thấy ngọt ngào hơn).
-                                    + ['Lẩu', 'Nướng',...] (ăn cho đã cơn thèm).
-                                - Đừng trả về danh sách trống khi user chửi bậy. Hãy lấp đầy bằng các món trên.                      
-                                """},
-                                "mood": {
-                                    "type": "string",
-                                    "enum": ["neutral", "negative"],
-                                    "description": "Nếu user chửi thề, dùng từ ngữ tiêu cực, than vãn, buồn bã -> Đặt là 'negative'. Còn lại là 'neutral'."
-                                },
-                                "rating_service_min": {"type": "number", "description": "Rating service tối thiểu (1.0-10.0). VD: User nói 'service tốt' -> 7.0, 'service xuất sắc' -> 8.5. Nếu không đề cập thì null."},
-                                "rating_service_max": {"type": "number", "description": "Rating service tối đa (1.0-10.0). VD: User nói 'service từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
-                                "rating_location_min": {"type": "number", "description": "Rating location tối thiểu (1.0-10.0). VD: User nói 'vị trí đẹp', 'location tốt' -> 7.0. Nếu không đề cập thì null."},
-                                "rating_location_max": {"type": "number", "description": "Rating location tối đa (1.0-10.0). Nếu không đề cập thì null."},
-                                "rating_price_min": {"type": "number", "description": "Rating price tối thiểu (1.0-10.0). VD: User nói 'giá hợp lý' -> 6.0, 'giá tốt' -> 7.0. Lưu ý: rating_price cao = giá rẻ/hợp lý. Nếu không đề cập thì null."},
-                                "rating_price_max": {"type": "number", "description": "Rating price tối đa (1.0-10.0). Nếu không đề cập thì null."},
-                                "rating_quality_min": {"type": "number", "description": "Rating quality tối thiểu (1.0-10.0). VD: User nói 'chất lượng tốt', 'món ngon' -> 7.0. Nếu không đề cập thì null."},
-                                "rating_quality_max": {"type": "number", "description": "Rating quality tối đa (1.0-10.0). Nếu không đề cập thì null."},
-                                "rating_ambiance_min": {"type": "number", "description": "Rating ambiance tối thiểu (1.0-10.0). VD: User nói 'không gian đẹp', 'ambiance tốt' -> 7.0. Nếu không đề cập thì null."},
-                                "rating_ambiance_max": {"type": "number", "description": "Rating ambiance tối đa (1.0-10.0). Nếu không đề cập thì null."},
-                                "rating_overall_min": {"type": "number", "description": "Rating tổng thể tối thiểu (1.0-10.0). VD: User nói 'rating trên 8', 'quán tốt' -> 8.0, 'quán xuất sắc' -> 9.0. Nếu không đề cập thì null."},
-                                "rating_overall_max": {"type": "number", "description": "Rating tổng thể tối đa (1.0-10.0). VD: User nói 'rating từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
-                                "min_rating_count": {"type": "integer", "description": "Số lượng rating tối thiểu. VD: User nói 'quán có nhiều đánh giá', 'nhiều người rate' -> 20. Nếu không đề cập thì null."},
-                                "min_review_count": {"type": "integer", "description": "Số lượng review tối thiểu. VD: User nói 'quán nhiều review', 'nhiều người review' -> 50. Nếu không đề cập thì null."},
-                                "min_favorite_count": {"type": "integer", "description": "Số lượng favorite tối thiểu. VD: User nói 'quán được yêu thích', 'nhiều người thích' -> 10. Nếu không đề cập thì null."},
-                                "min_view_count": {"type": "integer", "description": "Số lượng view tối thiểu. VD: User nói 'quán nhiều người xem', 'phổ biến' -> 100. Nếu không đề cập thì null."}               
-                            },
-                            "required": ["search_text", "search_strategy"]
-                        }
-                    }
-                }
-            }]
-        }
+        # Dùng cached tool_spec
+        tool_spec = self._get_tool_spec()
 
-        messages_payload = self.history[-6:]
-        messages_payload.append({"role": "user", "content": [{"text": user_input}]})
-        system_prompt = [{"text": f"Giờ là {current_time}. Kế thừa lịch sử tìm kiếm."}]
+        # Đơn giản hóa messages payload - chỉ dùng query hiện tại (đã được rewrite với context)
+        # Không cần full history vì query đã chứa context quan trọng
+        messages_payload = [{"role": "user", "content": [{"text": user_input}]}]
+        
+        # Cải thiện system prompt với instructions rõ ràng và context summary
+        system_prompt_text = f"""Bạn là intent parser chuyên nghiệp. Nhiệm vụ của bạn là trích xuất chính xác thông tin từ query để tìm kiếm nhà hàng/quán ăn.
+
+Giờ hiện tại: {current_time}
+Query đã được tối ưu: {user_input}
+"""
+        
+        if context_summary:
+            system_prompt_text += f"""
+Context từ session: {context_summary}
+"""
+        
+        system_prompt_text += """
+Hãy trích xuất chính xác các filters và parameters từ query. Query đã được tối ưu nên chứa đầy đủ thông tin cần thiết.
+"""
+        
+        system_prompt = [{"text": system_prompt_text}]
 
         try:
             response = self.call_bedrock_retry(
@@ -724,12 +864,55 @@ class RAGService:
         query_text = params.get("search_text", "")
         strategy = params.get("search_strategy", "semantic")
         
+        logger.info(f"[SEARCH] Starting search with query: '{query_text}' | Strategy: {strategy} | Min Score: {min_score}")
+        
+        # Log filters được áp dụng
+        active_filters = []
+        if params.get("district"):
+            active_filters.append(f"district={params['district']}")
+        if params.get("min_price") or params.get("max_price"):
+            price_range = f"{params.get('min_price', 'N/A')}-{params.get('max_price', 'N/A')}"
+            active_filters.append(f"price={price_range}")
+        if params.get("is_open_now"):
+            active_filters.append("is_open_now=True")
+        if params.get("target_categories"):
+            active_filters.append(f"categories={params['target_categories']}")
+        if params.get("exclude_keywords"):
+            active_filters.append(f"exclude_keywords={params['exclude_keywords']}")
+        if params.get("exclude_districts"):
+            active_filters.append(f"exclude_districts={params['exclude_districts']}")
+        
+        # Log rating filters
+        rating_filters = []
+        for field in ["rating_service", "rating_location", "rating_price", "rating_quality", "rating_ambiance", "rating_overall"]:
+            min_key = f"{field}_min"
+            max_key = f"{field}_max"
+            if params.get(min_key) is not None or params.get(max_key) is not None:
+                rating_filters.append(f"{field}={params.get(min_key, 'N/A')}-{params.get(max_key, 'N/A')}")
+        if rating_filters:
+            active_filters.append(f"ratings=[{', '.join(rating_filters)}]")
+        
+        # Log count filters
+        count_filters = []
+        for key in ["min_rating_count", "min_review_count", "min_favorite_count", "min_view_count"]:
+            if params.get(key) is not None:
+                count_filters.append(f"{key}={params[key]}")
+        if count_filters:
+            active_filters.append(f"counts=[{', '.join(count_filters)}]")
+        
+        if active_filters:
+            logger.info(f"[SEARCH] Active filters: {', '.join(active_filters)}")
+        else:
+            logger.info(f"[SEARCH] No filters applied (semantic search only)")
+        
         query_emb = self.get_embedding(query_text)
         if not query_emb: 
+            logger.warning(f"[SEARCH] Failed to get embedding for query: '{query_text}'")
             return []
 
         # Build base query
         sql_base, sql_params = self._build_base_query(query_text, strategy, query_emb)
+        logger.debug(f"[SEARCH] Base query built | Strategy: {strategy}")
         
         # Build filters
         sql_base, sql_params = self._build_district_filter(sql_base, sql_params, params.get("district"))
@@ -749,13 +932,18 @@ class RAGService:
                 # --- LOGGING PHẦN SQL ---
                 duration = (datetime.now() - start_time).total_seconds()
                 top_score = results[0].final_score if results else 0
-                logger.info(f"[SQL] Found: {len(results)} items | Time: {duration:.2f}s | Top Score: {top_score:.4f} | Filters: {params}")
+                logger.info(f"[SEARCH] SQL Query executed | Found: {len(results)} items | Time: {duration:.2f}s | Top Score: {top_score:.4f}")
+                
+                if results:
+                    logger.info(f"[SEARCH] Top 3 results: {[(r.name_vi, f'{r.final_score:.4f}') for r in results[:3]]}")
+                else:
+                    logger.warning(f"[SEARCH] No results found with min_score >= {min_score}")
                 
                 return results
         except Exception as e:
-            logger.error(f"[SQL ERROR] Query failed: {e}")
-            logger.error(f"[SQL ERROR] Query: {sql_base[:500]}...")
-            logger.error(f"[SQL ERROR] Params keys: {list(sql_params.keys())}")
+            logger.error(f"[SEARCH ERROR] Query failed: {e}")
+            logger.error(f"[SEARCH ERROR] Query: {sql_base[:500]}...")
+            logger.error(f"[SEARCH ERROR] Params keys: {list(sql_params.keys())}")
             raise
 
     def _relax_rating_filters(self, params: Dict[str, Any], relax_by: float = 1.0) -> Dict[str, Any]:
@@ -777,9 +965,18 @@ class RAGService:
         return relaxed
 
     def search_pipeline(self, params):
+        pipeline_start = datetime.now()
+        logger.info(f"[SEARCH PIPELINE] Starting search pipeline with params: {params}")
+        
         # 1. Strict
+        logger.info(f"[SEARCH PIPELINE] Step 1: Strict search (all filters)")
         results = self.execute_db_search(params, min_score=0.2)
-        if results: return results, "Đây là kết quả phù hợp nhất:"
+        if results:
+            duration = (datetime.now() - pipeline_start).total_seconds()
+            logger.info(f"[SEARCH PIPELINE] ✅ Step 1 SUCCESS | Found {len(results)} results | Total time: {duration:.2f}s")
+            return results, "Đây là kết quả phù hợp nhất:"
+        else:
+            logger.info(f"[SEARCH PIPELINE] ❌ Step 1 FAILED | No results, trying fallback...")
 
         # 2. Relax Time/Price
         relax_params = params.copy()
@@ -788,9 +985,15 @@ class RAGService:
             relax_params.pop("min_price", None)
             relax_params.pop("max_price", None)
             relax_params.pop("is_open_now", None)
-            logger.info(f"⚠️ Trigger Fallback 1 (Drop Price/Time)")
+            logger.info(f"[SEARCH PIPELINE] Step 2: Fallback - Drop Price/Time filters")
+            logger.info(f"[SEARCH PIPELINE] Removed filters: min_price, max_price, is_open_now")
             results = self.execute_db_search(relax_params, min_score=0.2)
-            if results: return results, "Không đúng giá/giờ yêu cầu, nhưng có quán này:"
+            if results:
+                duration = (datetime.now() - pipeline_start).total_seconds()
+                logger.info(f"[SEARCH PIPELINE] ✅ Step 2 SUCCESS | Found {len(results)} results | Total time: {duration:.2f}s")
+                return results, "Không đúng giá/giờ yêu cầu, nhưng có quán này:"
+            else:
+                logger.info(f"[SEARCH PIPELINE] ❌ Step 2 FAILED | No results, trying next fallback...")
 
         # 3. Relax Rating Filters (giảm 1 điểm)
         has_rating_filters = any(k in params for k in [
@@ -799,25 +1002,42 @@ class RAGService:
         ])
         if has_rating_filters:
             relaxed_rating_params = self._relax_rating_filters(params, relax_by=1.0)
-            logger.info(f"⚠️ Trigger Fallback 2 (Relax Rating by 1.0)")
+            logger.info(f"[SEARCH PIPELINE] Step 3: Fallback - Relax Rating filters by 1.0")
             results = self.execute_db_search(relaxed_rating_params, min_score=0.2)
-            if results: return results, "Không đúng rating yêu cầu, nhưng có quán gần đúng:"
+            if results:
+                duration = (datetime.now() - pipeline_start).total_seconds()
+                logger.info(f"[SEARCH PIPELINE] ✅ Step 3 SUCCESS | Found {len(results)} results | Total time: {duration:.2f}s")
+                return results, "Không đúng rating yêu cầu, nhưng có quán gần đúng:"
+            else:
+                logger.info(f"[SEARCH PIPELINE] ❌ Step 3 FAILED | No results, trying next fallback...")
 
         # 4. Relax District
         if "district" in params:
             d_params = params.copy()
-            del d_params["district"]
+            original_district = d_params.pop("district")
             d_params.pop("is_open_now", None)
-            logger.info(f"⚠️ Trigger Fallback 3 (Drop District)")
+            logger.info(f"[SEARCH PIPELINE] Step 4: Fallback - Drop District filter")
+            logger.info(f"[SEARCH PIPELINE] Removed district: {original_district}")
             results = self.execute_db_search(d_params, min_score=0.2)
-            if results: return results, f"Quận {params['district']} không có, nhưng chỗ khác có:"
+            if results:
+                duration = (datetime.now() - pipeline_start).total_seconds()
+                logger.info(f"[SEARCH PIPELINE] ✅ Step 4 SUCCESS | Found {len(results)} results | Total time: {duration:.2f}s")
+                return results, f"Quận {original_district} không có, nhưng chỗ khác có:"
+            else:
+                logger.info(f"[SEARCH PIPELINE] ❌ Step 4 FAILED | No results, trying final fallback...")
 
         # 5. Semantic Only
-        logger.info(f"⚠️ Trigger Fallback 4 (Semantic Only)")
-        results = self.execute_db_search({"search_text": params["search_text"], "search_strategy": "semantic"}, min_score=0.25)
-        if results: return results, "Tìm theo vibe/ngữ nghĩa:"
-        
-        return [], ""
+        logger.info(f"[SEARCH PIPELINE] Step 5: Final Fallback - Semantic search only (no filters)")
+        semantic_params = {"search_text": params["search_text"], "search_strategy": "semantic"}
+        results = self.execute_db_search(semantic_params, min_score=0.25)
+        if results:
+            duration = (datetime.now() - pipeline_start).total_seconds()
+            logger.info(f"[SEARCH PIPELINE] ✅ Step 5 SUCCESS | Found {len(results)} results | Total time: {duration:.2f}s")
+            return results, "Tìm theo vibe/ngữ nghĩa:"
+        else:
+            duration = (datetime.now() - pipeline_start).total_seconds()
+            logger.warning(f"[SEARCH PIPELINE] ❌ ALL STEPS FAILED | No results found after all fallbacks | Total time: {duration:.2f}s")
+            return [], ""
 
     def get_restaurant_images(self, restaurant_ids: List[str]) -> Dict[str, str]:
         """Lấy ảnh đầu tiên của mỗi restaurant từ table photos"""
@@ -934,17 +1154,25 @@ async def search_endpoint(payload: SearchPayload):
         
         rag = RAGService(payload.session_id, session_mgr)
 
-        # Nối 10 query trước đó vào query hiện tại
-        combined_query = rag._concatenate_previous_queries(session_mgr, payload.query, max_queries=10)
-
-        # Pipeline
-        params = rag.parse_intent(combined_query)
-        logger.info(f"[INTENT] {params}") # Log Intent đã parse được
+        # Query Rewriting: Tóm tắt context và rewrite query để tối ưu cho search
+        logger.info(f"[SEARCH FLOW] Step 1: Summarizing context from session history")
+        context_summary = rag._summarize_context(session_mgr, max_messages=10)
+        
+        logger.info(f"[SEARCH FLOW] Step 2: Rewriting query for search optimization")
+        rewritten_query = rag._rewrite_query_for_search(payload.query, context_summary)
+        
+        logger.info(f"[SEARCH FLOW] Step 3: Parsing intent from rewritten query")
+        # Pipeline - dùng rewritten query cho search engine, truyền context_summary vào parse_intent
+        params = rag.parse_intent(rewritten_query, context_summary=context_summary)
+        logger.info(f"[SEARCH FLOW] Parsed intent: {params}")
 
         # Lấy mood ra (mặc định là neutral nếu không có)
         current_mood = params.get("mood", "neutral")
+        logger.info(f"[SEARCH FLOW] User mood: {current_mood}")
 
+        logger.info(f"[SEARCH FLOW] Step 4: Executing search pipeline")
         results, note = rag.search_pipeline(params)
+        logger.info(f"[SEARCH FLOW] Search completed | Found {len(results)} results | Note: {note}")
         answer, json_data = rag.generate_response_and_data(payload.query, results, note, user_mood=current_mood)
 
         # Save History

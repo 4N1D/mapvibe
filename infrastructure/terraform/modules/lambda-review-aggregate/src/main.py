@@ -542,8 +542,11 @@ def lambda_handler(event, context):
         response = {
             "statusCode": 200,
             "headers": RESPONSE_HEADERS,
-            "body": json.dumps(result),
+            "body": result_json,
         }
+        
+        log_print(f"📤 Response statusCode: {response['statusCode']}")
+        return response
     except ValueError as e:
         import traceback
         error_trace = traceback.format_exc()

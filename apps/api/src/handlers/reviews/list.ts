@@ -151,13 +151,20 @@ export const handler: Handler = {
       // Get all review IDs
       const reviewIds = rawReviews.map((r) => r.id);
 
+      // Categorized photos type
+      type CategorizedPhotos = {
+        general: Array<{ url: string; caption?: string }>;
+        food: Array<{ url: string; caption?: string }>;
+        menu: Array<{ url: string; caption?: string }>;
+      };
+
       // First try: Query photos directly from photos table by review_post_id
-      const reviewPhotosMap = new Map<string, Array<{ url: string }>>();
+      const reviewPhotosMap = new Map<string, CategorizedPhotos>();
       
       if (reviewIds.length > 0) {
         const photosFromTable = await db
           .selectFrom("photos")
-          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url"])
+          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url", "photo_type", "menu_name"])
           .where("review_post_id", "in", reviewIds)
           .orderBy("created_at", "asc")
           .execute();
@@ -166,8 +173,17 @@ export const handler: Handler = {
           if (photo.review_post_id) {
             const url = photo.s3_thumbnail_url || photo.s3_url;
             if (url) {
-              const existing = reviewPhotosMap.get(photo.review_post_id) || [];
-              existing.push({ url });
+              const existing = reviewPhotosMap.get(photo.review_post_id) || { general: [], food: [], menu: [] };
+              const photoData = { url, caption: photo.menu_name || undefined };
+              const photoType = photo.photo_type || "review";
+
+              if (photoType === "food") {
+                existing.food.push(photoData);
+              } else if (photoType === "menu") {
+                existing.menu.push(photoData);
+              } else {
+                existing.general.push(photoData);
+              }
               reviewPhotosMap.set(photo.review_post_id, existing);
             }
           }
@@ -195,33 +211,46 @@ export const handler: Handler = {
           const uniqueIds = [...new Set(allPhotoIds)];
           const photoRecords = await db
             .selectFrom("photos")
-            .select(["id", "s3_url", "s3_thumbnail_url"])
+            .select(["id", "s3_url", "s3_thumbnail_url", "photo_type", "menu_name"])
             .where("id", "in", uniqueIds)
             .execute();
 
-          const photoUrlMap = new Map<string, string>();
+          const photoDataMap = new Map<string, { url: string; type: string; caption?: string }>();
           for (const p of photoRecords) {
-            photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+            photoDataMap.set(p.id, {
+              url: p.s3_thumbnail_url || p.s3_url,
+              type: p.photo_type || "review",
+              caption: p.menu_name || undefined,
+            });
           }
 
           for (const [reviewId, photoIds] of reviewPhotoIdsMap) {
-            const photos = photoIds
-              .map((id) => {
-                const url = photoUrlMap.get(id);
-                return url ? { url } : null;
-              })
-              .filter((p): p is { url: string } => p !== null);
+            const categorized: CategorizedPhotos = { general: [], food: [], menu: [] };
             
-            if (photos.length > 0) {
-              reviewPhotosMap.set(reviewId, photos);
+            for (const id of photoIds) {
+              const data = photoDataMap.get(id);
+              if (data) {
+                const photoData = { url: data.url, caption: data.caption };
+                if (data.type === "food") {
+                  categorized.food.push(photoData);
+                } else if (data.type === "menu") {
+                  categorized.menu.push(photoData);
+                } else {
+                  categorized.general.push(photoData);
+                }
+              }
+            }
+            
+            if (categorized.general.length > 0 || categorized.food.length > 0 || categorized.menu.length > 0) {
+              reviewPhotosMap.set(reviewId, categorized);
             }
           }
         }
       }
 
-      // Build reviews with resolved photo URLs
+      // Build reviews with resolved photo URLs (categorized)
       const reviews = rawReviews.map((review) => {
-        const photos = reviewPhotosMap.get(review.id) || [];
+        const photos = reviewPhotosMap.get(review.id) || { general: [], food: [], menu: [] };
         return {
           ...review,
           photos,

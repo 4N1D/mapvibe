@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import boto3
 import time
 import random
@@ -22,8 +23,25 @@ import hashlib
 from collections import OrderedDict
 
 # --- 1. CẤU HÌNH & LOGGING ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    force=True  # Force reconfiguration để đảm bảo settings được apply
+)
 logger = logging.getLogger(__name__)
+
+# Đảm bảo logs được flush ngay lập tức (quan trọng cho Lambda)
+import sys
+for handler in logger.handlers:
+    handler.setLevel(logging.INFO)
+# Thêm StreamHandler nếu chưa có để đảm bảo logs được ghi
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 # Lấy cấu hình từ Biến môi trường (CDK truyền vào)
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -390,7 +408,7 @@ class RAGService:
     @staticmethod
     def _validate_rating_value(value: float, field_name: str) -> Optional[float]:
         """Validate rating value trong khoảng 1.0-10.0"""
-        if value is None:
+        if value is None or value == "null" or value == "NULL":
             return None
         try:
             val = float(value)
@@ -400,13 +418,15 @@ class RAGService:
                 logger.warning(f"[VALIDATION] {field_name} value {val} out of range [1.0-10.0], ignoring")
                 return None
         except (ValueError, TypeError):
-            logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid number, ignoring")
+            # Không log warning nếu là None/null (bình thường)
+            if value not in [None, "null", "NULL", ""]:
+                logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid number, ignoring")
             return None
 
     @staticmethod
     def _validate_count_value(value: int, field_name: str) -> Optional[int]:
         """Validate count value phải >= 0"""
-        if value is None:
+        if value is None or value == "null" or value == "NULL":
             return None
         try:
             val = int(value)
@@ -416,7 +436,9 @@ class RAGService:
                 logger.warning(f"[VALIDATION] {field_name} value {val} must be >= 0, ignoring")
                 return None
         except (ValueError, TypeError):
-            logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid integer, ignoring")
+            # Không log warning nếu là None/null (bình thường)
+            if value not in [None, "null", "NULL", ""]:
+                logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid integer, ignoring")
             return None
 
     def _summarize_context(self, session_history: List[Dict], max_messages: int = 10) -> str:
@@ -457,8 +479,6 @@ Hãy tóm tắt thành format ngắn gọn:
 - Entities (quận, huyện, đặc điểm)
 - Filters đã đề cập (giá, rating, giờ mở cửa)
 
-Format: "Keywords: [keywords] | Filters: [filters] | Location: [location]"
-
 CHỈ giữ lại thông tin QUAN TRỌNG và LIÊN QUAN. Loại bỏ thông tin không cần thiết.
 Nếu không có thông tin quan trọng, trả về chuỗi rỗng.
 """
@@ -482,6 +502,9 @@ Nếu không có thông tin quan trọng, trả về chuỗi rỗng.
         """
         Dùng LLM để rewrite query hiện tại dựa trên context thành search query tối ưu
         Tự động detect topic change và loại bỏ context không liên quan
+        
+        QUAN TRỌNG: Chỉ thêm context khi query hiện tại THỰC SỰ liên quan đến context.
+        Nếu query mới/chung chung (VD: "quán nào rẻ thôi"), KHÔNG thêm context cũ.
         """
         if not context_summary:
             # Không có context, trả về query gốc
@@ -495,22 +518,31 @@ CONTEXT (từ các query trước):
 QUERY HIỆN TẠI:
 {current_query}
 
-QUAN TRỌNG:
-1. Nếu query hiện tại ĐỔI TOPIC (VD: từ "đồ ăn" sang "đồ uống"), CHỈ giữ context LIÊN QUAN đến query mới, LOẠI BỎ context cũ không liên quan.
-2. Nếu query hiện tại TIẾP TỤC topic cũ, KẾT HỢP context với query hiện tại.
-3. Chỉ giữ lại:
-   - Keywords quan trọng (tên món, loại quán, địa điểm)
-   - Entities (quận, huyện, đặc điểm)
-   - Filters quan trọng (giá, rating)
+QUY TẮC QUAN TRỌNG:
+1. Nếu query hiện tại là QUERY CHUNG CHUNG hoặc KHÔNG chỉ định rõ (VD: "quán nào rẻ thôi", "có gì ngon không", "gợi ý đi"), 
+   -> CHỈ trả về query hiện tại đã được làm sạch, KHÔNG thêm BẤT KỲ context cũ nào (KHÔNG thêm location, KHÔNG thêm categories, KHÔNG thêm price).
 
-LOẠI BỎ:
-- Từ dư thừa ("này", "có gì", "thì", "mà", "vậy", ...)
-- Câu hỏi không cần thiết
-- Từ lặp lại
-- Context không liên quan đến query hiện tại
+2. Nếu query hiện tại ĐỔI TOPIC hoàn toàn (VD: từ "quán nướng" sang "quán cafe"), 
+   -> CHỈ trả về query hiện tại, LOẠI BỎ toàn bộ context cũ.
+
+3. CHỈ kết hợp context khi:
+   - Query hiện tại TIẾP TỤC/REFINE topic cũ (VD: "quán nướng" -> "quán nướng nào rẻ")
+   - Query hiện tại có từ chỉ định rõ (VD: "quán nướng ở Q7", "buffet giá tốt")
+   - Query hiện tại là câu hỏi follow-up rõ ràng (VD: "còn quán nào khác không", "quán nào gần hơn")
+
+4. Khi kết hợp context, TUYỆT ĐỐI TUÂN THỦ:
+   - Location (quận, huyện, địa điểm): CHỈ thêm nếu query hiện tại CÓ đề cập đến location. Nếu query hiện tại KHÔNG nói gì về location, TUYỆT ĐỐI KHÔNG thêm location từ context.
+   - Categories (loại quán, món ăn): CHỈ thêm nếu query hiện tại CÓ đề cập đến loại quán/món. Nếu query hiện tại KHÔNG nói gì về loại quán (VD: "quán nào rẻ thôi"), TUYỆT ĐỐI KHÔNG thêm categories từ context.
+   - Price range: CHỈ thêm nếu query hiện tại CÓ đề cập đến giá cụ thể (VD: "dưới 100k", "100k-200k"). Nếu query hiện tại chỉ nói "rẻ", "giá tốt" -> KHÔNG thêm price range cụ thể từ context.
+
+5. LOẠI BỎ:
+   - Từ dư thừa ("này", "có gì", "thì", "mà", "vậy", ...)
+   - Câu hỏi không cần thiết
+   - Từ lặp lại
+   - Context không liên quan đến query hiện tại
 
 Output CHỈ là search query đã được rewrite, KHÔNG giải thích, KHÔNG thêm từ nào khác.
-Nếu query hiện tại hoàn toàn mới và không liên quan context, chỉ trả về query hiện tại đã được làm sạch.
+Nếu query hiện tại là query chung chung hoặc không liên quan context, chỉ trả về query hiện tại đã được làm sạch.
 """
         
         try:
@@ -627,34 +659,107 @@ Nếu query hiện tại hoàn toàn mới và không liên quan context, chỉ 
             logger.error(f"[UNEXPECTED ERROR] Embedding Error: {e}")
             return None
 
-    def parse_intent(self, user_input: str, context_summary: str = "") -> Dict[str, Any]:
+    @staticmethod
+    def _has_location_keywords(text: str) -> bool:
+        """Kiểm tra xem text có chứa location keywords không"""
+        if not text:
+            return False
+        
+        text_lower = text.lower()
+        # Các từ khóa về location
+        location_keywords = [
+            'quận', 'q.', 'q ', 'huyện', 'phường', 'xã',
+            'tân bình', 'bình thạnh', 'thủ đức', 'gò vấp', 'phú nhuận',
+            'quận 1', 'quận 2', 'quận 3', 'quận 4', 'quận 5', 'quận 6', 'quận 7', 'quận 8', 'quận 9', 'quận 10', 'quận 11', 'quận 12',
+            'ở', 'tại', 'gần', 'khu vực', 'địa điểm', 'vị trí',
+            'long bình', 'tân sơn', 'bình tân', 'cần giờ', 'củ chi', 'hóc môn', 'nhà bè'
+        ]
+        
+        return any(keyword in text_lower for keyword in location_keywords)
+    
+    @staticmethod
+    def _has_category_keywords(text: str) -> bool:
+        """Kiểm tra xem text có chứa category keywords không"""
+        if not text:
+            return False
+        
+        text_lower = text.lower()
+        # Các từ khóa về category/loại quán
+        category_keywords = [
+            'quán', 'nhà hàng', 'cafe', 'cà phê', 'trà sữa', 'bánh', 'chè',
+            'nướng', 'bbq', 'grill', 'buffet', 'lẩu', 'sushi', 'pizza',
+            'chay', 'món việt', 'món nhật', 'món hàn', 'món thái',
+            'nhậu', 'bar', 'pub', 'club', 'beer', 'bia',
+            'steak', 'pasta', 'burger', 'gà', 'phở', 'bún', 'cơm'
+        ]
+        
+        return any(keyword in text_lower for keyword in category_keywords)
+
+    def parse_intent(self, user_input: str, context_summary: str = "", original_query: str = "") -> Dict[str, Any]:
         """
         Dùng CLAUDE HAIKU + Tool Use để parse intent từ query đã được rewrite
-        Query đã được rewrite nên không cần full history, chỉ cần query hiện tại
+        
+        QUAN TRỌNG: Chỉ extract filters mà user THỰC SỰ yêu cầu trong original_query,
+        không phải từ context đã được inject vào rewritten query.
         """
         current_time = datetime.now(VN_TZ).strftime("%H:%M")
         
         # Dùng cached tool_spec
         tool_spec = self._get_tool_spec()
 
+        # Nếu không có original_query, dùng user_input làm original (fallback)
+        if not original_query:
+            original_query = user_input
+
         # Đơn giản hóa messages payload - chỉ dùng query hiện tại (đã được rewrite với context)
-        # Không cần full history vì query đã chứa context quan trọng
         messages_payload = [{"role": "user", "content": [{"text": user_input}]}]
         
-        # Cải thiện system prompt với instructions rõ ràng và context summary
+        # Cải thiện system prompt với instructions rõ ràng
         system_prompt_text = f"""Bạn là intent parser chuyên nghiệp. Nhiệm vụ của bạn là trích xuất chính xác thông tin từ query để tìm kiếm nhà hàng/quán ăn.
 
 Giờ hiện tại: {current_time}
-Query đã được tối ưu: {user_input}
+
+QUERY GỐC CỦA USER (quan trọng nhất):
+"{original_query}"
+
+QUERY ĐÃ ĐƯỢC TỐI ƯU (có thể chứa context):
+"{user_input}"
 """
         
         if context_summary:
             system_prompt_text += f"""
-Context từ session: {context_summary}
+CONTEXT TỪ SESSION (chỉ để tham khảo):
+{context_summary}
 """
         
         system_prompt_text += """
-Hãy trích xuất chính xác các filters và parameters từ query. Query đã được tối ưu nên chứa đầy đủ thông tin cần thiết.
+QUY TẮC TRÍCH XUẤT (RẤT QUAN TRỌNG):
+
+1. ƯU TIÊN QUERY GỐC: Chỉ extract filters/categories/location/price mà user THỰC SỰ đề cập trong QUERY GỐC.
+
+2. Nếu QUERY GỐC là query chung chung (VD: "quán nào rẻ thôi", "có gì ngon không", "gợi ý đi"):
+   - KHÔNG extract categories từ context (VD: nếu context có "quán nướng" nhưng query gốc không nói, thì KHÔNG thêm categories)
+   - KHÔNG extract location từ context (VD: nếu context có "Q7" nhưng query gốc không nói, thì KHÔNG thêm district)
+   - CHỈ extract filters mà query gốc thực sự yêu cầu (VD: "rẻ" -> chỉ set rating_price_min, KHÔNG set categories/location)
+
+3. Nếu QUERY GỐC có thông tin cụ thể:
+   - Extract đầy đủ từ query gốc
+   - Có thể tham khảo context để làm rõ thêm (VD: query gốc nói "quán nướng" + context có "Q7" -> có thể thêm district nếu hợp lý)
+
+4. Categories (target_categories):
+   - CHỈ extract khi query gốc đề cập đến loại quán/món cụ thể
+   - Nếu query gốc không nói gì về loại quán (VD: "quán nào rẻ thôi"), để NULL hoặc mảng rỗng
+
+5. Location (district) - RẤT QUAN TRỌNG:
+   - CHỈ extract khi QUERY GỐC CỦA USER đề cập đến quận/huyện/địa điểm cụ thể (VD: "Q7", "Quận 1", "Thủ Đức", "Long Bình")
+   - Nếu QUERY GỐC KHÔNG nói gì về location (VD: "quán nào rẻ thôi", "quán nướng"), TUYỆT ĐỐI để NULL, KHÔNG extract location từ QUERY ĐÃ ĐƯỢC TỐI ƯU (vì location đó có thể đến từ context)
+   - KIỂM TRA KỸ: Nếu QUERY GỐC không có từ khóa về location, thì district phải là NULL
+
+6. Price (min_price, max_price):
+   - CHỈ extract khi query gốc đề cập đến giá cụ thể (VD: "dưới 100k", "100k-200k")
+   - Nếu query gốc chỉ nói "rẻ", "giá tốt" -> CHỈ set rating_price_min, KHÔNG set min_price/max_price
+
+Hãy trích xuất chính xác các filters và parameters từ QUERY GỐC. Đừng thêm filters từ context nếu user không yêu cầu.
 """
         
         system_prompt = [{"text": system_prompt_text}]
@@ -674,6 +779,17 @@ Hãy trích xuất chính xác các filters và parameters từ query. Query đ�
                     
                     if params.get("district") == "NULL":
                         params["district"] = None
+                    
+                    # VALIDATION: Nếu original_query không có location keywords, loại bỏ district
+                    if params.get("district") and not self._has_location_keywords(original_query):
+                        logger.warning(f"[VALIDATION] Removed district '{params['district']}' because original_query '{original_query}' doesn't mention location")
+                        params["district"] = None
+                    
+                    # VALIDATION: Nếu original_query không có category keywords, loại bỏ target_categories
+                    if params.get("target_categories") and not self._has_category_keywords(original_query):
+                        logger.warning(f"[VALIDATION] Removed target_categories '{params['target_categories']}' because original_query '{original_query}' doesn't mention category")
+                        params["target_categories"] = []
+                    
                     return params
             
             return {"search_text": user_input, "search_strategy": "semantic"}
@@ -693,7 +809,11 @@ Hãy trích xuất chính xác các filters và parameters từ query. Query đ�
         else:
             w_text, w_vec = 0.3, 0.7
 
-        clean_query = " | ".join(query_text.replace("!", "").replace("&", "").split())
+        # Sanitize query cho tsquery: loại bỏ ký tự đặc biệt, số, dấu câu
+        # tsquery không hỗ trợ số, dấu phẩy, dấu gạch ngang, dấu hai chấm
+        # Loại bỏ số, dấu câu đặc biệt, chỉ giữ chữ cái và khoảng trắng
+        words = re.findall(r'[a-zA-ZÀ-ỹ]+', query_text)
+        clean_query = " | ".join(words) if words else query_text.replace("!", "").replace("&", "").replace("|", " ").replace(":", " ").replace("-", " ").replace(",", " ").replace(".", " ")
 
         sql_base = f"""
         SELECT id, name_vi, slug, address, price_min, price_max, "opening_hours", business_type,
@@ -720,6 +840,24 @@ Hãy trích xuất chính xác các filters và parameters từ query. Query đ�
 
     def _build_district_filter(self, sql_base: str, sql_params: Dict, district: str) -> tuple:
         """Build district filter với ward mapping"""
+        if not district:
+            return sql_base, sql_params
+        
+        # Handle district có thể là array/JSON string
+        if isinstance(district, list):
+            # Nếu là array, lấy phần tử đầu tiên
+            district = district[0] if district else None
+        elif isinstance(district, str):
+            # Nếu là JSON string như '["Quận 7", "Quận 3"]', parse nó
+            if district.strip().startswith('[') and district.strip().endswith(']'):
+                try:
+                    import json
+                    district_list = json.loads(district)
+                    district = district_list[0] if district_list else None
+                    logger.info(f"[DISTRICT] Parsed JSON array, using first district: {district}")
+                except (json.JSONDecodeError, IndexError):
+                    logger.warning(f"[DISTRICT] Failed to parse JSON array: {district}, using as-is")
+        
         if not district:
             return sql_base, sql_params
         
@@ -865,6 +1003,8 @@ Hãy trích xuất chính xác các filters và parameters từ query. Query đ�
         strategy = params.get("search_strategy", "semantic")
         
         logger.info(f"[SEARCH] Starting search with query: '{query_text}' | Strategy: {strategy} | Min Score: {min_score}")
+        import sys
+        sys.stdout.flush()  # Force flush để đảm bảo log được ghi ngay
         
         # Log filters được áp dụng
         active_filters = []
@@ -958,15 +1098,27 @@ Hãy trích xuất chính xác các filters và parameters từ query. Query đ�
             min_key = f"{field}_min"
             if min_key in relaxed and relaxed[min_key] is not None:
                 original_val = relaxed[min_key]
-                relaxed_val = max(1.0, original_val - relax_by)  # Không được < 1.0
-                relaxed[min_key] = relaxed_val
-                logger.info(f"[RATING RELAX] {min_key}: {original_val} -> {relaxed_val}")
+                # Convert to float nếu là string
+                try:
+                    if isinstance(original_val, str):
+                        original_val = float(original_val)
+                    elif not isinstance(original_val, (int, float)):
+                        logger.warning(f"[RATING RELAX] Skipping {min_key}: invalid type {type(original_val)}")
+                        continue
+                    relaxed_val = max(1.0, float(original_val) - relax_by)  # Không được < 1.0
+                    relaxed[min_key] = relaxed_val
+                    logger.info(f"[RATING RELAX] {min_key}: {original_val} -> {relaxed_val}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"[RATING RELAX] Failed to relax {min_key}: {e}, skipping")
+                    continue
         
         return relaxed
 
     def search_pipeline(self, params):
         pipeline_start = datetime.now()
         logger.info(f"[SEARCH PIPELINE] Starting search pipeline with params: {params}")
+        import sys
+        sys.stdout.flush()  # Force flush để đảm bảo log được ghi ngay
         
         # 1. Strict
         logger.info(f"[SEARCH PIPELINE] Step 1: Strict search (all filters)")
@@ -1144,35 +1296,83 @@ def health_check():
 @app.post("/search")
 async def search_endpoint(payload: SearchPayload):
     # --- LOG START REQUEST ---
+    import sys
     try:
         logger.info(f"\n{'='*20} NEW REQUEST [Session: {payload.session_id}] {'='*20}")
         logger.info(f"[USER QUERY] {payload.query}")
+        sys.stdout.flush()  # Force flush ngay từ đầu
 
         
         session_mgr = USER_SESSIONS.get(payload.session_id, [])
         if payload.is_new_topic: session_mgr = []
+        logger.info(f"[SEARCH FLOW] Session history length: {len(session_mgr)} | is_new_topic: {payload.is_new_topic}")
+        sys.stdout.flush()
         
         rag = RAGService(payload.session_id, session_mgr)
+        logger.info(f"[SEARCH FLOW] RAGService initialized")
+        sys.stdout.flush()
 
         # Query Rewriting: Tóm tắt context và rewrite query để tối ưu cho search
         logger.info(f"[SEARCH FLOW] Step 1: Summarizing context from session history")
-        context_summary = rag._summarize_context(session_mgr, max_messages=10)
+        sys.stdout.flush()
+        
+        try:
+            context_summary = rag._summarize_context(session_mgr, max_messages=10)
+            logger.info(f"[SEARCH FLOW] Context summary: {context_summary[:100] if context_summary else 'None'}...")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[SEARCH FLOW ERROR] Context summarization failed: {e}")
+            logger.error(traceback.format_exc())
+            sys.stdout.flush()
+            context_summary = ""
         
         logger.info(f"[SEARCH FLOW] Step 2: Rewriting query for search optimization")
-        rewritten_query = rag._rewrite_query_for_search(payload.query, context_summary)
+        sys.stdout.flush()
+        
+        try:
+            rewritten_query = rag._rewrite_query_for_search(payload.query, context_summary)
+            logger.info(f"[SEARCH FLOW] Rewritten query: '{rewritten_query}'")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[SEARCH FLOW ERROR] Query rewrite failed: {e}")
+            logger.error(traceback.format_exc())
+            sys.stdout.flush()
+            rewritten_query = payload.query  # Fallback to original
         
         logger.info(f"[SEARCH FLOW] Step 3: Parsing intent from rewritten query")
-        # Pipeline - dùng rewritten query cho search engine, truyền context_summary vào parse_intent
-        params = rag.parse_intent(rewritten_query, context_summary=context_summary)
-        logger.info(f"[SEARCH FLOW] Parsed intent: {params}")
+        sys.stdout.flush()
+        
+        try:
+            # Pipeline - dùng rewritten query cho search engine, nhưng truyền original_query vào parse_intent
+            # để chỉ extract filters từ query gốc của user, không phải từ context đã inject
+            params = rag.parse_intent(rewritten_query, context_summary=context_summary, original_query=payload.query)
+            logger.info(f"[SEARCH FLOW] Parsed intent: {params}")
+            sys.stdout.flush()
+        except Exception as e:
+            logger.error(f"[SEARCH FLOW ERROR] Intent parsing failed: {e}")
+            logger.error(traceback.format_exc())
+            sys.stdout.flush()
+            # Fallback to basic params
+            params = {"search_text": rewritten_query, "search_strategy": "semantic"}
+            logger.warning(f"[SEARCH FLOW] Using fallback params: {params}")
 
         # Lấy mood ra (mặc định là neutral nếu không có)
         current_mood = params.get("mood", "neutral")
         logger.info(f"[SEARCH FLOW] User mood: {current_mood}")
+        sys.stdout.flush()
 
         logger.info(f"[SEARCH FLOW] Step 4: Executing search pipeline")
-        results, note = rag.search_pipeline(params)
-        logger.info(f"[SEARCH FLOW] Search completed | Found {len(results)} results | Note: {note}")
+        sys.stdout.flush()  # Force flush logs
+        
+        try:
+            results, note = rag.search_pipeline(params)
+            logger.info(f"[SEARCH FLOW] Search completed | Found {len(results)} results | Note: {note}")
+            sys.stdout.flush()  # Force flush logs
+        except Exception as e:
+            logger.error(f"[SEARCH FLOW ERROR] Search pipeline failed: {e}")
+            logger.error(traceback.format_exc())
+            sys.stdout.flush()
+            raise  # Re-raise để được catch ở outer try-catch
         answer, json_data = rag.generate_response_and_data(payload.query, results, note, user_mood=current_mood)
 
         # Save History

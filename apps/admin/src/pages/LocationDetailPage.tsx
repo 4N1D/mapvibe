@@ -160,7 +160,18 @@ export default function LocationDetailPage() {
       toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
       setActiveTab("info");
     } catch (error: any) {
-      toast.error("Lỗi tổng hợp: " + (error.response?.data?.error || "Lỗi không xác định"));
+      console.error("AI Aggregate error:", error);
+      let errorMsg = "Lỗi không xác định";
+      if (error.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.code === "ECONNABORTED") {
+        errorMsg = "Timeout - AI đang xử lý quá lâu, vui lòng thử lại";
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      toast.error("Lỗi tổng hợp: " + errorMsg);
     } finally {
       setIsAggregating(false);
     }

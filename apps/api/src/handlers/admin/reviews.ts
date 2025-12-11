@@ -71,7 +71,7 @@ export const listReviewsHandler: Handler = {
       const _sortOrder = params.sort_order === "asc" ? "asc" : "desc";
 
       // Build query based on status filter
-      let whereClause = sql``;
+      let whereClause = sql`WHERE 1=1`;
       if (status === "reported") {
         whereClause = sql`WHERE rp.report_count > 0`;
       } else if (status === "hidden") {
@@ -274,16 +274,28 @@ export const updateReviewHandler: Handler = {
         return badRequest("Invalid JSON body");
       }
 
-      const { action, reason } = body;
+      const { action } = body;
       if (!action) {
-        return badRequest("Action required (approve, hide, delete, restore)");
+        return badRequest("Action required (hide, delete, restore)");
       }
 
       const db = await getDb();
-      const updateData: Record<string, unknown> = { updated_at: new Date() };
 
       // Handle delete action separately (hard delete)
       if (action === "delete") {
+        // Get the review first to know the location_address_id
+        const review = await db
+          .selectFrom("review_posts")
+          .select(["id", "location_address_id"])
+          .where("id", "=", reviewId)
+          .executeTakeFirst();
+
+        if (!review) {
+          return notFound("Review not found");
+        }
+
+        const locationAddressId = review.location_address_id;
+
         // Delete in transaction to ensure data integrity
         await db.transaction().execute(async (trx) => {
           // 1. Get all comment IDs for this review
@@ -334,6 +346,41 @@ export const updateReviewHandler: Handler = {
             .deleteFrom("review_posts")
             .where("id", "=", reviewId)
             .execute();
+
+          // 8. Check if location_address has any other reviews, if not delete it
+          if (locationAddressId) {
+            const remainingReviews = await trx
+              .selectFrom("review_posts")
+              .select("id")
+              .where("location_address_id", "=", locationAddressId)
+              .executeTakeFirst();
+
+            if (!remainingReviews) {
+              // No more reviews for this location, check if it's linked to a restaurant
+              const locationAddress = await trx
+                .selectFrom("location_addresses")
+                .select(["id", "restaurant_id"])
+                .where("id", "=", locationAddressId)
+                .executeTakeFirst();
+
+              // Only delete if not linked to a restaurant
+              if (locationAddress && !locationAddress.restaurant_id) {
+                // Delete photos linked to location_address
+                await trx
+                  .deleteFrom("photos")
+                  .where("location_address_id", "=", locationAddressId)
+                  .execute();
+
+                // Delete the location_address
+                await trx
+                  .deleteFrom("location_addresses")
+                  .where("id", "=", locationAddressId)
+                  .execute();
+
+                console.log(`[admin/reviews/:id] Deleted orphaned location_address: ${locationAddressId}`);
+              }
+            }
+          }
         });
 
         return success({
@@ -342,69 +389,45 @@ export const updateReviewHandler: Handler = {
         });
       }
 
-      // Handle hide action as hard delete (same as delete)
+      // Handle hide action - set status='hidden' (soft hide, still visible in admin)
       if (action === "hide") {
-        await db.transaction().execute(async (trx) => {
-          const comments = await trx
-            .selectFrom("comments")
-            .select("id")
-            .where("review_post_id", "=", reviewId)
-            .execute();
+        const updated = await db
+          .updateTable("review_posts")
+          .set({ status: "hidden", updated_at: new Date() } as Record<string, unknown>)
+          .where("id", "=", reviewId)
+          .returningAll()
+          .executeTakeFirst();
 
-          const commentIds = comments.map((c) => c.id);
-
-          if (commentIds.length > 0) {
-            await trx
-              .deleteFrom("likes")
-              .where("target_type", "=", "comment")
-              .where("target_id", "in", commentIds)
-              .execute();
-          }
-
-          await trx.deleteFrom("comments").where("review_post_id", "=", reviewId).execute();
-          await trx.deleteFrom("votes").where("review_post_id", "=", reviewId).execute();
-          await trx
-            .deleteFrom("reports")
-            .where("target_type", "=", "review_post")
-            .where("target_id", "=", reviewId)
-            .execute();
-          await trx.deleteFrom("photos").where("review_post_id", "=", reviewId).execute();
-          await trx.deleteFrom("review_posts").where("id", "=", reviewId).execute();
-        });
+        if (!updated) {
+          return notFound("Review not found");
+        }
 
         return success({
-          message: "Review hidden (deleted) successfully",
-          review: { id: reviewId },
+          message: "Review hidden successfully",
+          review: updated,
         });
       }
 
-      switch (action) {
-        case "approve":
-          updateData.status = "published";
-          updateData.report_count = 0;
-          break;
-        case "restore":
-          updateData.status = "published";
-          break;
-        default:
-          return badRequest("Invalid action. Use: approve, hide, delete, restore");
+      // Handle restore action - set status back to 'published'
+      if (action === "restore") {
+        const updated = await db
+          .updateTable("review_posts")
+          .set({ status: "published", updated_at: new Date() } as Record<string, unknown>)
+          .where("id", "=", reviewId)
+          .returningAll()
+          .executeTakeFirst();
+
+        if (!updated) {
+          return notFound("Review not found");
+        }
+
+        return success({
+          message: "Review restored successfully",
+          review: updated,
+        });
       }
 
-      const updated = await db
-        .updateTable("review_posts")
-        .set(updateData)
-        .where("id", "=", reviewId)
-        .returningAll()
-        .executeTakeFirst();
-
-      if (!updated) {
-        return notFound("Review not found");
-      }
-
-      return success({
-        message: `Review ${action}d successfully`,
-        review: updated,
-      });
+      return badRequest("Invalid action. Use: hide, delete, restore");
     } catch (err) {
       console.error("[admin/reviews/:id] Error:", err);
       return error((err as Error).message);

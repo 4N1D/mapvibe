@@ -535,11 +535,24 @@ def lambda_handler(event, context):
         result = aggregate(location_address_id)
         log_print(f"✅ Aggregation completed successfully")
         
-        return {
+        # Log result before returning
+        result_json = json.dumps(result)
+        log_print(f"📤 Returning result (length: {len(result_json)} chars)")
+        log_print(f"📤 Result preview: {result_json[:200]}...")
+        
+        response = {
             "statusCode": 200,
-            "headers": CORS_HEADERS,
-            "body": json.dumps(result),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type,Authorization",
+                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+            },
+            "body": result_json,
         }
+        
+        log_print(f"📤 Response statusCode: {response['statusCode']}")
+        return response
     except ValueError as e:
         import traceback
         error_trace = traceback.format_exc()

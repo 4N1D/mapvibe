@@ -30,6 +30,30 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Add response interceptor for debugging
+apiClient.interceptors.response.use(
+  (response) => {
+    // Log successful responses for aggregate endpoint
+    if (response.config.url?.includes("aggregate-pending")) {
+      console.log("[API] Aggregate response received:");
+      console.log("  Status:", response.status);
+      console.log("  Data type:", typeof response.data);
+      console.log("  Data:", response.data);
+    }
+    return response;
+  },
+  (error) => {
+    // Log errors for aggregate endpoint
+    if (error.config?.url?.includes("aggregate-pending")) {
+      console.error("[API] Aggregate error:");
+      console.error("  Status:", error.response?.status);
+      console.error("  Data:", error.response?.data);
+      console.error("  Data type:", typeof error.response?.data);
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Admin API functions
 export const adminApi = {
   // Stats

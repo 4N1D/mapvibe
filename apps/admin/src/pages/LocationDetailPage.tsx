@@ -155,19 +155,50 @@ export default function LocationDetailPage() {
       }).then(res => res.json().then(data => ({ data })));
 
       console.log("Raw response:", response);
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
       console.log("Response data:", response.data);
       console.log("Response data type:", typeof response.data);
+      console.log("Response data keys:", response.data ? Object.keys(response.data) : "null");
+
+      // Validate response structure
+      if (!response.data) {
+        throw new Error("Response data is empty");
+      }
 
       // Handle case where response.data might be a string
       let data: AggregateResult;
-      if (typeof response.data === "string") {
-        data = JSON.parse(response.data);
-      } else {
-        data = response.data;
-      }
+      try {
+        if (typeof response.data === "string") {
+          console.log("Parsing string response data...");
+          data = JSON.parse(response.data);
+        } else if (response.data && typeof response.data === "object") {
+          console.log("Using object response data directly");
+          data = response.data;
+        } else {
+          throw new Error(`Unexpected response data type: ${typeof response.data}`);
+        }
 
-      console.log("Parsed data:", data);
-      console.log("Result:", data.result);
+        // Validate data structure
+        if (!data || typeof data !== "object") {
+          throw new Error("Parsed data is not an object");
+        }
+        
+        if (!data.result || typeof data.result !== "object") {
+          console.warn("⚠️ Missing or invalid 'result' field in response");
+          console.warn("Data structure:", data);
+          throw new Error("Response missing 'result' field");
+        }
+
+        console.log("✅ Parsed data successfully:", data);
+        console.log("Result:", data.result);
+        console.log("Result keys:", Object.keys(data.result));
+
+      } catch (parseError: any) {
+        console.error("❌ Failed to parse response data:", parseError);
+        console.error("Raw response.data:", response.data);
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
 
       setAggregateResult(data);
 
@@ -203,7 +234,68 @@ export default function LocationDetailPage() {
       setActiveTab("info");
     } catch (error: any) {
       console.error("AI Aggregate error:", error);
+      console.error("Error response:", error.response);
+      console.error("Error response data:", error.response?.data);
+      console.error("Error response status:", error.response?.status);
+      console.error("Error message:", error.message);
+      
       let errorMsg = "Lỗi không xác định";
+      if (error.response?.data) {
+        // Handle case where data might be a string
+        const errorData = typeof error.response.data === "string" 
+          ? JSON.parse(error.response.data) 
+          : error.response.data;
+        
+        if (errorData?.error) {
+          errorMsg = errorData.error;
+        } else if (errorData?.message) {
+          errorMsg = errorData.message;
+        } else if (typeof error.response.data === "string") {
+          errorMsg = error.response.data;
+        }
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      // Also check if response was successful but data format is wrong
+      if (error.response?.status === 200 && error.response?.data) {
+        console.warn("⚠️ Got 200 status but error in catch block - checking data format");
+        console.warn("Response data type:", typeof error.response.data);
+        console.warn("Response data:", error.response.data);
+        
+        // Try to parse if it's a string
+        try {
+          const parsedData = typeof error.response.data === "string" 
+            ? JSON.parse(error.response.data) 
+            : error.response.data;
+          
+          if (parsedData && parsedData.result) {
+            console.log("✅ Found valid data in error response, using it");
+            const data: AggregateResult = parsedData;
+            setAggregateResult(data);
+            
+            const result = data.result;
+            const newFormData = {
+              name_vi: result.name_vi || formData.name_vi,
+              cuisine_types: result.cuisine_types || [],
+              price_min: result.price_min != null ? String(result.price_min) : "",
+              price_max: result.price_max != null ? String(result.price_max) : "",
+              phone: result.phone || "",
+              opening_hours: result.opening_hours || "",
+              features: result.features || [],
+              description: result.description || "",
+            };
+            
+            setFormData(newFormData);
+            toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
+            setActiveTab("info");
+            return; // Exit early if we successfully parsed the data
+          }
+        } catch (parseError) {
+          console.error("Failed to parse response data:", parseError);
+        }
+      }
+      
       if (error.response?.data?.error) {
         errorMsg = error.response.data.error;
       } else if (error.response?.data?.message) {

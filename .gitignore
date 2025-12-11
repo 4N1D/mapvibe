@@ -110,6 +110,7 @@ docs/
 packages/types/src/database.ts
 
 AGENTS.md
+GEMINI.md
 .factory/
 
 # Cloudfront Information
@@ -130,7 +131,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 
->>>>>>> Stashed changes
 #Lambda response query
 response.json
 
@@ -142,3 +142,4 @@ infrastructure/terraform/modules/lambda-rag/src/**
 
 # Query script from Datagrip
 queries/*
+

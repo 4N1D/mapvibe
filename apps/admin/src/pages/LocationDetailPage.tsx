@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getFeatureLabel, ALL_FEATURES } from "@/utils/format";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { apiClient } from "../lib/api";
@@ -96,6 +97,8 @@ export default function LocationDetailPage() {
         apiClient.get(`/admin/locations/${id}`),
         apiClient.get(`/admin/locations/${id}/reviews`),
       ]);
+
+      console.log("Posts API response:", postsRes.data.reviews);
 
       const loc = locationRes.data.location || locationRes.data;
       setLocation(loc);
@@ -702,23 +705,29 @@ export default function LocationDetailPage() {
                     dangerouslySetInnerHTML={{ __html: selectedPost.text }}
                   />
 
-                  {selectedPost.features && Object.keys(selectedPost.features).length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="mb-2 text-sm font-medium text-gray-700">Đặc điểm đề cập</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(selectedPost.features)
-                          .filter(([, value]) => Boolean(value))
-                          .map(([key]) => (
+                  {selectedPost.features &&
+                    (Array.isArray(selectedPost.features)
+                      ? selectedPost.features.length > 0
+                      : Object.keys(selectedPost.features).length > 0) && (
+                      <div className="mt-4">
+                        <h4 className="mb-2 text-sm font-medium text-gray-700">Đặc điểm đề cập</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {ALL_FEATURES.filter((feature) => {
+                            if (Array.isArray(selectedPost.features)) {
+                              return selectedPost.features.includes(feature);
+                            }
+                            return selectedPost.features?.[feature];
+                          }).map((feature) => (
                             <span
-                              key={key}
+                              key={feature}
                               className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
                             >
-                              {key.replace(/_/g, " ")}
+                              {getFeatureLabel(feature)}
                             </span>
                           ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {selectedPost.photos && selectedPost.photos.length > 0 && (
                     <div className="mt-6">
@@ -890,28 +899,26 @@ export default function LocationDetailPage() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">Tiện ích</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {["wifi", "parking", "air_con", "credit_card", "delivery", "outdoor"].map(
-                      (feature) => (
-                        <label
-                          key={feature}
-                          className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 transition-colors ${
-                            formData.features.includes(feature)
-                              ? "border-primary-500 bg-primary-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.features.includes(feature)}
-                            onChange={() => toggleFeature(feature)}
-                            className="sr-only"
-                          />
-                          <span className="text-sm capitalize text-gray-700">
-                            {feature.replace("_", " ")}
-                          </span>
-                        </label>
-                      )
-                    )}
+                    {ALL_FEATURES.map((feature) => (
+                      <label
+                        key={feature}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 transition-colors ${
+                          formData.features.includes(feature)
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.features.includes(feature)}
+                          onChange={() => toggleFeature(feature)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm capitalize text-gray-700">
+                          {getFeatureLabel(feature)}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 

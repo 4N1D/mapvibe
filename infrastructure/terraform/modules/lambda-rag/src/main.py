@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, text
 from botocore.exceptions import ClientError
 
 import hashlib
+from collections import OrderedDict
 
 # --- 1. CẤU HÌNH & LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,9 +35,9 @@ DB_NAME = os.environ.get("DB_NAME", "food_recommendation")
 secrets_client = boto3.client('secretsmanager', region_name=AWS_REGION)
 bedrock_client = boto3.client(service_name='bedrock-runtime', region_name=AWS_REGION)
 
-# Cache embeddings trong Lambda container
-EMBEDDING_CACHE = {}
+# Cache embeddings trong Lambda container - dùng OrderedDict để tự động evict item cũ nhất
 MAX_CACHE_SIZE = 100
+EMBEDDING_CACHE = OrderedDict()
 
 def get_cache_key(text: str) -> str:
     """Tạo cache key từ text input"""
@@ -307,6 +308,60 @@ class RAGService:
         self.history = history
         self.bedrock = bedrock_client
 
+    @staticmethod
+    def _validate_rating_value(value: float, field_name: str) -> Optional[float]:
+        """Validate rating value trong khoảng 1.0-10.0"""
+        if value is None:
+            return None
+        try:
+            val = float(value)
+            if 1.0 <= val <= 10.0:
+                return val
+            else:
+                logger.warning(f"[VALIDATION] {field_name} value {val} out of range [1.0-10.0], ignoring")
+                return None
+        except (ValueError, TypeError):
+            logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid number, ignoring")
+            return None
+
+    @staticmethod
+    def _validate_count_value(value: int, field_name: str) -> Optional[int]:
+        """Validate count value phải >= 0"""
+        if value is None:
+            return None
+        try:
+            val = int(value)
+            if val >= 0:
+                return val
+            else:
+                logger.warning(f"[VALIDATION] {field_name} value {val} must be >= 0, ignoring")
+                return None
+        except (ValueError, TypeError):
+            logger.warning(f"[VALIDATION] {field_name} value {value} is not a valid integer, ignoring")
+            return None
+
+    def _concatenate_previous_queries(self, session_history: List[Dict], current_query: str, max_queries: int = 10) -> str:
+        """Nối các query trước đó trong session với query hiện tại"""
+        previous_queries = []
+        for msg in session_history[-20:]:  # Lấy 20 message gần nhất để đảm bảo có đủ user queries
+            if msg.get("role") == "user" and "content" in msg:
+                content = msg["content"]
+                if isinstance(content, list) and len(content) > 0:
+                    text = content[0].get("text", "")
+                    if text:
+                        previous_queries.append(text)
+        
+        # Lấy N query gần nhất (không tính query hiện tại)
+        previous_queries = previous_queries[-max_queries:]
+        
+        # Nối tất cả query lại
+        if previous_queries:
+            combined_query = " ".join(previous_queries + [current_query])
+            logger.info(f"[QUERY CONCAT] Nối {len(previous_queries)} query trước: {combined_query[:200]}...")
+            return combined_query
+        else:
+            return current_query
+
     def call_bedrock_retry(self, model_id, messages, system_prompts=None, tool_config=None):
         """
         Cơ chế Retry + LOGGING CHI TIẾT (Cost & Latency)
@@ -354,6 +409,8 @@ class RAGService:
         # Check cache trước
         cache_key = get_cache_key(text_input)
         if cache_key in EMBEDDING_CACHE:
+            # Move to end (most recently used)
+            EMBEDDING_CACHE.move_to_end(cache_key)
             logger.info(f"[CACHE HIT] Embedding cached for: {text_input[:50]}...")
             return EMBEDDING_CACHE[cache_key]
         
@@ -364,16 +421,22 @@ class RAGService:
             response = self.bedrock.invoke_model(modelId=MODEL_EMBED, body=body)
             embedding = json.loads(response["body"].read())["embedding"]
             
-            # Lưu vào cache (nếu chưa đầy)
-            if len(EMBEDDING_CACHE) < MAX_CACHE_SIZE:
-                EMBEDDING_CACHE[cache_key] = embedding
-                logger.info(f"[CACHE] Stored embedding. Cache size: {len(EMBEDDING_CACHE)}/{MAX_CACHE_SIZE}")
-            else:
-                logger.warning(f"[CACHE] Cache full ({MAX_CACHE_SIZE} items), skipping cache")
+            # Lưu vào cache với LRU eviction
+            if len(EMBEDDING_CACHE) >= MAX_CACHE_SIZE:
+                # Remove oldest item (first item)
+                EMBEDDING_CACHE.popitem(last=False)
+                logger.info(f"[CACHE] Evicted oldest item. Cache size: {len(EMBEDDING_CACHE)}/{MAX_CACHE_SIZE}")
+            
+            EMBEDDING_CACHE[cache_key] = embedding
+            EMBEDDING_CACHE.move_to_end(cache_key)  # Move to end (most recently used)
+            logger.info(f"[CACHE] Stored embedding. Cache size: {len(EMBEDDING_CACHE)}/{MAX_CACHE_SIZE}")
             
             return embedding
+        except ClientError as e:
+            logger.error(f"[BEDROCK ERROR] Embedding Error: {e}")
+            return None
         except Exception as e:
-            logger.error(f"Embedding Error: {e}")
+            logger.error(f"[UNEXPECTED ERROR] Embedding Error: {e}")
             return None
 
     def parse_intent(self, user_input: str) -> Dict[str, Any]:
@@ -407,30 +470,43 @@ class RAGService:
                                 "target_categories": {"type": "array","items": {"type": "string"},"description": """
                                 Danh sách các loại hình quán user ĐANG TÌM.
                                 QUAN TRỌNG: 
-                                1. Nếu user tìm 'cafe', 'nước', 'trà sữa' -> CHỈ lấy ['Cà phê', 'Trà sữa', 'Giải khát']. TUYỆT ĐỐI KHÔNG thêm 'Quán ăn', 'Nhà hàng'.
-                                2. Nếu user tìm 'ăn', 'cơm', 'phở' -> Lấy ['Nhà hàng', 'Quán ăn', 'Món Việt', ...].
-                                3. Nếu user tìm 'nhậu' -> Lấy ['Quán nhậu', 'Beer', 'Bar'].
-                                4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay') -> CHỈ lấy business_type đó. TUYỆT ĐỐI KHÔNG thêm 'Nhà hàng' hay 'Quán ăn'.
-                                (VD: Tìm 'BBQ' -> ['Nướng', 'Buffet', 'Grill']. KHÔNG lấy 'Nhà hàng').
+                                1. Nếu user tìm 'cafe', 'nước', 'trà sữa',... -> CHỈ lấy ['Cà phê', 'Trà sữa', 'Giải khát',...]. TUYỆT ĐỐI KHÔNG thêm 'Quán ăn', 'Nhà hàng'...
+                                2. Nếu user tìm 'ăn', 'cơm',... -> Lấy ['Nhà hàng', 'Quán ăn', 'Món Việt', ...].
+                                3. Nếu user tìm 'nhậu' -> Lấy ['Quán nhậu', 'Beer', 'Bar',...].
+                                4. Nếu user tìm MÓN CỤ THỂ (VD: 'BBQ', 'Lẩu', 'Sushi', 'Pizza', 'Chay',...) -> CHỈ lấy business_type đó.
+                                (VD: Tìm 'BBQ' -> ['Nướng', 'Buffet', 'Grill']. KHÔNG lấy 'phở', 'cơm',...).
                                 Hãy chọn business_type sát nhất với từ khóa của user.
-                                5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo') -> CHỈ lấy business_type chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
-                                -> TUYỆT ĐỐI KHÔNG thêm 'Cafe' hay 'Nhà hàng' chung chung vào list này.
+                                5. Nếu user tìm ĐẶC ĐIỂM RIÊNG (VD: 'Rooftop', 'View đẹp', 'Sân vườn', 'Cá Koi', 'Mèo',...) -> CHỈ lấy business_type chứa đặc điểm đó (VD: ['Rooftop', 'Sân vườn', 'View']). 
                                 6. Nếu user tìm 'Bar', 'Pub', 'Club', 'Quẩy' -> 
                                 - Lấy ['Bar', 'Pub', 'Club', 'Nightlife', 'Lounge'].
-                                - QUAN TRỌNG: TUYỆT ĐỐI KHÔNG lấy 'Nhà hàng', 'Steakhouse', 'Grill', 'Kitchen', 'Bistro'. 
-                                (Vì 'Grill & Bar' thường là chỗ ăn, không phải chỗ quẩy).
                                 7. LOGIC ĐẶC BIỆT KHI USER TIÊU CỰC (Chửi thề, buồn, chán):
                                 - Nếu user đang bực bội/chửi (mood='negative'), hãy TỰ ĐỘNG gợi ý các món 'Giải sầu' phù hợp:
-                                    + ['Quán nhậu', 'Bia', 'Bar'] (để xả stress).
-                                    + ['Đồ ngọt', 'Trà sữa', 'Bánh'] (để user thấy ngọt ngào hơn).
-                                    + ['Lẩu', 'Nướng'] (ăn cho đã cơn thèm).
+                                    + ['Quán nhậu', 'Bia', 'Bar',...] (để xả stress).
+                                    + ['Đồ ngọt', 'Trà sữa', 'Bánh',...] (để user thấy ngọt ngào hơn).
+                                    + ['Lẩu', 'Nướng',...] (ăn cho đã cơn thèm).
                                 - Đừng trả về danh sách trống khi user chửi bậy. Hãy lấp đầy bằng các món trên.                      
                                 """},
                                 "mood": {
                                     "type": "string",
                                     "enum": ["neutral", "negative"],
                                     "description": "Nếu user chửi thề, dùng từ ngữ tiêu cực, than vãn, buồn bã -> Đặt là 'negative'. Còn lại là 'neutral'."
-                                }               
+                                },
+                                "rating_service_min": {"type": "number", "description": "Rating service tối thiểu (1.0-10.0). VD: User nói 'service tốt' -> 7.0, 'service xuất sắc' -> 8.5. Nếu không đề cập thì null."},
+                                "rating_service_max": {"type": "number", "description": "Rating service tối đa (1.0-10.0). VD: User nói 'service từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
+                                "rating_location_min": {"type": "number", "description": "Rating location tối thiểu (1.0-10.0). VD: User nói 'vị trí đẹp', 'location tốt' -> 7.0. Nếu không đề cập thì null."},
+                                "rating_location_max": {"type": "number", "description": "Rating location tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                "rating_price_min": {"type": "number", "description": "Rating price tối thiểu (1.0-10.0). VD: User nói 'giá hợp lý' -> 6.0, 'giá tốt' -> 7.0. Lưu ý: rating_price cao = giá rẻ/hợp lý. Nếu không đề cập thì null."},
+                                "rating_price_max": {"type": "number", "description": "Rating price tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                "rating_quality_min": {"type": "number", "description": "Rating quality tối thiểu (1.0-10.0). VD: User nói 'chất lượng tốt', 'món ngon' -> 7.0. Nếu không đề cập thì null."},
+                                "rating_quality_max": {"type": "number", "description": "Rating quality tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                "rating_ambiance_min": {"type": "number", "description": "Rating ambiance tối thiểu (1.0-10.0). VD: User nói 'không gian đẹp', 'ambiance tốt' -> 7.0. Nếu không đề cập thì null."},
+                                "rating_ambiance_max": {"type": "number", "description": "Rating ambiance tối đa (1.0-10.0). Nếu không đề cập thì null."},
+                                "rating_overall_min": {"type": "number", "description": "Rating tổng thể tối thiểu (1.0-10.0). VD: User nói 'rating trên 8', 'quán tốt' -> 8.0, 'quán xuất sắc' -> 9.0. Nếu không đề cập thì null."},
+                                "rating_overall_max": {"type": "number", "description": "Rating tổng thể tối đa (1.0-10.0). VD: User nói 'rating từ 7 đến 9' -> 9.0. Nếu không đề cập thì null."},
+                                "min_rating_count": {"type": "integer", "description": "Số lượng rating tối thiểu. VD: User nói 'quán có nhiều đánh giá', 'nhiều người rate' -> 20. Nếu không đề cập thì null."},
+                                "min_review_count": {"type": "integer", "description": "Số lượng review tối thiểu. VD: User nói 'quán nhiều review', 'nhiều người review' -> 50. Nếu không đề cập thì null."},
+                                "min_favorite_count": {"type": "integer", "description": "Số lượng favorite tối thiểu. VD: User nói 'quán được yêu thích', 'nhiều người thích' -> 10. Nếu không đề cập thì null."},
+                                "min_view_count": {"type": "integer", "description": "Số lượng view tối thiểu. VD: User nói 'quán nhiều người xem', 'phổ biến' -> 100. Nếu không đề cập thì null."}               
                             },
                             "required": ["search_text", "search_strategy"]
                         }
@@ -461,22 +537,17 @@ class RAGService:
                     return params
             
             return {"search_text": user_input, "search_strategy": "semantic"}
-        except Exception:
+        except ClientError as e:
+            logger.error(f"[BEDROCK ERROR] parse_intent failed: {e}")
+            return {"search_text": user_input, "search_strategy": "semantic"}
+        except Exception as e:
+            logger.error(f"[UNEXPECTED ERROR] parse_intent failed: {e}")
             return {"search_text": user_input, "search_strategy": "semantic"}
 
-    def execute_db_search(self, params: Dict[str, Any], min_score: float = 0.0):
-        start_time = datetime.now() # Bắt đầu đếm giờ SQL
-        
-        if not engine:
-            raise Exception("Database Engine is NOT connected. Check AWS Secrets or Network.")
-
-        query_text = params.get("search_text", "")
-        strategy = params.get("search_strategy", "semantic")
-        
-        query_emb = self.get_embedding(query_text)
-        if not query_emb: return []
+    def _build_base_query(self, query_text: str, strategy: str, query_emb: List[float]) -> tuple:
+        """Build base SQL query với scoring"""
         emb_literal = "[" + ",".join(map(str, query_emb)) + "]"
-
+        
         if strategy == "precise":
             w_text, w_vec = 0.7, 0.3
         else:
@@ -486,6 +557,8 @@ class RAGService:
 
         sql_base = f"""
         SELECT id, name_vi, slug, address, price_min, price_max, "opening_hours", business_type,
+            rating_service, rating_location, rating_price, rating_quality, rating_ambiance, rating_overall,
+            rating_count, review_count, favorite_count, view_count,
             (
                 {w_text} * (
                 ts_rank_cd(search_vector, to_tsquery('simple', unaccent(:query_ts))) / 
@@ -499,66 +572,79 @@ class RAGService:
         """
         
         sql_params = {"query_ts": clean_query, "emb_literal": emb_literal}
+        
+        if strategy == "precise":
+            sql_base += " AND search_vector @@ to_tsquery('simple', unaccent(:query_ts))"
+        
+        return sql_base, sql_params
 
-        if params.get("district"):
-            wards = get_wards_from_district(params["district"])
-            if wards:
-                # Tạo điều kiện OR cho tất cả các phường
-                # Tìm trong cả trường address và ward (nếu có)
-                ward_conditions = []
-                for i, ward in enumerate(wards):
-                    param_name = f"ward_{i}"
-                    # Tìm trong address hoặc ward field
-                    ward_conditions.append(f"(address ILIKE :{param_name} OR ward ILIKE :{param_name})")
-                    sql_params[param_name] = f"%{ward}%"
-                
-                if ward_conditions:
-                    sql_base += f" AND ({' OR '.join(ward_conditions)})"
-                    logger.info(f"[DISTRICT MAPPING] Quận '{params['district']}' -> {len(wards)} phường: {', '.join(wards[:3])}{'...' if len(wards) > 3 else ''}")
-            else:
-                # Fallback: nếu không tìm thấy mapping, tìm trực tiếp trong address
-                # (có thể là quận cũ hoặc tên không chuẩn)
-                sql_base += " AND address ILIKE :district"
-                sql_params["district"] = f"%{params['district']}%"
-                logger.warning(f"[DISTRICT FALLBACK] Không tìm thấy mapping cho '{params['district']}', tìm trực tiếp trong address")
-
-        if params.get("max_price"):
-            sql_base += " AND price_min <= :max_p"
-            sql_params["max_p"] = params["max_price"]
+    def _build_district_filter(self, sql_base: str, sql_params: Dict, district: str) -> tuple:
+        """Build district filter với ward mapping"""
+        if not district:
+            return sql_base, sql_params
+        
+        wards = get_wards_from_district(district)
+        if wards:
+            ward_conditions = []
+            for i, ward in enumerate(wards):
+                param_name = f"ward_{i}"
+                ward_conditions.append(f"(address ILIKE :{param_name} OR ward ILIKE :{param_name})")
+                sql_params[param_name] = f"%{ward}%"
             
-        if params.get("min_price"):
-            sql_base += " AND price_max >= :min_p"
-            sql_params["min_p"] = params["min_price"]
+            if ward_conditions:
+                sql_base += f" AND ({' OR '.join(ward_conditions)})"
+                logger.info(f"[DISTRICT MAPPING] Quận '{district}' -> {len(wards)} phường: {', '.join(wards[:3])}{'...' if len(wards) > 3 else ''}")
+        else:
+            sql_base += " AND address ILIKE :district"
+            sql_params["district"] = f"%{district}%"
+            logger.warning(f"[DISTRICT FALLBACK] Không tìm thấy mapping cho '{district}', tìm trực tiếp trong address")
+        
+        return sql_base, sql_params
 
-        if params.get("is_open_now"):
-            now = datetime.now(VN_TZ)
-            sql_params["now"] = now.strftime("%H:%M:00")
-            sql_base += """
-                AND (
-                    "opening_hours" ILIKE '%Cả ngày%' 
-                    OR (
-                        "opening_hours" ~ '^\\d{2}:\\d{2} - \\d{2}:\\d{2}$'
-                        AND (
-                            CASE 
-                                WHEN CAST(split_part("opening_hours", ' - ', 1) AS TIME) <= CAST(split_part("opening_hours", ' - ', 2) AS TIME) THEN
-                                    CAST(:now AS TIME) BETWEEN CAST(split_part("opening_hours", ' - ', 1) AS TIME) AND CAST(split_part("opening_hours", ' - ', 2) AS TIME)
-                                ELSE 
-                                    CAST(:now AS TIME) >= CAST(split_part("opening_hours", ' - ', 1) AS TIME) 
-                                    OR CAST(:now AS TIME) <= CAST(split_part("opening_hours", ' - ', 2) AS TIME)
-                            END
-                        )
+    def _build_price_filter(self, sql_base: str, sql_params: Dict, min_price: Optional[int], max_price: Optional[int]) -> tuple:
+        """Build price filter"""
+        if max_price:
+            sql_base += " AND price_min <= :max_p"
+            sql_params["max_p"] = max_price
+            
+        if min_price:
+            sql_base += " AND price_max >= :min_p"
+            sql_params["min_p"] = min_price
+        
+        return sql_base, sql_params
+
+    def _build_time_filter(self, sql_base: str, sql_params: Dict, is_open_now: bool) -> tuple:
+        """Build opening hours filter"""
+        if not is_open_now:
+            return sql_base, sql_params
+        
+        now = datetime.now(VN_TZ)
+        sql_params["now"] = now.strftime("%H:%M:00")
+        sql_base += """
+            AND (
+                "opening_hours" ILIKE '%Cả ngày%' 
+                OR (
+                    "opening_hours" ~ '^\\d{2}:\\d{2} - \\d{2}:\\d{2}$'
+                    AND (
+                        CASE 
+                            WHEN CAST(split_part("opening_hours", ' - ', 1) AS TIME) <= CAST(split_part("opening_hours", ' - ', 2) AS TIME) THEN
+                                CAST(:now AS TIME) BETWEEN CAST(split_part("opening_hours", ' - ', 1) AS TIME) AND CAST(split_part("opening_hours", ' - ', 2) AS TIME)
+                            ELSE 
+                                CAST(:now AS TIME) >= CAST(split_part("opening_hours", ' - ', 1) AS TIME) 
+                                OR CAST(:now AS TIME) <= CAST(split_part("opening_hours", ' - ', 2) AS TIME)
+                        END
                     )
                 )
-            """
+            )
+        """
+        return sql_base, sql_params
 
-        if strategy == "precise":
-             sql_base += " AND search_vector @@ to_tsquery('simple', unaccent(:query_ts))"
-
+    def _build_keyword_filters(self, sql_base: str, sql_params: Dict, params: Dict[str, Any]) -> tuple:
+        """Build exclude_keywords, exclude_districts, target_categories filters"""
+        # Exclude keywords
         if params.get("exclude_keywords"):
             for i, keyword in enumerate(params["exclude_keywords"]):
-                # Tạo param name động: exclude_0, exclude_1...
                 arg_name = f"exclude_{i}"
-                # Logic: Tên quán HOẶC business_type không được chứa từ khóa này
                 sql_base += f""" 
                     AND NOT (
                         name_vi ILIKE :{arg_name} 
@@ -568,45 +654,129 @@ class RAGService:
                 """
                 sql_params[arg_name] = f"%{keyword}%"
 
+        # Exclude districts
         if params.get("exclude_districts"):
             for i, dist in enumerate(params["exclude_districts"]):
-                # Chuẩn hóa tên quận nếu cần (để đảm bảo khớp DB)
-                # Ở đây giả sử Bot đã trả về "Quận 1", "Quận 3" chuẩn
                 arg_name = f"ex_dist_{i}"
-                
-                # Logic: Địa chỉ KHÔNG ĐƯỢC chứa tên quận này
                 sql_base += f" AND address NOT ILIKE :{arg_name}"
                 sql_params[arg_name] = f"%{dist}%"
-                
-        or_conditions = []
+        
+        # Target categories
         if params.get("target_categories"):
-        # Tạo danh sách điều kiện OR (VD: business_type LIKE cafe OR business_type LIKE trà sữa)
             or_conditions = []
             for i, cat in enumerate(params["target_categories"]):
                 arg_name = f"inc_cat_{i}"
                 or_conditions.append(f"(business_type ILIKE :{arg_name} OR name_vi ILIKE :{arg_name})")
                 sql_params[arg_name] = f"%{cat}%"
+            
+            if or_conditions:
+                sql_base += f" AND ({' OR '.join(or_conditions)})"
         
-        # Gộp lại bằng OR và đóng ngoặc
-        if or_conditions:
-            sql_base += f" AND ({' OR '.join(or_conditions)})"        
+        return sql_base, sql_params
 
-        sql_base += " ORDER BY final_score DESC LIMIT 8;"
+    def _build_rating_filters(self, sql_base: str, sql_params: Dict, params: Dict[str, Any]) -> tuple:
+        """Build rating filters với validation"""
+        rating_fields = [
+            "rating_service", "rating_location", "rating_price", 
+            "rating_quality", "rating_ambiance", "rating_overall"
+        ]
+        
+        for field in rating_fields:
+            min_key = f"{field}_min"
+            max_key = f"{field}_max"
+            
+            min_val = self._validate_rating_value(params.get(min_key), min_key)
+            max_val = self._validate_rating_value(params.get(max_key), max_key)
+            
+            if min_val is not None:
+                sql_base += f" AND {field} >= :{min_key}"
+                sql_params[min_key] = min_val
+            
+            if max_val is not None:
+                sql_base += f" AND {field} <= :{max_key}"
+                sql_params[max_key] = max_val
+        
+        return sql_base, sql_params
 
-        with engine.connect() as conn:
-            rows = conn.execute(text(sql_base), sql_params).fetchall()
-            results = [row for row in rows if row.final_score is not None and row.final_score >= min_score]
-            
-            # --- LOGGING PHẦN SQL ---
-            duration = (datetime.now() - start_time).total_seconds()
-            top_score = results[0].final_score if results else 0
-            logger.info(f"[SQL] Found: {len(results)} items | Time: {duration:.2f}s | Top Score: {top_score:.4f} | Filters: {params}")
-            
-            return results
+    def _build_count_filters(self, sql_base: str, sql_params: Dict, params: Dict[str, Any]) -> tuple:
+        """Build count filters với validation"""
+        count_fields = [
+            ("min_rating_count", "rating_count"),
+            ("min_review_count", "review_count"),
+            ("min_favorite_count", "favorite_count"),
+            ("min_view_count", "view_count")
+        ]
+        
+        for param_key, db_field in count_fields:
+            val = self._validate_count_value(params.get(param_key), param_key)
+            if val is not None:
+                sql_base += f" AND {db_field} >= :{param_key}"
+                sql_params[param_key] = val
+        
+        return sql_base, sql_params
+
+    def execute_db_search(self, params: Dict[str, Any], min_score: float = 0.0):
+        start_time = datetime.now() # Bắt đầu đếm giờ SQL
+        
+        if not engine:
+            raise Exception("Database Engine is NOT connected. Check AWS Secrets or Network.")
+
+        query_text = params.get("search_text", "")
+        strategy = params.get("search_strategy", "semantic")
+        
+        query_emb = self.get_embedding(query_text)
+        if not query_emb: 
+            return []
+
+        # Build base query
+        sql_base, sql_params = self._build_base_query(query_text, strategy, query_emb)
+        
+        # Build filters
+        sql_base, sql_params = self._build_district_filter(sql_base, sql_params, params.get("district"))
+        sql_base, sql_params = self._build_price_filter(sql_base, sql_params, params.get("min_price"), params.get("max_price"))
+        sql_base, sql_params = self._build_time_filter(sql_base, sql_params, params.get("is_open_now", False))
+        sql_base, sql_params = self._build_keyword_filters(sql_base, sql_params, params)
+        sql_base, sql_params = self._build_rating_filters(sql_base, sql_params, params)
+        sql_base, sql_params = self._build_count_filters(sql_base, sql_params, params)
+
+        sql_base += " ORDER BY final_score DESC LIMIT 10;"
+
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(text(sql_base), sql_params).fetchall()
+                results = [row for row in rows if row.final_score is not None and row.final_score >= min_score]
+                
+                # --- LOGGING PHẦN SQL ---
+                duration = (datetime.now() - start_time).total_seconds()
+                top_score = results[0].final_score if results else 0
+                logger.info(f"[SQL] Found: {len(results)} items | Time: {duration:.2f}s | Top Score: {top_score:.4f} | Filters: {params}")
+                
+                return results
+        except Exception as e:
+            logger.error(f"[SQL ERROR] Query failed: {e}")
+            logger.error(f"[SQL ERROR] Query: {sql_base[:500]}...")
+            logger.error(f"[SQL ERROR] Params keys: {list(sql_params.keys())}")
+            raise
+
+    def _relax_rating_filters(self, params: Dict[str, Any], relax_by: float = 1.0) -> Dict[str, Any]:
+        """Relax rating filters bằng cách giảm min values đi relax_by điểm"""
+        relaxed = params.copy()
+        rating_fields = [
+            "rating_service", "rating_location", "rating_price", 
+            "rating_quality", "rating_ambiance", "rating_overall"
+        ]
+        
+        for field in rating_fields:
+            min_key = f"{field}_min"
+            if min_key in relaxed and relaxed[min_key] is not None:
+                original_val = relaxed[min_key]
+                relaxed_val = max(1.0, original_val - relax_by)  # Không được < 1.0
+                relaxed[min_key] = relaxed_val
+                logger.info(f"[RATING RELAX] {min_key}: {original_val} -> {relaxed_val}")
+        
+        return relaxed
 
     def search_pipeline(self, params):
-        # logger.info(f"🚀 Searching with Params: {params}") # Đã log trong Endpoint rồi nên có thể ẩn bớt
-        
         # 1. Strict
         results = self.execute_db_search(params, min_score=0.2)
         if results: return results, "Đây là kết quả phù hợp nhất:"
@@ -622,17 +792,28 @@ class RAGService:
             results = self.execute_db_search(relax_params, min_score=0.2)
             if results: return results, "Không đúng giá/giờ yêu cầu, nhưng có quán này:"
 
-        # 3. Relax District
+        # 3. Relax Rating Filters (giảm 1 điểm)
+        has_rating_filters = any(k in params for k in [
+            "rating_service_min", "rating_location_min", "rating_price_min",
+            "rating_quality_min", "rating_ambiance_min", "rating_overall_min"
+        ])
+        if has_rating_filters:
+            relaxed_rating_params = self._relax_rating_filters(params, relax_by=1.0)
+            logger.info(f"⚠️ Trigger Fallback 2 (Relax Rating by 1.0)")
+            results = self.execute_db_search(relaxed_rating_params, min_score=0.2)
+            if results: return results, "Không đúng rating yêu cầu, nhưng có quán gần đúng:"
+
+        # 4. Relax District
         if "district" in params:
             d_params = params.copy()
             del d_params["district"]
             d_params.pop("is_open_now", None)
-            logger.info(f"⚠️ Trigger Fallback 2 (Drop District)")
+            logger.info(f"⚠️ Trigger Fallback 3 (Drop District)")
             results = self.execute_db_search(d_params, min_score=0.2)
             if results: return results, f"Quận {params['district']} không có, nhưng chỗ khác có:"
 
-        # 4. Semantic
-        logger.info(f"⚠️ Trigger Fallback 3 (Semantic Only)")
+        # 5. Semantic Only
+        logger.info(f"⚠️ Trigger Fallback 4 (Semantic Only)")
         results = self.execute_db_search({"search_text": params["search_text"], "search_strategy": "semantic"}, min_score=0.25)
         if results: return results, "Tìm theo vibe/ngữ nghĩa:"
         
@@ -643,7 +824,11 @@ class RAGService:
         if not restaurant_ids or not engine:
             return {}
         
+        if len(restaurant_ids) == 0:
+            return {}
+        
         try:
+            # Tối ưu: dùng ANY array thay vì IN với nhiều placeholders
             # Tạo placeholder cho các restaurant_id
             placeholders = ", ".join([f":id_{i}" for i in range(len(restaurant_ids))])
             sql_query = f"""
@@ -652,6 +837,7 @@ class RAGService:
                 FROM photos 
                 WHERE restaurant_id IN ({placeholders})
                     AND s3_url IS NOT NULL
+                    AND s3_url != ''
                 ORDER BY restaurant_id, created_at DESC
             """
             
@@ -661,7 +847,8 @@ class RAGService:
                 rows = conn.execute(text(sql_query), params).fetchall()
                 return {row.restaurant_id: row.s3_url for row in rows}
         except Exception as e:
-            logger.error(f"Error fetching restaurant images: {e}")
+            logger.error(f"[IMAGE ERROR] Error fetching restaurant images: {e}")
+            logger.error(traceback.format_exc())
             return {}
 
     def generate_response_and_data(self, user_input, results, system_note, user_mood="neutral"):
@@ -719,7 +906,14 @@ class RAGService:
         try:
             resp = self.call_bedrock_retry(MODEL_CHAT, messages)
             return resp['output']['message']['content'][0]['text'], restaurants_data
-        except Exception:
+        except ClientError as e:
+            logger.error(f"[BEDROCK ERROR] generate_response failed: {e}")
+            return "Dưới đây là danh sách quán.", restaurants_data
+        except (KeyError, IndexError) as e:
+            logger.error(f"[RESPONSE PARSE ERROR] Failed to parse response: {e}")
+            return "Dưới đây là danh sách quán.", restaurants_data
+        except Exception as e:
+            logger.error(f"[UNEXPECTED ERROR] generate_response failed: {e}")
             return "Dưới đây là danh sách quán.", restaurants_data
 
 # --- 5. API ENDPOINT ---
@@ -740,8 +934,11 @@ async def search_endpoint(payload: SearchPayload):
         
         rag = RAGService(payload.session_id, session_mgr)
 
+        # Nối 10 query trước đó vào query hiện tại
+        combined_query = rag._concatenate_previous_queries(session_mgr, payload.query, max_queries=10)
+
         # Pipeline
-        params = rag.parse_intent(payload.query)
+        params = rag.parse_intent(combined_query)
         logger.info(f"[INTENT] {params}") # Log Intent đã parse được
 
         # Lấy mood ra (mặc định là neutral nếu không có)
@@ -763,9 +960,25 @@ async def search_endpoint(payload: SearchPayload):
             "restaurants": json_data,
             "debug_intent": params
         }
+    except ValueError as e:
+        logger.error(f"[VALIDATION ERROR] {str(e)}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "message": f"Validation error: {str(e)}",
+            "type": "ValueError"
+        }
+    except ClientError as e:
+        logger.error(f"[AWS ERROR] {str(e)}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "message": f"AWS service error: {str(e)}",
+            "type": "ClientError"
+        }
     except Exception as e:
         # --- TRẢ VỀ LỖI CHI TIẾT RA POSTMAN ---
-        logger.error(f"CRITICAL ERROR: {str(e)}")
+        logger.error(f"[CRITICAL ERROR] {str(e)}")
         logger.error(traceback.format_exc()) # Log traceback đầy đủ lên CloudWatch
 
         return {

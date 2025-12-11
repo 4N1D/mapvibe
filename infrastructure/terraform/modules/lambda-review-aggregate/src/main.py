@@ -107,6 +107,7 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
         raise Exception("Database engine not initialized")
 
     with engine.connect() as conn:
+        # Lấy reviews - bỏ điều kiện upvote_count > 0 để lấy cả reviews chưa có upvote
         reviews = conn.execute(
             text(
                 """
@@ -114,14 +115,16 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
                 FROM review_posts
                 WHERE location_address_id = :loc
                   AND status = 'pending'
-                  AND upvote_count > 0
-                ORDER BY upvote_count DESC, created_at DESC
+                ORDER BY upvote_count DESC NULLS LAST, created_at DESC
                 LIMIT 10
                 """
             ),
             {"loc": location_address_id},
         ).fetchall()
+        
+        logger.info(f"📊 Found {len(reviews)} pending reviews for location {location_address_id}")
 
+        # Lấy comments - bỏ điều kiện like_count > 0 để lấy cả comments chưa có like
         comments = conn.execute(
             text(
                 """
@@ -131,13 +134,14 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
                 WHERE rp.location_address_id = :loc
                   AND rp.status = 'pending'
                   AND c.status = 'pending'
-                  AND c.like_count > 0
-                ORDER BY c.like_count DESC, c.created_at DESC
+                ORDER BY c.like_count DESC NULLS LAST, c.created_at DESC
                 LIMIT 10
                 """
             ),
             {"loc": location_address_id},
         ).fetchall()
+        
+        logger.info(f"📊 Found {len(comments)} pending comments for location {location_address_id}")
 
     def serialize_review(row):
         return {
@@ -165,20 +169,23 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
         raise Exception("Database engine not initialized")
 
     with engine.connect() as conn:
+        # Lấy reviews - bỏ điều kiện upvote_count > 0 để lấy cả reviews chưa có upvote
         reviews = conn.execute(
             text(
                 """
                 SELECT id, text, upvote_count, created_at
                 FROM restaurant_reviews
                 WHERE restaurant_id = :rest_id
-                  AND upvote_count > 0
-                ORDER BY upvote_count DESC, created_at DESC
+                ORDER BY upvote_count DESC NULLS LAST, created_at DESC
                 LIMIT 10
                 """
             ),
             {"rest_id": restaurant_id},
         ).fetchall()
+        
+        logger.info(f"📊 Found {len(reviews)} approved reviews for restaurant {restaurant_id}")
 
+        # Lấy comments - bỏ điều kiện like_count > 0 để lấy cả comments chưa có like
         comments = conn.execute(
             text(
                 """
@@ -186,14 +193,15 @@ def fetch_approved_reviews_and_comments(restaurant_id: str):
                 FROM comments c
                 JOIN restaurant_reviews rr ON c.restaurant_review_id = rr.id
                 WHERE rr.restaurant_id = :rest_id
-                  AND c.like_count > 0
                   AND c.status = 'published'
-                ORDER BY c.like_count DESC, c.created_at DESC
+                ORDER BY c.like_count DESC NULLS LAST, c.created_at DESC
                 LIMIT 10
                 """
             ),
             {"rest_id": restaurant_id},
         ).fetchall()
+        
+        logger.info(f"📊 Found {len(comments)} approved comments for restaurant {restaurant_id}")
 
     def serialize_review(row):
         return {
@@ -341,6 +349,14 @@ def aggregate(location_address_id: str):
         raise ValueError(
             f"Invalid location status: {status}. Expected 'pending' or 'approved' with restaurant_id"
         )
+
+    # Log warning nếu không có reviews
+    if not reviews and not comments:
+        logger.warning(f"⚠️ No reviews or comments found for location {location_address_id} (status: {status})")
+    elif not reviews:
+        logger.warning(f"⚠️ No reviews found, but found {len(comments)} comments")
+    elif not comments:
+        logger.warning(f"⚠️ No comments found, but found {len(reviews)} reviews")
 
     messages, system_prompt = build_prompt(reviews, comments, source_type)
     response = call_bedrock_retry(messages, system_prompt)

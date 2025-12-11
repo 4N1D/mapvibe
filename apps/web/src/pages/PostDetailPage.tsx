@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 import {
   CommentsTab,
-  PhotosTab,
-  MenuTab,
   DirectionSidebar,
   ServicesList,
   CuisineType,
@@ -80,6 +78,18 @@ interface ReviewsResponse {
   reviews: ReviewFromAPI[];
 }
 
+interface PhotoItem {
+  url: string;
+  caption?: string;
+}
+
+interface CategorizedPhotos {
+  all: PhotoItem[];
+  food: PhotoItem[];
+  menu: PhotoItem[];
+  view: PhotoItem[];
+}
+
 interface PostDetail {
   id: string;
   slug: string;
@@ -104,6 +114,7 @@ interface PostDetail {
     comments: number;
   };
   images: string[];
+  categorizedPhotos: CategorizedPhotos;
   lat?: number | null;
   lng?: number | null;
   features?: string[];
@@ -249,6 +260,49 @@ const extractImages = (
   return urls;
 };
 
+// Helper function to extract categorized images from photos
+const extractCategorizedPhotos = (
+  photos?: ReviewPhoto[] | { general?: ReviewPhoto[]; food?: ReviewPhoto[]; menu?: ReviewPhoto[] }
+): CategorizedPhotos => {
+  const result: CategorizedPhotos = {
+    all: [],
+    food: [],
+    menu: [],
+    view: [],
+  };
+
+  if (!photos) {
+    return result;
+  }
+
+  // Helper to convert ReviewPhoto to PhotoItem
+  const toPhotoItem = (photo: ReviewPhoto): PhotoItem | null => {
+    const url = fixCdnUrl(photo.url);
+    if (!url) return null;
+    return { url, caption: photo.caption };
+  };
+
+  // If photos is an array (no categories, put all in "all" and "view")
+  if (Array.isArray(photos)) {
+    const items = photos.map(toPhotoItem).filter((p): p is PhotoItem => p !== null);
+    result.all = items;
+    result.view = items; // Default to view for uncategorized
+    return result;
+  }
+
+  // If photos is an object with general, food, menu
+  const generalItems = (photos.general || []).map(toPhotoItem).filter((p): p is PhotoItem => p !== null);
+  const foodItems = (photos.food || []).map(toPhotoItem).filter((p): p is PhotoItem => p !== null);
+  const menuItems = (photos.menu || []).map(toPhotoItem).filter((p): p is PhotoItem => p !== null);
+
+  result.view = generalItems;
+  result.food = foodItems;
+  result.menu = menuItems;
+  result.all = [...generalItems, ...foodItems, ...menuItems];
+
+  return result;
+};
+
 // Helper function to extract categories from cuisine types
 const extractCategories = (
   cuisineTypes?: string[] | Array<{ name: string; description?: string }> | null
@@ -296,11 +350,13 @@ const extractCuisineTypes = (
 const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
   const slug = generateSlug(review.location_name, review.id);
   const images = extractImages(review.photos);
+  const categorizedPhotos = extractCategorizedPhotos(review.photos);
   const categories = extractCategories(review.location_cuisine_types);
   const cuisineTypes = extractCuisineTypes(review.location_cuisine_types);
 
   console.log("[mapReviewToPostDetail] Review photos:", review.photos);
   console.log("[mapReviewToPostDetail] Extracted images:", images);
+  console.log("[mapReviewToPostDetail] Categorized photos:", categorizedPhotos);
 
   // Determine if location is open (simplified - you might want to add actual logic)
   const isOpen = true; // TODO: Add logic to check if location is currently open based on opening_hours
@@ -331,6 +387,7 @@ const mapReviewToPostDetail = (review: ReviewFromAPI): PostDetail => {
       comments: review.comment_count,
     },
     images: images.length > 0 ? images : [],
+    categorizedPhotos,
     lat: review.location_geo_lat ?? undefined,
     lng: review.location_geo_lng ?? undefined,
     features: review.features || [],
@@ -393,6 +450,9 @@ export function PostDetailPage() {
   const [voteAnimation, setVoteAnimation] = useState<"upvote" | "downvote" | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
+
+  // Photo category state
+  const [photoCategory, setPhotoCategory] = useState<"all" | "food" | "menu" | "view">("all");
 
   // Check if URL has #comments hash to auto-scroll to comments
   useEffect(() => {
@@ -1119,11 +1179,73 @@ export function PostDetailPage() {
         {activeTab === "binh-luan" && <CommentsTab reviewId={post.id} />}
 
         {activeTab === "anh" && (
+          <div className="space-y-4">
+            {/* Photo Category Filters */}
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { key: "all", label: "Tất cả" },
+                  { key: "food", label: "Thức ăn" },
+                  { key: "view", label: "Không gian" },
+                  { key: "menu", label: "Thực đơn" },
+                ] as const
+              ).map((cat) => {
+                const count = post.categorizedPhotos[cat.key]?.length || 0;
+                return (
+                  <button
+                    key={cat.key}
+                    onClick={() => setPhotoCategory(cat.key)}
+                    className={`rounded-full border px-4 py-1.5 text-sm transition ${
+                      photoCategory === cat.key
+                        ? "border-primary-500 bg-primary-50 text-primary-600"
+                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                    }`}
+                  >
+                    {cat.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Photo Grid */}
+            <div className="rounded-lg bg-white p-6 shadow-sm">
+              {post.categorizedPhotos[photoCategory] &&
+              post.categorizedPhotos[photoCategory].length > 0 ? (
+                <Image.PreviewGroup>
+                  <div className="gap-4" style={{ columnCount: 5, columnGap: "16px" }}>
+                    {post.categorizedPhotos[photoCategory].map((photo, index) => (
+                      <div
+                        key={index}
+                        className="relative mb-4 overflow-hidden rounded-lg bg-gray-100"
+                        style={{ breakInside: "avoid" }}
+                      >
+                        <Image
+                          width="100%"
+                          src={photo.url}
+                          alt={photo.caption || `Ảnh ${index + 1} của ${post.title}`}
+                          className="h-full w-full object-contain transition duration-300 hover:scale-110"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </Image.PreviewGroup>
+              ) : (
+                <p className="py-8 text-center text-gray-500">Chưa có ảnh nào trong danh mục này.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "thuc-don" && (
           <div className="rounded-lg bg-white p-6 shadow-sm">
-            {post.images && post.images.length > 0 ? (
+            {post.categorizedPhotos.menu && post.categorizedPhotos.menu.length > 0 ? (
               <Image.PreviewGroup>
                 <div className="gap-4" style={{ columnCount: 5, columnGap: "16px" }}>
-                  {post.images.map((imageUrl, index) => (
+                  {post.categorizedPhotos.menu.map((photo, index) => (
                     <div
                       key={index}
                       className="relative mb-4 overflow-hidden rounded-lg bg-gray-100"
@@ -1131,37 +1253,31 @@ export function PostDetailPage() {
                     >
                       <Image
                         width="100%"
-                        src={imageUrl}
-                        alt={`Ảnh ${index + 1} của ${post.title}`}
+                        src={photo.url}
+                        alt={photo.caption || `Thực đơn ${index + 1}`}
                         className="h-full w-full object-contain transition duration-300 hover:scale-110"
                         loading="lazy"
                         onError={(e) => {
-                          console.error(
-                            `[PostDetailPage] Failed to load image ${index + 1}:`,
-                            imageUrl
-                          );
                           (e.target as HTMLImageElement).style.display = "none";
                         }}
                       />
+                      {photo.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-2 py-1 text-xs text-white">
+                          {photo.caption}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </Image.PreviewGroup>
             ) : (
-              <p className="py-8 text-center text-gray-500">Chưa có ảnh nào.</p>
+              <div className="py-8 text-center">
+                <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
+                <p className="mt-4 text-gray-500">Chưa có thực đơn cho địa điểm này.</p>
+              </div>
             )}
           </div>
         )}
-
-        {activeTab === "thuc-don" &&
-          (post.restaurantSlug ? (
-            <MenuTab slug={post.restaurantSlug} />
-          ) : (
-            <div className="rounded-lg bg-white p-8 text-center shadow-sm">
-              <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
-              <p className="mt-4 text-gray-500">Chưa có thực đơn cho địa điểm này.</p>
-            </div>
-          ))}
       </section>
     </div>
   );

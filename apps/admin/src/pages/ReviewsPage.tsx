@@ -251,15 +251,6 @@ function ReviewCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {status !== "approved" && status !== "active" && (
-              <ActionButton
-                onClick={() => onAction("approve")}
-                disabled={isUpdating}
-                variant="success"
-              >
-                Duyệt
-              </ActionButton>
-            )}
             {status !== "hidden" && (
               <ActionButton
                 onClick={() => onAction("hide", true)}

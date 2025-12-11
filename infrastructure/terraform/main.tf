@@ -319,47 +319,47 @@ resource "aws_lambda_permission" "allow_s3_ocr_menu" {
 resource "aws_s3_bucket_notification" "photos_all" {
   bucket = module.cdn.photos_bucket_name
 
-  # OCR Menu triggers - chỉ cho folder menus/
+  # OCR Menu triggers - chỉ cho folder menu/
   lambda_function {
     lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/"
+    filter_prefix       = "menu/"
     filter_suffix       = ".jpg"
   }
 
   lambda_function {
     lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/"
+    filter_prefix       = "menu/"
     filter_suffix       = ".jpeg"
   }
 
   lambda_function {
     lambda_function_arn = module.lambda_ocr_menu.function_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "menus/"
+    filter_prefix       = "menu/"
     filter_suffix       = ".png"
   }
 
-  # S3 Trigger Lambda - cho tất cả ảnh (trừ menus/)
+  # S3 Trigger Lambda - cho tất cả ảnh (trừ menu/)
   lambda_function {
     lambda_function_arn = module.lambda_s3_trigger.function_arn
     events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "reviews/"
+    filter_prefix       = "review/"
     filter_suffix       = ".jpg"
   }
 
   lambda_function {
     lambda_function_arn = module.lambda_s3_trigger.function_arn
     events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "reviews/"
+    filter_prefix       = "review/"
     filter_suffix       = ".jpeg"
   }
 
   lambda_function {
     lambda_function_arn = module.lambda_s3_trigger.function_arn
     events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "reviews/"
+    filter_prefix       = "review/"
     filter_suffix       = ".png"
   }
 

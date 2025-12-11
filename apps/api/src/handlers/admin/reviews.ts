@@ -5,6 +5,48 @@ import { success, badRequest, unauthorized, notFound, error } from "../../middle
 import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
 import { sql } from "kysely";
 
+// Helper to extract photo IDs from photos JSON
+function extractPhotoIds(photos: unknown): string[] {
+  if (!photos) return [];
+
+  let photosData = photos;
+  if (typeof photosData === "string") {
+    try {
+      photosData = JSON.parse(photosData);
+    } catch {
+      return [];
+    }
+  }
+
+  const photoIds: string[] = [];
+
+  if (photosData && typeof photosData === "object" && !Array.isArray(photosData)) {
+    const categories = photosData as Record<string, unknown[]>;
+    for (const category of Object.values(categories)) {
+      if (Array.isArray(category)) {
+        for (const item of category) {
+          if (typeof item === "string") {
+            photoIds.push(item);
+          } else if (item && typeof item === "object" && "id" in item) {
+            photoIds.push((item as { id: string }).id);
+          }
+        }
+      }
+    }
+  }
+  else if (Array.isArray(photosData)) {
+    for (const p of photosData) {
+      if (typeof p === "string") {
+        photoIds.push(p);
+      } else if (p && typeof p === "object" && "id" in p) {
+        photoIds.push((p as { id: string }).id);
+      }
+    }
+  }
+
+  return photoIds;
+}
+
 // GET /admin/reviews - List all reviews with filters
 export const listReviewsHandler: Handler = {
   async handle(event: APIGatewayEvent): Promise<APIGatewayResponse> {
@@ -512,6 +554,78 @@ export const getLocationReviewsHandler: Handler = {
         LIMIT ${limit}
         OFFSET ${offset}
       `.execute(db);
+
+      // Process reviews to resolve photo URLs
+      const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
+      const reviewIds = rawReviews.map((r) => r.id);
+      const reviewPhotosMap = new Map<string, string[]>();
+
+      if (reviewIds.length > 0) {
+        const photosFromTable = await db
+          .selectFrom("photos")
+          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url"])
+          .where("review_post_id", "in", reviewIds)
+          .orderBy("created_at", "asc")
+          .execute();
+
+        for (const photo of photosFromTable) {
+          if (photo.review_post_id) {
+            const url = photo.s3_thumbnail_url || photo.s3_url;
+            if (url) {
+              const existing = reviewPhotosMap.get(photo.review_post_id) || [];
+              existing.push(url);
+              reviewPhotosMap.set(photo.review_post_id, existing);
+            }
+          }
+        }
+      }
+
+      // Fallback to photos column
+      const reviewsNeedingJsonPhotos = rawReviews.filter(
+        (r) => !reviewPhotosMap.has(r.id) && r.photos
+      );
+
+      if (reviewsNeedingJsonPhotos.length > 0) {
+        const allPhotoIds: string[] = [];
+        const reviewPhotoIdsMap = new Map<string, string[]>();
+
+        for (const review of reviewsNeedingJsonPhotos) {
+          const photoIds = extractPhotoIds(review.photos);
+          if (photoIds.length > 0) {
+            reviewPhotoIdsMap.set(review.id, photoIds);
+            allPhotoIds.push(...photoIds);
+          }
+        }
+
+        if (allPhotoIds.length > 0) {
+          const uniqueIds = [...new Set(allPhotoIds)];
+          const photoRecords = await db
+            .selectFrom("photos")
+            .select(["id", "s3_url", "s3_thumbnail_url"])
+            .where("id", "in", uniqueIds)
+            .execute();
+
+          const photoUrlMap = new Map<string, string>();
+          for (const p of photoRecords) {
+            photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
+          }
+
+          for (const [reviewId, photoIds] of reviewPhotoIdsMap) {
+            const photos = photoIds
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+            
+            if (photos.length > 0) {
+              reviewPhotosMap.set(reviewId, photos);
+            }
+          }
+        }
+      }
+
+      const reviews = rawReviews.map((review) => ({
+        ...review,
+        photos: reviewPhotosMap.get(review.id) || [],
+      }));
 
       const countResult = await sql`
         SELECT count(*)::int as total

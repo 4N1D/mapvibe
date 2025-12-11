@@ -290,7 +290,10 @@ function ReviewCard({
 
         {/* Content */}
         <div className="mt-4">
-          <p className="whitespace-pre-wrap text-gray-700">{review.text as string}</p>
+          <div
+            className="prose prose-sm max-w-none text-gray-700 [&>p]:mb-0"
+            dangerouslySetInnerHTML={{ __html: review.text as string }}
+          />
         </div>
 
         {/* Photos */}

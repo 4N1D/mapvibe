@@ -95,6 +95,7 @@ export const handler: Handler = {
           LEFT JOIN users u ON u.id = rp.author_id
           LEFT JOIN location_addresses la ON la.id = rp.location_address_id
           WHERE rp.restaurant_id = ${restaurantId}
+            AND (la.status IS NULL OR la.status != 'rejected')
           ORDER BY rp.created_at DESC
           LIMIT ${limit}
           OFFSET ${offset}
@@ -135,6 +136,7 @@ export const handler: Handler = {
           FROM review_posts rp
           LEFT JOIN users u ON u.id = rp.author_id
           LEFT JOIN location_addresses la ON la.id = rp.location_address_id
+          WHERE (la.status IS NULL OR la.status != 'rejected')
           ORDER BY rp.created_at DESC
           LIMIT ${limit}
           OFFSET ${offset}

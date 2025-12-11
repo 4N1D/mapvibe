@@ -97,8 +97,10 @@ export default function PlacesPage() {
           >
             <option value="">Tất cả trạng thái</option>
             <option value="active">Đang hoạt động</option>
+            <option value="approved">Đã duyệt</option>
             <option value="inactive">Không hoạt động</option>
             <option value="pending">Chờ duyệt</option>
+            <option value="deleted">Đã xóa</option>
           </select>
         </div>
       </div>
@@ -303,16 +305,25 @@ export default function PlacesPage() {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: "bg-green-100 text-green-800",
+    approved: "bg-green-100 text-green-800",
     inactive: "bg-gray-100 text-gray-800",
     deleted: "bg-red-100 text-red-800",
     pending: "bg-yellow-100 text-yellow-800",
+  };
+
+  const labels: Record<string, string> = {
+    active: "Hoạt động",
+    approved: "Đã duyệt",
+    inactive: "Không hoạt động",
+    deleted: "Đã xóa",
+    pending: "Chờ duyệt",
   };
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status] || styles.active}`}
     >
-      {status}
+      {labels[status] || status}
     </span>
   );
 }

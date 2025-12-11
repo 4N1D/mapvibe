@@ -76,6 +76,8 @@ export const listReviewsHandler: Handler = {
         whereClause = sql`WHERE rp.report_count > 0`;
       } else if (status === "hidden") {
         whereClause = sql`WHERE rp.status = 'hidden'`;
+      } else if (status === "rejected") {
+        whereClause = sql`WHERE rp.status = 'rejected'`;
       }
 
       const result = await sql`
@@ -112,77 +114,77 @@ export const listReviewsHandler: Handler = {
         .select(sql<number>`count(*)::int`.as("total"))
         .executeTakeFirst();
 
-      // Process reviews to resolve photo URLs
-      const rawReviews = result.rows as Array<{ id: string; photos?: unknown; [key: string]: unknown }>;
-      const reviewIds = rawReviews.map((r) => r.id);
-      const reviewPhotosMap = new Map<string, string[]>();
+      // Process photos to get URLs
+      interface ReviewRow {
+        id: string;
+        photos?: unknown;
+        [key: string]: unknown;
+      }
+      const rawReviews = result.rows as ReviewRow[];
+      
+      // Collect all photo IDs
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
 
-      if (reviewIds.length > 0) {
-        const photosFromTable = await db
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              if (typeof firstItem === "string") {
+                if (firstItem.startsWith("http")) {
+                  reviewPhotoMap.set(review.id, photosData);
+                } else {
+                  reviewPhotoMap.set(review.id, photosData);
+                  allPhotoIds.push(...photosData.filter((id: unknown) => typeof id === "string"));
+                }
+              } else if (firstItem?.url) {
+                reviewPhotoMap.set(review.id, photosData.map((p: { url: string }) => p.url));
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Fetch photo URLs from database
+      const photoUrlMap = new Map<string, string>();
+      const uniquePhotoIds = [...new Set(allPhotoIds)].filter(id => !id.startsWith("http"));
+      if (uniquePhotoIds.length > 0) {
+        const photosFromDb = await db
           .selectFrom("photos")
-          .select(["id", "review_post_id", "s3_url", "s3_thumbnail_url"])
-          .where("review_post_id", "in", reviewIds)
-          .orderBy("created_at", "asc")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniquePhotoIds)
           .execute();
 
-        for (const photo of photosFromTable) {
-          if (photo.review_post_id) {
-            const url = photo.s3_thumbnail_url || photo.s3_url;
-            if (url) {
-              const existing = reviewPhotosMap.get(photo.review_post_id) || [];
-              existing.push(url);
-              reviewPhotosMap.set(photo.review_post_id, existing);
-            }
-          }
+        for (const photo of photosFromDb) {
+          photoUrlMap.set(photo.id, photo.s3_thumbnail_url || photo.s3_url);
         }
       }
 
-      // Fallback to photos column (extract IDs and fetch)
-      const reviewsNeedingJsonPhotos = rawReviews.filter(
-        (r) => !reviewPhotosMap.has(r.id) && r.photos
-      );
+      // Build reviews with resolved URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photos: string[] = [];
 
-      if (reviewsNeedingJsonPhotos.length > 0) {
-        const allPhotoIds: string[] = [];
-        const reviewPhotoIdsMap = new Map<string, string[]>();
-
-        for (const review of reviewsNeedingJsonPhotos) {
-          const photoIds = extractPhotoIds(review.photos);
-          if (photoIds.length > 0) {
-            reviewPhotoIdsMap.set(review.id, photoIds);
-            allPhotoIds.push(...photoIds);
-          }
-        }
-
-        if (allPhotoIds.length > 0) {
-          const uniqueIds = [...new Set(allPhotoIds)];
-          const photoRecords = await db
-            .selectFrom("photos")
-            .select(["id", "s3_url", "s3_thumbnail_url"])
-            .where("id", "in", uniqueIds)
-            .execute();
-
-          const photoUrlMap = new Map<string, string>();
-          for (const p of photoRecords) {
-            photoUrlMap.set(p.id, p.s3_thumbnail_url || p.s3_url);
-          }
-
-          for (const [reviewId, photoIds] of reviewPhotoIdsMap) {
-            const photos = photoIds
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (typeof firstItem === "string" && firstItem.startsWith("http")) {
+            photos = photoData as string[];
+          } else {
+            photos = (photoData as string[])
               .map((id) => photoUrlMap.get(id))
               .filter((url): url is string => !!url);
-            
-            if (photos.length > 0) {
-              reviewPhotosMap.set(reviewId, photos);
-            }
           }
         }
-      }
 
-      const reviews = rawReviews.map((review) => ({
-        ...review,
-        photos: reviewPhotosMap.get(review.id) || [],
-      }));
+        return { ...review, photos };
+      });
 
       return success({
         reviews,
@@ -340,18 +342,49 @@ export const updateReviewHandler: Handler = {
         });
       }
 
+      // Handle hide action as hard delete (same as delete)
+      if (action === "hide") {
+        await db.transaction().execute(async (trx) => {
+          const comments = await trx
+            .selectFrom("comments")
+            .select("id")
+            .where("review_post_id", "=", reviewId)
+            .execute();
+
+          const commentIds = comments.map((c) => c.id);
+
+          if (commentIds.length > 0) {
+            await trx
+              .deleteFrom("likes")
+              .where("target_type", "=", "comment")
+              .where("target_id", "in", commentIds)
+              .execute();
+          }
+
+          await trx.deleteFrom("comments").where("review_post_id", "=", reviewId).execute();
+          await trx.deleteFrom("votes").where("review_post_id", "=", reviewId).execute();
+          await trx
+            .deleteFrom("reports")
+            .where("target_type", "=", "review_post")
+            .where("target_id", "=", reviewId)
+            .execute();
+          await trx.deleteFrom("photos").where("review_post_id", "=", reviewId).execute();
+          await trx.deleteFrom("review_posts").where("id", "=", reviewId).execute();
+        });
+
+        return success({
+          message: "Review hidden (deleted) successfully",
+          review: { id: reviewId },
+        });
+      }
+
       switch (action) {
         case "approve":
           updateData.status = "published";
           updateData.report_count = 0;
           break;
-        case "hide":
-          updateData.status = "hidden";
-          updateData.hidden_reason = reason || "Violated community guidelines";
-          break;
         case "restore":
           updateData.status = "published";
-          updateData.hidden_reason = null;
           break;
         default:
           return badRequest("Invalid action. Use: approve, hide, delete, restore");
@@ -600,6 +633,78 @@ export const getLocationReviewsHandler: Handler = {
         WHERE location_address_id = ${locationId}
       `.execute(db);
 
+      // Process photos to get URLs
+      interface ReviewRow {
+        id: string;
+        photos?: unknown;
+        [key: string]: unknown;
+      }
+      const rawReviews = result.rows as ReviewRow[];
+
+      // Collect all photo IDs
+      const allPhotoIds: string[] = [];
+      const reviewPhotoMap = new Map<string, string[]>();
+
+      for (const review of rawReviews) {
+        if (review.photos) {
+          try {
+            const photosData = typeof review.photos === "string"
+              ? JSON.parse(review.photos)
+              : review.photos;
+
+            if (Array.isArray(photosData) && photosData.length > 0) {
+              const firstItem = photosData[0];
+              if (typeof firstItem === "string") {
+                if (firstItem.startsWith("http")) {
+                  reviewPhotoMap.set(review.id, photosData);
+                } else {
+                  reviewPhotoMap.set(review.id, photosData);
+                  allPhotoIds.push(...photosData.filter((id: unknown) => typeof id === "string"));
+                }
+              } else if (firstItem?.url) {
+                reviewPhotoMap.set(review.id, photosData.map((p: { url: string }) => p.url));
+              }
+            }
+          } catch {
+            // Skip invalid photos
+          }
+        }
+      }
+
+      // Fetch photo URLs from database
+      const photoUrlMap = new Map<string, string>();
+      const uniquePhotoIds = [...new Set(allPhotoIds)].filter(id => !id.startsWith("http"));
+      if (uniquePhotoIds.length > 0) {
+        const photosFromDb = await db
+          .selectFrom("photos")
+          .select(["id", "s3_url", "s3_thumbnail_url"])
+          .where("id", "in", uniquePhotoIds)
+          .execute();
+
+        for (const photo of photosFromDb) {
+          photoUrlMap.set(photo.id, photo.s3_thumbnail_url || photo.s3_url);
+        }
+      }
+
+      // Build reviews with resolved URLs
+      const reviews = rawReviews.map((review) => {
+        const photoData = reviewPhotoMap.get(review.id) || [];
+        let photos: string[] = [];
+
+        if (photoData.length > 0) {
+          const firstItem = photoData[0];
+          if (typeof firstItem === "string" && firstItem.startsWith("http")) {
+            photos = photoData as string[];
+          } else {
+            photos = (photoData as string[])
+              .map((id) => photoUrlMap.get(id))
+              .filter((url): url is string => !!url);
+          }
+        }
+
+        return { ...review, photos };
+      });
+
       return success({
         reviews,
         pagination: {
@@ -688,21 +793,30 @@ export const updateLocationHandler: Handler = {
       }
 
       if (action === "reject") {
-        // Just update status for rejection
-        const updated = await db
-          .updateTable("location_addresses")
-          .set({
-            status: "rejected",
-            rejection_reason: reason || null,
-            updated_at: new Date(),
-          })
-          .where("id", "=", locationId)
-          .returningAll()
-          .executeTakeFirst();
+        // Hard delete: remove review_posts and location_addresses
+        // Execute each delete separately and ignore errors for missing tables
+        const deleteQueries = [
+          sql`DELETE FROM votes WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM comments WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM photos WHERE review_post_id IN (SELECT id FROM review_posts WHERE location_address_id = ${locationId})`,
+          sql`DELETE FROM review_posts WHERE location_address_id = ${locationId}`,
+          sql`DELETE FROM photos WHERE location_address_id = ${locationId}`,
+        ];
+
+        for (const query of deleteQueries) {
+          try {
+            await query.execute(db);
+          } catch (e) {
+            console.log(`[admin/locations/:id] Query skipped:`, e);
+          }
+        }
+
+        // Delete the location_address itself
+        await sql`DELETE FROM location_addresses WHERE id = ${locationId}`.execute(db);
 
         return success({
-          message: "Location rejected successfully",
-          location: updated,
+          message: "Location and all related data deleted successfully",
+          location: { id: locationId },
         });
       }
 

@@ -1,3 +1,4 @@
+import { Image } from "antd";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -1120,29 +1121,32 @@ export function PostDetailPage() {
         {activeTab === "anh" && (
           <div className="rounded-lg bg-white p-6 shadow-sm">
             {post.images && post.images.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {post.images.map((imageUrl, index) => (
-                  <div
-                    key={index}
-                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-gray-100"
-                  >
-                    <img
-                      src={imageUrl}
-                      alt={`Ảnh ${index + 1} của ${post.title}`}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
-                      loading="lazy"
-                      onError={(e) => {
-                        console.error(
-                          `[PostDetailPage] Failed to load image ${index + 1}:`,
-                          imageUrl
-                        );
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/20" />
-                  </div>
-                ))}
-              </div>
+              <Image.PreviewGroup>
+                <div className="gap-4" style={{ columnCount: 5, columnGap: "16px" }}>
+                  {post.images.map((imageUrl, index) => (
+                    <div
+                      key={index}
+                      className="relative mb-4 overflow-hidden rounded-lg bg-gray-100"
+                      style={{ breakInside: "avoid" }}
+                    >
+                      <Image
+                        width="100%"
+                        src={imageUrl}
+                        alt={`Ảnh ${index + 1} của ${post.title}`}
+                        className="h-full w-full object-contain transition duration-300 hover:scale-110"
+                        loading="lazy"
+                        onError={(e) => {
+                          console.error(
+                            `[PostDetailPage] Failed to load image ${index + 1}:`,
+                            imageUrl
+                          );
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Image.PreviewGroup>
             ) : (
               <p className="py-8 text-center text-gray-500">Chưa có ảnh nào.</p>
             )}

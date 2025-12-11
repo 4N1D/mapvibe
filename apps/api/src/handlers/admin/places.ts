@@ -3,6 +3,7 @@ import { getDb } from "../../services/db";
 import { success, badRequest, unauthorized, notFound, error } from "../../middlewares/response";
 import { getUserIdFromEvent, isUserAdmin } from "../../utils/auth";
 import { sql } from "kysely";
+import { sendEmbeddingJob } from "../../services/sqs";
 
 // GET /admin/places - List all places with filters
 export const listPlacesHandler: Handler = {
@@ -198,6 +199,12 @@ export const updatePlaceHandler: Handler = {
       if (!updated) {
         return notFound("Place not found");
       }
+
+      // Gửi message vào SQS để trigger Lambda Embedding khi restaurant được update
+      // Không await để không block response
+      sendEmbeddingJob(placeId).catch((err) => {
+        console.error("[admin/places/:id] Failed to send embedding job:", err);
+      });
 
       return success({ place: updated });
     } catch (err) {

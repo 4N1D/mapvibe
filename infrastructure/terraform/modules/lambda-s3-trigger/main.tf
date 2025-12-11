@@ -87,7 +87,6 @@ resource "aws_lambda_function" "s3_trigger" {
       DB_SECRET_ARN          = var.db_secret_arn
       CLOUDFRONT_DOMAIN      = var.cloudfront_domain
       REKOGNITION_LAMBDA_NAME = var.rekognition_lambda_name
-      AWS_REGION             = var.aws_region
     }
   }
 

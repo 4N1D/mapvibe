@@ -44,7 +44,8 @@ exports.handler = async (event) => {
   // Initialize Lambda client if Rekognition Lambda is configured
   const rekognitionLambdaName = process.env.REKOGNITION_LAMBDA_NAME;
   if (rekognitionLambdaName && !lambdaClient) {
-    lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || "us-east-1" });
+    // AWS_REGION is automatically available in Lambda runtime
+    lambdaClient = new LambdaClient({});
   }
 
   for (const record of event.Records) {

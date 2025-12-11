@@ -246,22 +246,38 @@ export const deletePlaceHandler: Handler = {
         return notFound("Place not found");
       }
 
-      console.log(`[admin/places/:id] Hard deleting place: ${placeId}, name: ${existing.name_vi}`);
+      console.log(`[admin/places/:id] Cascade deleting place: ${placeId}, name: ${existing.name_vi}`);
 
-      // Hard delete - execute each delete separately
-      // Delete related data first (ignore errors for missing tables)
-      const deleteQueries = [
+      // CASCADE DELETE: restaurant → location_addresses → review_posts
+      // Step 1: Delete data related to review_posts (via restaurant_id OR via location_address_id)
+      const deleteReviewRelatedQueries = [
+        // Delete votes for reviews linked directly to restaurant
         sql`DELETE FROM votes WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        // Delete votes for reviews linked via location_addresses
+        sql`DELETE FROM votes WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
+        // Delete comments for reviews linked directly to restaurant
         sql`DELETE FROM comments WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
+        // Delete comments for reviews linked via location_addresses
+        sql`DELETE FROM comments WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
+        // Delete photos for reviews linked directly to restaurant
         sql`DELETE FROM photos WHERE review_post_id IN (SELECT id FROM review_posts WHERE restaurant_id = ${placeId})`,
-        sql`DELETE FROM review_posts WHERE restaurant_id = ${placeId}`,
-        sql`DELETE FROM photos WHERE restaurant_id = ${placeId}`,
-        sql`DELETE FROM restaurant_reviews WHERE restaurant_id = ${placeId}`,
-        sql`DELETE FROM favorites WHERE restaurant_id = ${placeId}`,
-        sql`UPDATE location_addresses SET restaurant_id = NULL WHERE restaurant_id = ${placeId}`,
+        // Delete photos for reviews linked via location_addresses
+        sql`DELETE FROM photos WHERE review_post_id IN (
+          SELECT id FROM review_posts WHERE location_address_id IN (
+            SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+          )
+        )`,
       ];
 
-      for (const query of deleteQueries) {
+      for (const query of deleteReviewRelatedQueries) {
         try {
           await query.execute(db);
         } catch (e) {
@@ -269,8 +285,65 @@ export const deletePlaceHandler: Handler = {
         }
       }
 
-      // Delete the restaurant itself
+      // Step 2: Delete review_posts (both direct and via location_addresses)
+      const deleteReviewPostsQueries = [
+        sql`DELETE FROM review_posts WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM review_posts WHERE location_address_id IN (
+          SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+        )`,
+      ];
+
+      for (const query of deleteReviewPostsQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Step 3: Delete photos linked to location_addresses
+      try {
+        await sql`DELETE FROM photos WHERE location_address_id IN (
+          SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+        )`.execute(db);
+      } catch (e) {
+        console.log(`[admin/places/:id] Query skipped:`, e);
+      }
+
+      // Step 4: Delete other restaurant-related data
+      const deleteRestaurantRelatedQueries = [
+        sql`DELETE FROM photos WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM restaurant_reviews WHERE restaurant_id = ${placeId}`,
+        sql`DELETE FROM favorites WHERE restaurant_id = ${placeId}`,
+      ];
+
+      for (const query of deleteRestaurantRelatedQueries) {
+        try {
+          await query.execute(db);
+        } catch (e) {
+          console.log(`[admin/places/:id] Query skipped:`, e);
+        }
+      }
+
+      // Step 5: Get location_address IDs before deleting restaurant
+      const locationIds = await sql`
+        SELECT id FROM location_addresses WHERE restaurant_id = ${placeId}
+      `.execute(db);
+      const locationAddressIds = (locationIds.rows as { id: string }[]).map(r => r.id);
+
+      // Step 6: Delete the restaurant itself (must be before location_addresses due to created_from_location_id FK)
       await sql`DELETE FROM restaurants WHERE id = ${placeId}`.execute(db);
+
+      // Step 7: Delete location_addresses (after restaurant is deleted)
+      if (locationAddressIds.length > 0) {
+        for (const locId of locationAddressIds) {
+          try {
+            await sql`DELETE FROM location_addresses WHERE id = ${locId}`.execute(db);
+          } catch (e) {
+            console.log(`[admin/places/:id] Failed to delete location_address ${locId}:`, e);
+          }
+        }
+      }
 
       console.log(`[admin/places/:id] Delete result: success`);
 

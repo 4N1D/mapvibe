@@ -134,11 +134,9 @@ def get_user_id_from_event(event: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-CORS_HEADERS = {
+# Note: CORS is handled by Lambda Function URL config in Terraform
+RESPONSE_HEADERS = {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 }
 
 
@@ -154,7 +152,7 @@ def require_auth(event: Dict[str, Any]) -> tuple[bool, Optional[str], Optional[D
     if not user_id:
         error_response = {
             "statusCode": 401,
-            "headers": CORS_HEADERS,
+            "headers": RESPONSE_HEADERS,
             "body": json.dumps({
                 "error": "Unauthorized",
                 "message": "JWT token required. Please include Authorization header with Bearer token."

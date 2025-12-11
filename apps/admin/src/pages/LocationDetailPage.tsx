@@ -88,6 +88,7 @@ export default function LocationDetailPage() {
     cuisine_types: [] as CuisineType[],
     price_min: "",
     price_max: "",
+    phone: "",
     opening_hours: "",
     features: [] as string[],
     description: "",
@@ -143,19 +144,50 @@ export default function LocationDetailPage() {
         location_address_id: id,
       });
 
-      const data: AggregateResult = response.data;
+      console.log("Raw response:", response);
+      console.log("Response data:", response.data);
+      console.log("Response data type:", typeof response.data);
+
+      // Handle case where response.data might be a string
+      let data: AggregateResult;
+      if (typeof response.data === "string") {
+        data = JSON.parse(response.data);
+      } else {
+        data = response.data;
+      }
+
+      console.log("Parsed data:", data);
+      console.log("Result:", data.result);
+
       setAggregateResult(data);
 
       const result = data.result;
-      setFormData({
+      
+      // Debug: log all fields
+      console.log("=== AI Result Fields ===");
+      console.log("name_vi:", result.name_vi);
+      console.log("cuisine_types:", result.cuisine_types);
+      console.log("price_min:", result.price_min, "type:", typeof result.price_min);
+      console.log("price_max:", result.price_max, "type:", typeof result.price_max);
+      console.log("phone:", result.phone);
+      console.log("opening_hours:", result.opening_hours);
+      console.log("features:", result.features);
+      console.log("description:", result.description);
+      console.log("========================");
+
+      const newFormData = {
         name_vi: result.name_vi || formData.name_vi,
         cuisine_types: result.cuisine_types || [],
-        price_min: result.price_min?.toString() || "",
-        price_max: result.price_max?.toString() || "",
+        price_min: result.price_min != null ? String(result.price_min) : "",
+        price_max: result.price_max != null ? String(result.price_max) : "",
+        phone: result.phone || "",
         opening_hours: result.opening_hours || "",
         features: result.features || [],
         description: result.description || "",
-      });
+      };
+      
+      console.log("New form data:", newFormData);
+      setFormData(newFormData);
 
       toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
       setActiveTab("info");
@@ -909,15 +941,27 @@ export default function LocationDetailPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Giờ mở cửa</label>
-                  <input
-                    type="text"
-                    value={formData.opening_hours}
-                    onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
-                    placeholder="07:00 - 22:00"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Số điện thoại</label>
+                    <input
+                      type="text"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
+                      placeholder="0901234567"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Giờ mở cửa</label>
+                    <input
+                      type="text"
+                      value={formData.opening_hours}
+                      onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
+                      placeholder="07:00 - 22:00"
+                    />
+                  </div>
                 </div>
 
                 <div>

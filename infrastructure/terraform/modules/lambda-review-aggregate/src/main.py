@@ -93,7 +93,7 @@ def normalize_text(text_input: Optional[str], limit: int = 800) -> str:
 
 
 def check_location_status(location_address_id: str) -> Dict[str, Any]:
-    """Check location_address status and restaurant_id"""
+    """Check location_address status, restaurant_id and existing data (phone, opening_hours, price)"""
     if not engine:
         raise Exception("Database engine not initialized")
 
@@ -101,7 +101,7 @@ def check_location_status(location_address_id: str) -> Dict[str, Any]:
         location = conn.execute(
             text(
                 """
-                SELECT status, restaurant_id
+                SELECT status, restaurant_id, phone, opening_hours, price_min, price_max
                 FROM location_addresses
                 WHERE id = :loc
                 """
@@ -115,6 +115,10 @@ def check_location_status(location_address_id: str) -> Dict[str, Any]:
         return {
             "status": location.status,
             "restaurant_id": location.restaurant_id,
+            "phone": location.phone,
+            "opening_hours": location.opening_hours,
+            "price_min": location.price_min,
+            "price_max": location.price_max,
         }
 
 
@@ -349,11 +353,16 @@ Hãy tổng hợp và trả JSON."""
 
 def aggregate(location_address_id: str):
     log_print(f"📍 Checking location status for: {location_address_id}")
-    # Check location status and restaurant_id
+    # Check location status and restaurant_id + existing data
     location_info = check_location_status(location_address_id)
     status = location_info["status"]
     restaurant_id = location_info["restaurant_id"]
+    existing_phone = location_info.get("phone")
+    existing_opening_hours = location_info.get("opening_hours")
+    existing_price_min = location_info.get("price_min")
+    existing_price_max = location_info.get("price_max")
     log_print(f"📍 Location status: {status}, restaurant_id: {restaurant_id}")
+    log_print(f"📍 Existing data - phone: {existing_phone}, opening_hours: {existing_opening_hours}, price: {existing_price_min}-{existing_price_max}")
 
     # Determine source type and fetch data accordingly
     if status == "approved" and restaurant_id:
@@ -422,6 +431,23 @@ def aggregate(location_address_id: str):
         logger.warning(f"⚠️ LLM output is not valid JSON: {e}")
         logger.warning(f"⚠️ Raw output (first 500 chars): {output_text[:500]}")
         payload = {"raw": output_text, "cuisine_types": []}
+
+    # Merge existing location data with AI results (existing data takes priority)
+    # These fields come from location_addresses table, not from AI
+    if existing_phone:
+        payload["phone"] = existing_phone
+    if existing_opening_hours:
+        # opening_hours might be JSON object, convert to string if needed
+        if isinstance(existing_opening_hours, dict):
+            payload["opening_hours"] = json.dumps(existing_opening_hours)
+        else:
+            payload["opening_hours"] = existing_opening_hours
+    if existing_price_min is not None:
+        payload["price_min"] = existing_price_min
+    if existing_price_max is not None:
+        payload["price_max"] = existing_price_max
+    
+    log_print(f"📦 Final payload - phone: {payload.get('phone')}, opening_hours: {payload.get('opening_hours')}, price: {payload.get('price_min')}-{payload.get('price_max')}")
 
     return {
         "location_address_id": location_address_id,

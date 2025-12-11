@@ -58,7 +58,7 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-2 md:gap-3">
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200">
           {user?.avatar ? (
             <img
@@ -80,14 +80,14 @@ export function CommentForm({ onSubmit, replyingTo, onCancelReply, loading }: Co
           placeholder={
             replyingTo ? `Trả lời @${replyingTo.name}...` : "Viết bình luận của bạn tại đây..."
           }
-          className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="flex-1 min-w-0 rounded-full border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 md:px-4"
           disabled={loading}
         />
 
         <button
           type="submit"
           disabled={!content.trim() || loading}
-          className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 lg:px-6"
+          className="shrink-0 rounded-full bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 md:px-4 lg:px-6"
         >
           {loading ? "..." : "Gửi"}
         </button>

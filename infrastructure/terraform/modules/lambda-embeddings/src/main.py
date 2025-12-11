@@ -349,10 +349,12 @@ def update_restaurant_embedding(restaurant_id: str, embedding: List[float]):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            with engine.connect() as conn:
+            # Sử dụng engine.begin() để đảm bảo transaction được commit đúng cách
+            with engine.begin() as conn:
                 # Lấy lại restaurant data để tạo search_vector
                 restaurant_data = get_restaurant_data(restaurant_id)
                 if not restaurant_data:
+                    logger.error(f"❌ Cannot get restaurant data for {restaurant_id}, cannot update embedding")
                     return False
                 
                 # Tạo text cho search_vector (chỉ cần tên, mô tả, địa chỉ)
@@ -419,11 +421,8 @@ def update_restaurant_embedding(restaurant_id: str, embedding: List[float]):
                 embedding_str = "[" + ",".join(map(str, embedding)) + "]"
                 
                 # Update cả embedding và search_vector
-                # Note: pg8000 requires proper parameter binding for vector type
-                # Use bindparam to ensure proper type handling
-                from sqlalchemy import bindparam
-                
-                conn.execute(
+                # Sử dụng engine.begin() nên transaction sẽ tự động commit khi exit context
+                result = conn.execute(
                     text("""
                         UPDATE restaurants
                         SET embedding = CAST(:embedding AS vector),
@@ -437,8 +436,15 @@ def update_restaurant_embedding(restaurant_id: str, embedding: List[float]):
                         "search_text": search_text
                     }
                 )
-                conn.commit()
-                logger.info(f"✅ Updated embedding for restaurant {restaurant_id}")
+                
+                # Kiểm tra xem có row nào được update không
+                rows_updated = result.rowcount
+                if rows_updated == 0:
+                    logger.warning(f"⚠️ No rows updated for restaurant {restaurant_id} - restaurant may not exist")
+                    return False
+                
+                # engine.begin() tự động commit khi exit context successfully
+                logger.info(f"✅ Updated embedding for restaurant {restaurant_id} (rows_updated={rows_updated})")
                 return True
                 
         except Exception as e:

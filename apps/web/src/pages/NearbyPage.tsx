@@ -293,7 +293,7 @@ function Gallery({ items }: { items: GalleryItem[] }) {
             <img
               src={display[0].url}
               alt=""
-              className="relative h-full w-full object-contain drop-shadow-lg"
+              className="absolute inset-0 h-full w-full object-contain drop-shadow-lg"
               onError={() => handleImageError(0)}
             />
           </>
@@ -733,7 +733,7 @@ function PostCard({ post, onVoteUpdate, initialVoteStatus }: PostCardProps) {
               {post.stats.comments}
             </Link>
             <button
-              onClick={(e) => { e.stopPropagation(); handleShare(); }}
+              onClick={(e) => { e.stopPropagation(); handleShare(e); }}
               className="flex h-[28px] items-center justify-center gap-1 rounded-full bg-gray-100 px-2 text-gray-700 transition hover:bg-gray-200"
               title="Chia sẻ"
             >
@@ -901,7 +901,7 @@ export function NearbyPage() {
       // Call real API endpoint (no mock data)
       const response = await apiClient.get<ReviewsResponse>("/reviews", {
         params: {
-          limit: 20,
+          limit: 10,
           offset: currentOffset,
         },
       });
@@ -1061,7 +1061,7 @@ export function NearbyPage() {
           />
 
           {/* Main content */}
-          <main className="flex-1 space-y-6">
+          <main className="flex-1 space-y-6 min-w-0">
             {loading ? (
               <div className="flex min-h-[300px] items-center justify-center">
                 <MapVibeLoader size="md" text="Đang tải bài review..." />

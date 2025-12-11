@@ -315,13 +315,13 @@ resource "aws_lambda_permission" "allow_s3_ocr_menu" {
   source_arn    = module.cdn.photos_bucket_arn
 }
 
-# Lambda permission: Cho phép S3 invoke Lambda Rekognition
-resource "aws_lambda_permission" "allow_s3_rekognition" {
-  statement_id  = "AllowExecutionFromS3Bucket"
+# Lambda permission: Cho phép Lambda s3-trigger invoke Lambda Rekognition
+resource "aws_lambda_permission" "allow_s3_trigger_invoke_rekognition" {
+  statement_id  = "AllowS3TriggerInvoke"
   action        = "lambda:InvokeFunction"
   function_name = module.lambda_rekognition.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = module.cdn.photos_bucket_arn
+  principal     = "lambda.amazonaws.com"
+  source_arn    = module.lambda_s3_trigger.function_arn
 }
 
 # S3 Notification: Gộp TẤT CẢ triggers vào 1 resource
@@ -351,6 +351,7 @@ resource "aws_s3_bucket_notification" "photos_all" {
   }
 
   # S3 Trigger Lambda - cho tất cả ảnh (trừ menu/)
+  # Lambda này sẽ tự động invoke Lambda Rekognition sau khi xử lý
   lambda_function {
     lambda_function_arn = module.lambda_s3_trigger.function_arn
     events              = ["s3:ObjectCreated:Put"]
@@ -367,28 +368,6 @@ resource "aws_s3_bucket_notification" "photos_all" {
 
   lambda_function {
     lambda_function_arn = module.lambda_s3_trigger.function_arn
-    events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "review/"
-    filter_suffix       = ".png"
-  }
-
-  # Rekognition triggers - cho folder review/ để phân tích ảnh
-  lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
-    events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "review/"
-    filter_suffix       = ".jpg"
-  }
-
-  lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
-    events              = ["s3:ObjectCreated:Put"]
-    filter_prefix       = "review/"
-    filter_suffix       = ".jpeg"
-  }
-
-  lambda_function {
-    lambda_function_arn = module.lambda_rekognition.function_arn
     events              = ["s3:ObjectCreated:Put"]
     filter_prefix       = "review/"
     filter_suffix       = ".png"
@@ -396,7 +375,6 @@ resource "aws_s3_bucket_notification" "photos_all" {
 
   depends_on = [
     aws_lambda_permission.allow_s3_ocr_menu,
-    aws_lambda_permission.allow_s3_rekognition,
     module.lambda_s3_trigger
   ]
 }
@@ -478,15 +456,16 @@ module "api_gateway" {
 module "lambda_s3_trigger" {
   source = "./modules/lambda-s3-trigger"
 
-  project_name      = var.project_name
-  environment       = var.environment
-  aws_region        = var.aws_region
-  db_host           = module.rds.address
-  db_name           = module.rds.database_name
-  db_secret_arn     = aws_secretsmanager_secret.db_credentials.arn
-  s3_bucket_id      = module.cdn.photos_bucket_name
-  s3_bucket_arn     = module.cdn.photos_bucket_arn
-  cloudfront_domain = module.cdn.cloudfront_domain_name
+  project_name           = var.project_name
+  environment            = var.environment
+  aws_region             = var.aws_region
+  db_host                = module.rds.address
+  db_name                = module.rds.database_name
+  db_secret_arn          = aws_secretsmanager_secret.db_credentials.arn
+  s3_bucket_id           = module.cdn.photos_bucket_name
+  s3_bucket_arn          = module.cdn.photos_bucket_arn
+  cloudfront_domain      = module.cdn.cloudfront_domain_name
+  rekognition_lambda_name = module.lambda_rekognition.function_name
 }
 
 data "aws_caller_identity" "current" {}

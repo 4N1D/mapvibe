@@ -4,6 +4,7 @@
   "main": "index.js",
   "dependencies": {
     "pg": "^8.11.3",
-    "@aws-sdk/client-secrets-manager": "^3.400.0"
+    "@aws-sdk/client-secrets-manager": "^3.400.0",
+    "@aws-sdk/client-lambda": "^3.400.0"
   }
 }

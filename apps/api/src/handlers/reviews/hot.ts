@@ -41,6 +41,7 @@ export const handler: Handler = {
           u.display_name AS author_name,
           u.avatar AS author_avatar,
           rp.restaurant_id,
+          rp.location_address_id,
           rp.text,
           rp.photos,
           rp.upvote_count,
@@ -103,6 +104,7 @@ export const handler: Handler = {
         author_name: string;
         author_avatar: string | null;
         restaurant_id: string;
+        location_address_id: string | null;
         text: string;
         photos: unknown;
         upvote_count: number;
@@ -139,10 +141,8 @@ export const handler: Handler = {
 
       // Extract first photo ID from each review (only need 1 for preview)
       const reviewFirstPhotoMap = new Map<string, string>();
-      const reviewsNeedingFallback: { reviewId: string; restaurantId: string }[] = [];
 
       for (const row of result.rows as HotReviewRow[]) {
-        let hasPhoto = false;
         if (row.photos) {
           let photosData = row.photos;
           if (typeof photosData === "string") {
@@ -177,12 +177,7 @@ export const handler: Handler = {
 
           if (firstPhotoId) {
             reviewFirstPhotoMap.set(row.id, firstPhotoId);
-            hasPhoto = true;
           }
-        }
-        
-        if (!hasPhoto && row.real_restaurant_id) {
-          reviewsNeedingFallback.push({ reviewId: row.id, restaurantId: row.real_restaurant_id });
         }
       }
 
@@ -201,13 +196,60 @@ export const handler: Handler = {
         }
       }
 
-      // Fetch fallback restaurant photos
+      // Determine which reviews need fallback (no photo ID or photo ID not found in DB)
+      const reviewsNeedingFallback: { reviewId: string; locationAddressId: string | null; restaurantId: string | null }[] = [];
+      for (const row of result.rows as HotReviewRow[]) {
+        const photoId = reviewFirstPhotoMap.get(row.id);
+        const hasValidPhoto = photoId && photoUrlMap.has(photoId);
+        
+        if (!hasValidPhoto && (row.location_address_id || row.real_restaurant_id)) {
+          reviewsNeedingFallback.push({ 
+            reviewId: row.id, 
+            locationAddressId: row.location_address_id,
+            restaurantId: row.real_restaurant_id 
+          });
+        }
+      }
+
+      // Fetch fallback photos by location_address_id and restaurant_id
+      const locationAddressPhotoMap = new Map<string, string>();
       const restaurantPhotoMap = new Map<string, string>();
+      
       if (reviewsNeedingFallback.length > 0) {
-        const restaurantIds = [...new Set(reviewsNeedingFallback.map((r) => r.restaurantId))];
+        // First, try to get photos by location_address_id
+        const locationAddressIds = [...new Set(
+          reviewsNeedingFallback
+            .map((r) => r.locationAddressId)
+            .filter((id): id is string => id !== null)
+        )];
+        
+        if (locationAddressIds.length > 0) {
+          const locationPhotos = await db
+            .selectFrom("photos")
+            .select(["location_address_id", "s3_url", "s3_thumbnail_url"])
+            .where("location_address_id", "in", locationAddressIds)
+            .where("is_safe", "=", true)
+            .distinctOn("location_address_id")
+            .orderBy("location_address_id")
+            .orderBy("display_order", "asc")
+            .execute();
+
+          for (const photo of locationPhotos) {
+            if (photo.location_address_id) {
+              locationAddressPhotoMap.set(photo.location_address_id, photo.s3_thumbnail_url || photo.s3_url);
+            }
+          }
+        }
+
+        // Then, get photos by restaurant_id for reviews that still need fallback
+        const restaurantIds = [...new Set(
+          reviewsNeedingFallback
+            .filter((r) => !r.locationAddressId || !locationAddressPhotoMap.has(r.locationAddressId))
+            .map((r) => r.restaurantId)
+            .filter((id): id is string => id !== null)
+        )];
         
         if (restaurantIds.length > 0) {
-          // Use distinctOn to get one photo per restaurant
           const fallbackPhotos = await db
             .selectFrom("photos")
             .select(["restaurant_id", "s3_url", "s3_thumbnail_url"])
@@ -230,7 +272,10 @@ export const handler: Handler = {
         const firstPhotoId = reviewFirstPhotoMap.get(row.id);
         let firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
         
-        // Apply fallback if no review photo
+        // Apply fallback: first try location_address photos, then restaurant photos
+        if (!firstPhotoUrl && row.location_address_id) {
+          firstPhotoUrl = locationAddressPhotoMap.get(row.location_address_id);
+        }
         if (!firstPhotoUrl && row.real_restaurant_id) {
           firstPhotoUrl = restaurantPhotoMap.get(row.real_restaurant_id);
         }

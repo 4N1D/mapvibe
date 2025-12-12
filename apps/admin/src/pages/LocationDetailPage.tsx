@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { getFeatureLabel, ALL_FEATURES } from "@/utils/format";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { apiClient } from "../lib/api";
 import { Breadcrumbs, Skeleton } from "../components/ui";
 import { useConfirm } from "../hooks/useConfirm";
+import { getFeatureLabel, ALL_FEATURES } from "../utils/format";
 
 const fixCdnUrl = (url: string): string => {
   const correctCdnDomain =

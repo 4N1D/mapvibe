@@ -577,6 +577,36 @@ export function PostDetailPage() {
 
         // Update State
         if (postResult) {
+          // If post has no images but has restaurant slug, try to fetch restaurant images
+          if (postResult.images.length === 0 && postResult.restaurantSlug) {
+            try {
+              console.log(
+                `[PostDetailPage] Fetching restaurant images for slug: ${postResult.restaurantSlug}`
+              );
+              const restaurantRes = await apiClient.get<{ images?: string[] }>(
+                `/restaurants/${postResult.restaurantSlug}/info`
+              );
+
+              if (restaurantRes.data?.images && restaurantRes.data.images.length > 0) {
+                const restaurantImages = restaurantRes.data.images.map((url) => fixCdnUrl(url));
+                console.log(`[PostDetailPage] Found ${restaurantImages.length} restaurant images`);
+
+                // Update post images
+                postResult.images = restaurantImages;
+
+                // Update categorized photos (put all in 'all' and 'view' as default)
+                postResult.categorizedPhotos = {
+                  all: restaurantImages.map((url) => ({ url })),
+                  view: restaurantImages.map((url) => ({ url })),
+                  food: [],
+                  menu: [],
+                };
+              }
+            } catch (err) {
+              console.error("[PostDetailPage] Failed to fetch restaurant images fallback:", err);
+            }
+          }
+
           setPost(postResult);
           setLocalUpvotes(postResult.stats.likes);
           setLocalDownvotes(postResult.stats.dislikes);

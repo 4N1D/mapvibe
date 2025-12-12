@@ -62,11 +62,13 @@ export const handler: Handler = {
           COALESCE(la.full_address, r.address) AS restaurant_address,
           COALESCE(la.price_min, r.price_min) AS price_min,
           COALESCE(la.price_max, r.price_max) AS price_max,
-          COALESCE(la.opening_hours::text, r.opening_hours::text) AS opening_hours
+          COALESCE(la.opening_hours::text, r.opening_hours::text) AS opening_hours,
+          r.slug AS restaurant_slug,
+          COALESCE(rp.restaurant_id, la.restaurant_id) AS real_restaurant_id
         FROM review_posts rp
         LEFT JOIN users u ON rp.author_id = u.id
         LEFT JOIN location_addresses la ON rp.location_address_id = la.id
-        LEFT JOIN restaurants r ON rp.restaurant_id = r.id
+        LEFT JOIN restaurants r ON r.id = COALESCE(rp.restaurant_id, la.restaurant_id)
       `;
 
       const whereClause = restaurantId
@@ -116,6 +118,8 @@ export const handler: Handler = {
         price_min: number | null;
         price_max: number | null;
         opening_hours: string | null;
+        restaurant_slug: string | null;
+        real_restaurant_id: string | null;
       }
 
       const userId = getUserIdFromEvent(event);
@@ -135,15 +139,17 @@ export const handler: Handler = {
 
       // Extract first photo ID from each review (only need 1 for preview)
       const reviewFirstPhotoMap = new Map<string, string>();
+      const reviewsNeedingFallback: { reviewId: string; restaurantId: string }[] = [];
 
       for (const row of result.rows as HotReviewRow[]) {
+        let hasPhoto = false;
         if (row.photos) {
           let photosData = row.photos;
           if (typeof photosData === "string") {
             try {
               photosData = JSON.parse(photosData);
             } catch {
-              continue;
+              // ignore
             }
           }
 
@@ -171,7 +177,12 @@ export const handler: Handler = {
 
           if (firstPhotoId) {
             reviewFirstPhotoMap.set(row.id, firstPhotoId);
+            hasPhoto = true;
           }
+        }
+        
+        if (!hasPhoto && row.real_restaurant_id) {
+          reviewsNeedingFallback.push({ reviewId: row.id, restaurantId: row.real_restaurant_id });
         }
       }
 
@@ -190,9 +201,40 @@ export const handler: Handler = {
         }
       }
 
+      // Fetch fallback restaurant photos
+      const restaurantPhotoMap = new Map<string, string>();
+      if (reviewsNeedingFallback.length > 0) {
+        const restaurantIds = [...new Set(reviewsNeedingFallback.map((r) => r.restaurantId))];
+        
+        if (restaurantIds.length > 0) {
+          // Use distinctOn to get one photo per restaurant
+          const fallbackPhotos = await db
+            .selectFrom("photos")
+            .select(["restaurant_id", "s3_url", "s3_thumbnail_url"])
+            .where("restaurant_id", "in", restaurantIds)
+            .where("is_safe", "=", true)
+            .distinctOn("restaurant_id")
+            .orderBy("restaurant_id")
+            .orderBy("display_order", "asc")
+            .execute();
+
+          for (const photo of fallbackPhotos) {
+            if (photo.restaurant_id) {
+              restaurantPhotoMap.set(photo.restaurant_id, photo.s3_thumbnail_url || photo.s3_url);
+            }
+          }
+        }
+      }
+
       const reviews = (result.rows as HotReviewRow[]).map((row) => {
         const firstPhotoId = reviewFirstPhotoMap.get(row.id);
-        const firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
+        let firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
+        
+        // Apply fallback if no review photo
+        if (!firstPhotoUrl && row.real_restaurant_id) {
+          firstPhotoUrl = restaurantPhotoMap.get(row.real_restaurant_id);
+        }
+
         const photos = firstPhotoUrl ? [{ url: firstPhotoUrl }] : [];
 
         return {
@@ -201,6 +243,7 @@ export const handler: Handler = {
           author_name: row.author_name,
           author_avatar: row.author_avatar,
           restaurant_id: row.restaurant_id,
+          restaurant_slug: row.restaurant_slug, // Include slug in response
           text: row.text,
           photos,
           upvote_count: row.upvote_count,

@@ -5,7 +5,10 @@
   <h1>MapVibe</h1>
 
   <p>
-    <strong>A Modern, Scalable Monorepo Web Application for AWS</strong>
+    <strong>
+      A Modern, Scalable Monorepo Web Application for AWS<br/>
+      An AI-powered food and drink discovery platform based on user needs and emotions.
+    </strong>
   </p>
 
   <p>

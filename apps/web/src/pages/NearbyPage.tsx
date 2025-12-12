@@ -32,6 +32,12 @@ interface ReviewPhoto {
   caption?: string;
 }
 
+interface CategorizedPhotos {
+  general?: ReviewPhoto[];
+  food?: ReviewPhoto[];
+  menu?: ReviewPhoto[];
+}
+
 interface ReviewFromAPI {
   id: string;
   author_id: string;
@@ -40,7 +46,7 @@ interface ReviewFromAPI {
   location_address_id?: string;
   text: string;
   features?: string[];
-  photos?: ReviewPhoto[];
+  photos?: ReviewPhoto[] | CategorizedPhotos;
   upvote_count: number;
   downvote_count: number;
   comment_count: number;
@@ -183,6 +189,29 @@ const formatOpeningHours = (hours?: Record<string, string> | null): string => {
   return mostCommonRange || hourRanges[0];
 };
 
+// Helper function to extract photos from API response (handles both array and categorized formats)
+const extractPhotosFromReview = (photos?: ReviewPhoto[] | CategorizedPhotos): GalleryItem[] => {
+  if (!photos) return [];
+
+  // If photos is an array
+  if (Array.isArray(photos)) {
+    return photos.map((photo) => ({ url: photo.url, caption: photo.caption }));
+  }
+
+  // If photos is categorized object { general, food, menu }
+  const allPhotos: GalleryItem[] = [];
+  if (photos.general) {
+    allPhotos.push(...photos.general.map((p) => ({ url: p.url, caption: p.caption })));
+  }
+  if (photos.food) {
+    allPhotos.push(...photos.food.map((p) => ({ url: p.url, caption: p.caption })));
+  }
+  if (photos.menu) {
+    allPhotos.push(...photos.menu.map((p) => ({ url: p.url, caption: p.caption })));
+  }
+  return allPhotos;
+};
+
 // Map API review to PostItem
 const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
   // Generate slug from location name or use id
@@ -194,11 +223,6 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "") || review.id
     : review.id;
-
-  // Debug: Log photos data
-  if (review.photos) {
-    console.log(`[Review ${review.id}] photos:`, review.photos);
-  }
 
   return {
     id: review.id,
@@ -220,9 +244,7 @@ const mapReviewToPostItem = (review: ReviewFromAPI): PostItem => {
       downvotes: review.downvote_count,
       shares: review.share_count,
     },
-    images: Array.isArray(review.photos)
-      ? review.photos.map((photo) => ({ url: photo.url, caption: photo.caption }))
-      : [],
+    images: extractPhotosFromReview(review.photos),
     features: review.features || [],
   };
 };

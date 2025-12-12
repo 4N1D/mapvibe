@@ -88,6 +88,7 @@ export default function LocationDetailPage() {
     cuisine_types: [] as CuisineType[],
     price_min: "",
     price_max: "",
+    phone: "",
     opening_hours: "",
     features: [] as string[],
     description: "",
@@ -139,28 +140,172 @@ export default function LocationDetailPage() {
 
     setIsAggregating(true);
     try {
-      const response = await apiClient.post("/reviews/aggregate-pending", {
-        location_address_id: id,
-      });
+      // Use Lambda Function URL directly to bypass API Gateway 30s timeout
+      const AGGREGATE_LAMBDA_URL = "https://bjukpevd6hzhpyzjaca4juknf40xqait.lambda-url.us-east-1.on.aws/";
+      const session = await import("aws-amplify/auth").then(m => m.fetchAuthSession());
+      const token = session.tokens?.idToken?.toString();
+      
+      const response = await fetch(AGGREGATE_LAMBDA_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ location_address_id: id }),
+      }).then(res => res.json().then(data => ({ data })));
 
-      const data: AggregateResult = response.data;
+      console.log("Raw response:", response);
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+      console.log("Response data:", response.data);
+      console.log("Response data type:", typeof response.data);
+      console.log("Response data keys:", response.data ? Object.keys(response.data) : "null");
+
+      // Validate response structure
+      if (!response.data) {
+        throw new Error("Response data is empty");
+      }
+
+      // Handle case where response.data might be a string
+      let data: AggregateResult;
+      try {
+        if (typeof response.data === "string") {
+          console.log("Parsing string response data...");
+          data = JSON.parse(response.data);
+        } else if (response.data && typeof response.data === "object") {
+          console.log("Using object response data directly");
+          data = response.data;
+        } else {
+          throw new Error(`Unexpected response data type: ${typeof response.data}`);
+        }
+
+        // Validate data structure
+        if (!data || typeof data !== "object") {
+          throw new Error("Parsed data is not an object");
+        }
+        
+        if (!data.result || typeof data.result !== "object") {
+          console.warn("⚠️ Missing or invalid 'result' field in response");
+          console.warn("Data structure:", data);
+          throw new Error("Response missing 'result' field");
+        }
+
+        console.log("✅ Parsed data successfully:", data);
+        console.log("Result:", data.result);
+        console.log("Result keys:", Object.keys(data.result));
+
+      } catch (parseError: any) {
+        console.error("❌ Failed to parse response data:", parseError);
+        console.error("Raw response.data:", response.data);
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+
       setAggregateResult(data);
 
       const result = data.result;
-      setFormData({
+      
+      // Debug: log all fields
+      console.log("=== AI Result Fields ===");
+      console.log("name_vi:", result.name_vi);
+      console.log("cuisine_types:", result.cuisine_types);
+      console.log("price_min:", result.price_min, "type:", typeof result.price_min);
+      console.log("price_max:", result.price_max, "type:", typeof result.price_max);
+      console.log("phone:", result.phone);
+      console.log("opening_hours:", result.opening_hours);
+      console.log("features:", result.features);
+      console.log("description:", result.description);
+      console.log("========================");
+
+      const newFormData = {
         name_vi: result.name_vi || formData.name_vi,
         cuisine_types: result.cuisine_types || [],
-        price_min: result.price_min?.toString() || "",
-        price_max: result.price_max?.toString() || "",
+        price_min: result.price_min != null ? String(result.price_min) : "",
+        price_max: result.price_max != null ? String(result.price_max) : "",
+        phone: result.phone || "",
         opening_hours: result.opening_hours || "",
         features: result.features || [],
         description: result.description || "",
-      });
+      };
+      
+      console.log("New form data:", newFormData);
+      setFormData(newFormData);
 
       toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
       setActiveTab("info");
     } catch (error: any) {
-      toast.error("Lỗi tổng hợp: " + (error.response?.data?.error || "Lỗi không xác định"));
+      console.error("AI Aggregate error:", error);
+      console.error("Error response:", error.response);
+      console.error("Error response data:", error.response?.data);
+      console.error("Error response status:", error.response?.status);
+      console.error("Error message:", error.message);
+      
+      let errorMsg = "Lỗi không xác định";
+      if (error.response?.data) {
+        // Handle case where data might be a string
+        const errorData = typeof error.response.data === "string" 
+          ? JSON.parse(error.response.data) 
+          : error.response.data;
+        
+        if (errorData?.error) {
+          errorMsg = errorData.error;
+        } else if (errorData?.message) {
+          errorMsg = errorData.message;
+        } else if (typeof error.response.data === "string") {
+          errorMsg = error.response.data;
+        }
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      // Also check if response was successful but data format is wrong
+      if (error.response?.status === 200 && error.response?.data) {
+        console.warn("⚠️ Got 200 status but error in catch block - checking data format");
+        console.warn("Response data type:", typeof error.response.data);
+        console.warn("Response data:", error.response.data);
+        
+        // Try to parse if it's a string
+        try {
+          const parsedData = typeof error.response.data === "string" 
+            ? JSON.parse(error.response.data) 
+            : error.response.data;
+          
+          if (parsedData && parsedData.result) {
+            console.log("✅ Found valid data in error response, using it");
+            const data: AggregateResult = parsedData;
+            setAggregateResult(data);
+            
+            const result = data.result;
+            const newFormData = {
+              name_vi: result.name_vi || formData.name_vi,
+              cuisine_types: result.cuisine_types || [],
+              price_min: result.price_min != null ? String(result.price_min) : "",
+              price_max: result.price_max != null ? String(result.price_max) : "",
+              phone: result.phone || "",
+              opening_hours: result.opening_hours || "",
+              features: result.features || [],
+              description: result.description || "",
+            };
+            
+            setFormData(newFormData);
+            toast.success(`AI đã tổng hợp từ ${data.reviews_used.length} bài viết!`);
+            setActiveTab("info");
+            return; // Exit early if we successfully parsed the data
+          }
+        } catch (parseError) {
+          console.error("Failed to parse response data:", parseError);
+        }
+      }
+      
+      if (error.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.code === "ECONNABORTED") {
+        errorMsg = "Timeout - AI đang xử lý quá lâu, vui lòng thử lại";
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      toast.error("Lỗi tổng hợp: " + errorMsg);
     } finally {
       setIsAggregating(false);
     }
@@ -898,15 +1043,27 @@ export default function LocationDetailPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Giờ mở cửa</label>
-                  <input
-                    type="text"
-                    value={formData.opening_hours}
-                    onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
-                    placeholder="07:00 - 22:00"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Số điện thoại</label>
+                    <input
+                      type="text"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
+                      placeholder="0901234567"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Giờ mở cửa</label>
+                    <input
+                      type="text"
+                      value={formData.opening_hours}
+                      onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-primary-500"
+                      placeholder="07:00 - 22:00"
+                    />
+                  </div>
                 </div>
 
                 <div>

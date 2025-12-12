@@ -111,28 +111,39 @@ export const handler: Handler = {
 
       const row = result.rows[0] as Record<string, unknown>;
 
-      // Extract photo IDs and fetch URLs
+      // Extract photo IDs and fetch URLs with photo_type
       const photoIds = extractPhotoIds(row.photos);
-      let photos: Array<{ url: string; caption?: string }> = [];
+      let photos: {
+        general: Array<{ url: string; caption?: string }>;
+        food: Array<{ url: string; caption?: string }>;
+        menu: Array<{ url: string; caption?: string }>;
+      } = { general: [], food: [], menu: [] };
 
       if (photoIds.length > 0) {
         const photosFromDb = await db
           .selectFrom("photos")
-          .select(["id", "s3_url", "s3_thumbnail_url", "s3_medium_url"])
+          .select(["id", "s3_url", "s3_thumbnail_url", "s3_medium_url", "photo_type", "menu_name"])
           .where("id", "in", photoIds)
           .execute();
 
-        // Maintain order and map to URLs
-        const photoUrlMap = new Map<string, { url: string }>();
+        // Group photos by type
         for (const photo of photosFromDb) {
-          photoUrlMap.set(photo.id, {
+          const photoData = {
             url: photo.s3_medium_url || photo.s3_url,
-          });
-        }
+            caption: photo.menu_name || undefined,
+          };
 
-        photos = photoIds
-          .map((id) => photoUrlMap.get(id))
-          .filter((p): p is { url: string } => p !== undefined);
+          const photoType = photo.photo_type || "review";
+
+          if (photoType === "food") {
+            photos.food.push(photoData);
+          } else if (photoType === "menu") {
+            photos.menu.push(photoData);
+          } else {
+            // "view", "review", or any other type goes to general
+            photos.general.push(photoData);
+          }
+        }
       }
 
       const review = {

@@ -52,6 +52,7 @@ resource "aws_apigatewayv2_integration" "review_aggregate" {
   integration_uri        = var.aggregate_lambda_invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
+  timeout_milliseconds   = 30000  # Max 30s for HTTP API v2
 }
 
 # ============================================

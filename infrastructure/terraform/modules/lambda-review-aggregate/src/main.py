@@ -10,8 +10,25 @@ from sqlalchemy import create_engine, text
 
 from jwt_utils import require_auth
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# Configure logging for Lambda
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    force=True  # Force reconfiguration
+)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Also use print for critical messages (always visible in CloudWatch)
+def log_print(message: str, level: str = "INFO"):
+    """Print message that will always appear in CloudWatch"""
+    print(f"[{level}] {message}")
+    if level == "ERROR":
+        logger.error(message)
+    elif level == "WARNING":
+        logger.warning(message)
+    else:
+        logger.info(message)
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 DB_SECRET_ARN = os.environ.get("DB_SECRET_ARN")
@@ -76,7 +93,7 @@ def normalize_text(text_input: Optional[str], limit: int = 800) -> str:
 
 
 def check_location_status(location_address_id: str) -> Dict[str, Any]:
-    """Check location_address status and restaurant_id"""
+    """Check location_address status, restaurant_id and existing data (phone, opening_hours, price)"""
     if not engine:
         raise Exception("Database engine not initialized")
 
@@ -84,7 +101,7 @@ def check_location_status(location_address_id: str) -> Dict[str, Any]:
         location = conn.execute(
             text(
                 """
-                SELECT status, restaurant_id
+                SELECT status, restaurant_id, phone, opening_hours, price_min, price_max
                 FROM location_addresses
                 WHERE id = :loc
                 """
@@ -98,23 +115,28 @@ def check_location_status(location_address_id: str) -> Dict[str, Any]:
         return {
             "status": location.status,
             "restaurant_id": location.restaurant_id,
+            "phone": location.phone,
+            "opening_hours": location.opening_hours,
+            "price_min": location.price_min,
+            "price_max": location.price_max,
         }
 
 
 def fetch_pending_reviews_and_comments(location_address_id: str):
-    """Fetch reviews and comments for pending location (from review_posts)"""
+    """Fetch reviews and comments for pending location (from review_posts with published status - vừa đăng chưa qua kiểm duyệt)"""
     if not engine:
         raise Exception("Database engine not initialized")
 
     with engine.connect() as conn:
         # Lấy reviews - bỏ điều kiện upvote_count > 0 để lấy cả reviews chưa có upvote
+        # Reviews vừa đăng lên (chưa qua kiểm duyệt) có status = 'published'
         reviews = conn.execute(
             text(
                 """
                 SELECT id, text, features, upvote_count, created_at
                 FROM review_posts
                 WHERE location_address_id = :loc
-                  AND status = 'pending'
+                  AND status = 'published'
                 ORDER BY upvote_count DESC NULLS LAST, created_at DESC
                 LIMIT 10
                 """
@@ -122,9 +144,10 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
             {"loc": location_address_id},
         ).fetchall()
         
-        logger.info(f"📊 Found {len(reviews)} pending reviews for location {location_address_id}")
+        logger.info(f"📊 Found {len(reviews)} published reviews for location {location_address_id}")
 
         # Lấy comments - bỏ điều kiện like_count > 0 để lấy cả comments chưa có like
+        # Comments vừa đăng lên (chưa qua kiểm duyệt) có status = 'published'
         comments = conn.execute(
             text(
                 """
@@ -132,8 +155,8 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
                 FROM comments c
                 JOIN review_posts rp ON c.review_post_id = rp.id
                 WHERE rp.location_address_id = :loc
-                  AND rp.status = 'pending'
-                  AND c.status = 'pending'
+                  AND rp.status = 'published'
+                  AND c.status = 'published'
                 ORDER BY c.like_count DESC NULLS LAST, c.created_at DESC
                 LIMIT 10
                 """
@@ -141,7 +164,7 @@ def fetch_pending_reviews_and_comments(location_address_id: str):
             {"loc": location_address_id},
         ).fetchall()
         
-        logger.info(f"📊 Found {len(comments)} pending comments for location {location_address_id}")
+        logger.info(f"📊 Found {len(comments)} published comments for location {location_address_id}")
 
     def serialize_review(row):
         return {
@@ -315,7 +338,7 @@ def build_prompt(
         "- Ưu tiên các thông tin được nhắc đến nhiều lần trong reviews/comments."
     )
 
-    status_text = "pending" if source_type == "pending" else "approved"
+    status_text = "published" if source_type == "pending" else "approved"
     user_prompt = f"""Dữ liệu review (top 10 upvote, status {status_text}):
 {reviews_str}
 
@@ -329,10 +352,17 @@ Hãy tổng hợp và trả JSON."""
 
 
 def aggregate(location_address_id: str):
-    # Check location status and restaurant_id
+    log_print(f"📍 Checking location status for: {location_address_id}")
+    # Check location status and restaurant_id + existing data
     location_info = check_location_status(location_address_id)
     status = location_info["status"]
     restaurant_id = location_info["restaurant_id"]
+    existing_phone = location_info.get("phone")
+    existing_opening_hours = location_info.get("opening_hours")
+    existing_price_min = location_info.get("price_min")
+    existing_price_max = location_info.get("price_max")
+    log_print(f"📍 Location status: {status}, restaurant_id: {restaurant_id}")
+    log_print(f"📍 Existing data - phone: {existing_phone}, opening_hours: {existing_opening_hours}, price: {existing_price_min}-{existing_price_max}")
 
     # Determine source type and fetch data accordingly
     if status == "approved" and restaurant_id:
@@ -359,18 +389,33 @@ def aggregate(location_address_id: str):
         logger.warning(f"⚠️ No comments found, but found {len(reviews)} reviews")
 
     messages, system_prompt = build_prompt(reviews, comments, source_type)
-    response = call_bedrock_retry(messages, system_prompt)
-    if not response:
-        raise Exception("Bedrock returned empty response")
-
-    text_blocks = response["output"]["message"]["content"]
-    output_text = ""
-    for block in text_blocks:
-        if "text" in block:
-            output_text += block["text"]
+    log_print(f"🤖 Calling Bedrock with {len(reviews)} reviews and {len(comments)} comments")
+    
+    try:
+        response = call_bedrock_retry(messages, system_prompt)
+        if not response:
+            raise Exception("Bedrock returned empty response")
+        
+        log_print("✅ Bedrock response received")
+        
+        text_blocks = response["output"]["message"]["content"]
+        output_text = ""
+        for block in text_blocks:
+            if "text" in block:
+                output_text += block["text"]
+        
+        log_print(f"📝 Bedrock output length: {len(output_text)} characters")
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        log_print(f"❌ Bedrock error: {e}", "ERROR")
+        log_print(f"Traceback: {error_trace}", "ERROR")
+        raise Exception(f"Failed to call Bedrock: {str(e)}")
 
     try:
         payload = json.loads(output_text)
+        log_print("✅ Successfully parsed JSON from Bedrock output")
         
         # Validate và normalize cuisine_types thành array of objects
         if "cuisine_types" in payload:
@@ -382,9 +427,27 @@ def aggregate(location_address_id: str):
             payload["cuisine_types"] = []
             logger.info("⚠️ cuisine_types not found in payload, setting to empty array")
             
-    except json.JSONDecodeError:
-        logger.warning("LLM output is not valid JSON, wrapping as string")
+    except json.JSONDecodeError as e:
+        logger.warning(f"⚠️ LLM output is not valid JSON: {e}")
+        logger.warning(f"⚠️ Raw output (first 500 chars): {output_text[:500]}")
         payload = {"raw": output_text, "cuisine_types": []}
+
+    # Merge existing location data with AI results (existing data takes priority)
+    # These fields come from location_addresses table, not from AI
+    if existing_phone:
+        payload["phone"] = existing_phone
+    if existing_opening_hours:
+        # opening_hours might be JSON object, convert to string if needed
+        if isinstance(existing_opening_hours, dict):
+            payload["opening_hours"] = json.dumps(existing_opening_hours)
+        else:
+            payload["opening_hours"] = existing_opening_hours
+    if existing_price_min is not None:
+        payload["price_min"] = existing_price_min
+    if existing_price_max is not None:
+        payload["price_max"] = existing_price_max
+    
+    log_print(f"📦 Final payload - phone: {payload.get('phone')}, opening_hours: {payload.get('opening_hours')}, price: {payload.get('price_min')}-{payload.get('price_max')}")
 
     return {
         "location_address_id": location_address_id,
@@ -396,39 +459,114 @@ def aggregate(location_address_id: str):
     }
 
 
+# Note: CORS is handled by Lambda Function URL config in Terraform
+# Only Content-Type header needed here
+RESPONSE_HEADERS = {
+    "Content-Type": "application/json",
+}
+
+
 def lambda_handler(event, context):
+    # Log immediately - before any try-catch
+    log_print("=" * 50)
+    log_print("🚀 Lambda function started")
+    log_print(f"📥 Event received: {type(event)}")
+    
+    # Handle CORS preflight request
+    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method", "")
+    if http_method == "OPTIONS":
+        log_print("✅ CORS preflight request - returning 200")
+        return {
+            "statusCode": 200,
+            "headers": RESPONSE_HEADERS,
+            "body": "",
+        }
+    
     try:
+        # Log event details (safe version)
+        event_summary = {
+            "httpMethod": event.get("httpMethod"),
+            "path": event.get("path"),
+            "pathParameters": event.get("pathParameters"),
+            "queryStringParameters": event.get("queryStringParameters"),
+            "headers": {k: v for k, v in (event.get("headers") or {}).items() if k.lower() != "authorization"},
+            "body": event.get("body")[:200] + "..." if event.get("body") and len(event.get("body", "")) > 200 else event.get("body"),
+        }
+        log_print(f"📋 Event summary: {json.dumps(event_summary, default=str)}")
+        
         # JWT Authentication check
+        log_print("🔐 Checking authentication...")
         is_authenticated, user_id, error_response = require_auth(event)
         if not is_authenticated:
+            log_print("❌ Authentication failed", "ERROR")
             return error_response
         
-        logger.info(f"✅ Authenticated user: {user_id}")
+        log_print(f"✅ Authenticated user: {user_id}")
         
-        if event.get("body"):
-            body = json.loads(event["body"])
-        else:
-            body = {}
+        # Parse body
+        log_print("📝 Parsing request body...")
+        try:
+            if event.get("body"):
+                body = json.loads(event["body"])
+            else:
+                body = {}
+            log_print(f"📋 Request body: {json.dumps(body, default=str)}")
+        except json.JSONDecodeError as e:
+            log_print(f"❌ Failed to parse request body: {e}", "ERROR")
+            return {
+                "statusCode": 400,
+                "headers": RESPONSE_HEADERS,
+                "body": json.dumps({"error": "Invalid JSON in request body"}),
+            }
+        
         location_address_id = body.get("location_address_id") or (event.get("queryStringParameters") or {}).get(
             "location_address_id"
         )
         if not location_address_id:
+            log_print("❌ Missing location_address_id", "ERROR")
             return {
                 "statusCode": 400,
-                "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+                "headers": RESPONSE_HEADERS,
                 "body": json.dumps({"error": "location_address_id is required"}),
             }
 
+        log_print(f"🔄 Starting aggregation for location: {location_address_id}")
         result = aggregate(location_address_id)
-        return {
+        log_print(f"✅ Aggregation completed successfully")
+        
+        # Log result before returning
+        result_json = json.dumps(result)
+        log_print(f"📤 Returning result (length: {len(result_json)} chars)")
+        log_print(f"📤 Result preview: {result_json[:200]}...")
+        
+        response = {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps(result),
+            "headers": RESPONSE_HEADERS,
+            "body": result_json,
         }
-    except Exception as e:
-        logger.error(f"Error: {e}")
+        
+        log_print(f"📤 Response statusCode: {response['statusCode']}")
+        return response
+    except ValueError as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        log_print(f"❌ ValueError: {e}", "ERROR")
+        log_print(f"Traceback: {error_trace}", "ERROR")
         return {
-            "statusCode": 500,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "statusCode": 400,
+            "headers": RESPONSE_HEADERS,
             "body": json.dumps({"error": str(e)}),
         }
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        log_print(f"❌ Unexpected error: {e}", "ERROR")
+        log_print(f"Traceback: {error_trace}", "ERROR")
+        return {
+            "statusCode": 500,
+            "headers": RESPONSE_HEADERS,
+            "body": json.dumps({"error": str(e), "message": "An unexpected error occurred"}),
+        }
+    finally:
+        log_print("🏁 Lambda function finished")
+        log_print("=" * 50)

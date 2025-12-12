@@ -103,21 +103,41 @@ def get_user_id_from_event(event: Dict[str, Any]) -> Optional[str]:
     request_context = event.get("requestContext", {})
     authorizer = request_context.get("authorizer", {})
     
-    # API Gateway JWT authorizer
+    logger.info(f"🔐 Authorizer context: {authorizer}")
+    
+    # API Gateway JWT authorizer - check jwt.claims first
     jwt_claims = authorizer.get("jwt", {}).get("claims", {})
     if jwt_claims and jwt_claims.get("sub"):
+        logger.info(f"✅ Found user via jwt.claims: {jwt_claims.get('sub')}")
         return jwt_claims["sub"]
+    
+    # Fallback: check authorizer.claims directly (some API Gateway configs)
+    direct_claims = authorizer.get("claims", {})
+    if direct_claims and direct_claims.get("sub"):
+        logger.info(f"✅ Found user via claims: {direct_claims.get('sub')}")
+        return direct_claims["sub"]
     
     # Direct invocation: verify JWT from headers
     headers = event.get("headers", {}) or {}
     token = extract_token_from_header(headers)
     
     if token:
+        logger.info("🔑 Found token in Authorization header, verifying...")
         decoded = verify_jwt_token(token)
         if decoded:
+            logger.info(f"✅ JWT verified, user: {decoded.get('sub')}")
             return decoded.get("sub")
+        logger.warning("⚠️ JWT verification failed")
+    else:
+        logger.warning("⚠️ No Authorization header found")
     
     return None
+
+
+# Note: CORS is handled by Lambda Function URL config in Terraform
+RESPONSE_HEADERS = {
+    "Content-Type": "application/json",
+}
 
 
 def require_auth(event: Dict[str, Any]) -> tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
@@ -132,10 +152,7 @@ def require_auth(event: Dict[str, Any]) -> tuple[bool, Optional[str], Optional[D
     if not user_id:
         error_response = {
             "statusCode": 401,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
+            "headers": RESPONSE_HEADERS,
             "body": json.dumps({
                 "error": "Unauthorized",
                 "message": "JWT token required. Please include Authorization header with Bearer token."

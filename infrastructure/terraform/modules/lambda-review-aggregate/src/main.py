@@ -290,6 +290,55 @@ def normalize_cuisine_types(cuisine_types: Any) -> List[Dict[str, str]]:
     return normalized
 
 
+def normalize_opening_hours(opening_hours: Any) -> Optional[str]:
+    """
+    Normalize opening_hours thành string format 'HH:MM - HH:MM' hoặc null.
+    
+    Nếu là dict với các ngày trong tuần, extract giá trị chung hoặc giá trị đầu tiên.
+    Nếu là string rồi thì giữ nguyên.
+    """
+    if opening_hours is None:
+        return None
+    
+    # Nếu đã là string, kiểm tra format và trả về
+    if isinstance(opening_hours, str):
+        # Nếu là JSON string, thử parse
+        if opening_hours.strip().startswith('{'):
+            try:
+                parsed = json.loads(opening_hours)
+                if isinstance(parsed, dict):
+                    opening_hours = parsed
+                else:
+                    # Nếu parse được nhưng không phải dict, trả về string gốc
+                    return opening_hours.strip() if opening_hours.strip() else None
+            except:
+                # Không parse được, trả về string gốc
+                return opening_hours.strip() if opening_hours.strip() else None
+        else:
+            # String thông thường, trả về
+            return opening_hours.strip() if opening_hours.strip() else None
+    
+    # Nếu là dict (object với các ngày trong tuần)
+    if isinstance(opening_hours, dict):
+        # Lấy tất cả các giá trị
+        values = [v for v in opening_hours.values() if v and isinstance(v, str) and v.strip()]
+        
+        if not values:
+            return None
+        
+        # Nếu tất cả giá trị giống nhau, trả về giá trị đó
+        unique_values = set(values)
+        if len(unique_values) == 1:
+            return values[0].strip()
+        
+        # Nếu có nhiều giá trị khác nhau, lấy giá trị đầu tiên (hoặc có thể chọn giá trị phổ biến nhất)
+        # Ở đây chọn giá trị đầu tiên để đơn giản
+        return values[0].strip()
+    
+    # Các trường hợp khác, convert thành string
+    return str(opening_hours).strip() if opening_hours else None
+
+
 def build_prompt(
     reviews: List[Dict[str, Any]], comments: List[Dict[str, Any]], source_type: str
 ) -> List[Dict[str, Any]]:
@@ -314,7 +363,10 @@ def build_prompt(
         "business_type, cuisine_types, price_min, price_max, opening_hours, "
         "description, features. "
         "Nếu thiếu thông tin, trả về null cho field đó (features và cuisine_types: mảng, có thể rỗng). "
-        "price_min/price_max là integer. opening_hours phải ở format 'HH:MM - HH:MM' hoặc null. "
+        "price_min/price_max là integer. "
+        "opening_hours PHẢI là string đơn giản format 'HH:MM - HH:MM' (VD: '07:00 - 21:00') hoặc null. "
+        "TUYỆT ĐỐI KHÔNG trả về object/dict với các ngày trong tuần (VD: {\"monday\": \"07:00 - 21:00\", ...}). "
+        "Nếu giờ mở cửa giống nhau tất cả các ngày, chỉ cần trả về một string duy nhất. "
         "Không tự bịa địa chỉ hay toạ độ nếu không có căn cứ. "
         "Với features: nếu review không có sẵn features, hãy suy luận từ nội dung text của reviews và comments.\n\n"
         "QUAN TRỌNG về cuisine_types (mảng JSON array của objects):\n"
@@ -426,22 +478,34 @@ def aggregate(location_address_id: str):
         else:
             payload["cuisine_types"] = []
             logger.info("⚠️ cuisine_types not found in payload, setting to empty array")
+        
+        # Normalize opening_hours thành string format 'HH:MM - HH:MM' hoặc null
+        if "opening_hours" in payload:
+            original_opening_hours = payload["opening_hours"]
+            payload["opening_hours"] = normalize_opening_hours(payload["opening_hours"])
+            if original_opening_hours != payload["opening_hours"]:
+                logger.info(f"✅ Normalized opening_hours: {original_opening_hours} -> {payload['opening_hours']}")
+            else:
+                logger.info(f"✅ opening_hours already in correct format: {payload['opening_hours']}")
+        else:
+            payload["opening_hours"] = None
+            logger.info("⚠️ opening_hours not found in payload, setting to null")
             
     except json.JSONDecodeError as e:
         logger.warning(f"⚠️ LLM output is not valid JSON: {e}")
         logger.warning(f"⚠️ Raw output (first 500 chars): {output_text[:500]}")
-        payload = {"raw": output_text, "cuisine_types": []}
+        payload = {"raw": output_text, "cuisine_types": [], "opening_hours": None}
 
     # Merge existing location data with AI results (existing data takes priority)
     # These fields come from location_addresses table, not from AI
     if existing_phone:
         payload["phone"] = existing_phone
     if existing_opening_hours:
-        # opening_hours might be JSON object, convert to string if needed
-        if isinstance(existing_opening_hours, dict):
-            payload["opening_hours"] = json.dumps(existing_opening_hours)
-        else:
-            payload["opening_hours"] = existing_opening_hours
+        # Normalize existing_opening_hours to string format
+        normalized_existing = normalize_opening_hours(existing_opening_hours)
+        if normalized_existing:
+            payload["opening_hours"] = normalized_existing
+            logger.info(f"✅ Using existing opening_hours (normalized): {normalized_existing}")
     if existing_price_min is not None:
         payload["price_min"] = existing_price_min
     if existing_price_max is not None:

@@ -695,6 +695,7 @@ interface UpdateLocationBody {
   cuisine_types?: CuisineType[];
   price_min?: number | null;
   price_max?: number | null;
+  phone?: string;
   opening_hours?: string;
   features?: string[];
   description?: string;
@@ -773,7 +774,7 @@ export const updateLocationHandler: Handler = {
       }
 
       // For approve action - create restaurant and link reviews
-      const { name_vi, cuisine_types, price_min, price_max, opening_hours, features, description } =
+      const { name_vi, cuisine_types, price_min, price_max, phone, opening_hours, features, description } =
         body;
 
       if (!name_vi?.trim()) {
@@ -804,8 +805,9 @@ export const updateLocationHandler: Handler = {
           cuisine_types: cuisine_types ? JSON.stringify(cuisine_types) : null,
           price_min: price_min || null,
           price_max: price_max || null,
+          phone: phone || null,
           opening_hours: opening_hours || null,
-          features: features || null,
+          features: features ? JSON.stringify(features) : null,
           description: description || null,
           status: "approved",
           created_by: userId,

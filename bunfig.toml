@@ -13,4 +13,3 @@ disable = false
 [install.lockfile]
 # Lockfile
 save = true
-print = "yarn"

@@ -34,21 +34,21 @@
   <img src="public/images/mapvibe.png" alt="MapVibe Application Screenshot" />
 </div>
 
-## 📋 Overview
+## Overview
 
 **MapVibe** is a high-performance web application engineered for scalability and developer experience. Built as a monorepo using **TurboRepo** and **Bun**, it seamlessly integrates a modern React frontend with a robust serverless backend on AWS.
 
 Whether you're looking for a solid foundation for your next SaaS or exploring modern full-stack patterns, MapVibe provides a production-ready architecture with type safety, shared UI components, and infrastructure-as-code.
 
-## ✨ Features
+## Features
 
-- **🚀 High Performance:** Powered by [Bun](https://bun.sh) and [Vite](https://vitejs.dev) for lightning-fast builds and HMR.
-- **🏗️ Monorepo Architecture:** Efficiently managed with [TurboRepo](https://turbo.build), sharing code between apps and packages.
-- **☁️ AWS Native:** Serverless infrastructure designed for AWS (Lambda, API Gateway, RDS).
-- **🛡️ End-to-End Type Safety:** Written in TypeScript with shared type definitions across frontend and backend.
-- **🎨 Modern UI:** Built with React 19, TailwindCSS, and a custom shared component library.
-- **🗄️ Type-Safe Database:** PostgreSQL interaction using [Kysely](https://kysely.dev) for type-safe SQL queries.
-- **🤖 Developer Experience:** Pre-configured ESLint, Prettier, and Husky for consistent code quality.
+- **High Performance:** Powered by [Bun](https://bun.sh) and [Vite](https://vitejs.dev) for lightning-fast builds and HMR.
+- **Monorepo Architecture:** Efficiently managed with [TurboRepo](https://turbo.build), sharing code between apps and packages.
+- **AWS Native:** Serverless infrastructure designed for AWS (Lambda, API Gateway, RDS).
+- **End-to-End Type Safety:** Written in TypeScript with shared type definitions across frontend and backend.
+- **Modern UI:** Built with React 19, TailwindCSS, and a custom shared component library.
+- **Type-Safe Database:** PostgreSQL interaction using [Kysely](https://kysely.dev) for type-safe SQL queries.
+- **Developer Experience:** Pre-configured ESLint, Prettier, and Husky for consistent code quality.
 
 ## 🛠️ Tech Stack
 

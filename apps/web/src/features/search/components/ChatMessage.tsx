@@ -1,4 +1,4 @@
-import { Bot, User } from "lucide-react";
+import { User } from "lucide-react";
 import { Card, CardContent } from "@mapvibe/ui-components";
 import { Link } from "react-router-dom";
 
@@ -36,7 +36,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
           isUser ? "bg-primary-500" : "bg-gray-800"
         }`}
       >
-        {isUser ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
+        {isUser ? (
+          <User className="h-4 w-4 text-white" />
+        ) : (
+          <img
+            src="/favicon/favicon-96x96.png"
+            alt="Bot"
+            className="h-full w-full rounded-full object-cover"
+          />
+        )}
       </div>
 
       {/* Content */}

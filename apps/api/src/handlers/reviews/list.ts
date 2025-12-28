@@ -90,10 +90,12 @@ export const handler: Handler = {
             la.restaurant_id as location_restaurant_id,
             la.review_count as location_review_count,
             la.avg_upvote_rate as location_avg_upvote_rate,
-            la.status as location_status
+            la.status as location_status,
+            r.slug as restaurant_slug
           FROM review_posts rp
           LEFT JOIN users u ON u.id = rp.author_id
           LEFT JOIN location_addresses la ON la.id = rp.location_address_id
+          LEFT JOIN restaurants r ON r.id = COALESCE(rp.restaurant_id, la.restaurant_id)
           WHERE rp.restaurant_id = ${restaurantId}
             AND (la.status IS NULL OR la.status != 'rejected')
             AND (rp.status IS NULL OR rp.status != 'hidden')
@@ -133,10 +135,12 @@ export const handler: Handler = {
             la.restaurant_id as location_restaurant_id,
             la.review_count as location_review_count,
             la.avg_upvote_rate as location_avg_upvote_rate,
-            la.status as location_status
+            la.status as location_status,
+            r.slug as restaurant_slug
           FROM review_posts rp
           LEFT JOIN users u ON u.id = rp.author_id
           LEFT JOIN location_addresses la ON la.id = rp.location_address_id
+          LEFT JOIN restaurants r ON r.id = COALESCE(rp.restaurant_id, la.restaurant_id)
           WHERE (la.status IS NULL OR la.status != 'rejected')
             AND (rp.status IS NULL OR rp.status != 'hidden')
           ORDER BY rp.created_at DESC

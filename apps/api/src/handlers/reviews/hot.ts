@@ -41,6 +41,7 @@ export const handler: Handler = {
           u.display_name AS author_name,
           u.avatar AS author_avatar,
           rp.restaurant_id,
+          rp.location_address_id,
           rp.text,
           rp.photos,
           rp.upvote_count,
@@ -62,11 +63,13 @@ export const handler: Handler = {
           COALESCE(la.full_address, r.address) AS restaurant_address,
           COALESCE(la.price_min, r.price_min) AS price_min,
           COALESCE(la.price_max, r.price_max) AS price_max,
-          COALESCE(la.opening_hours::text, r.opening_hours::text) AS opening_hours
+          COALESCE(la.opening_hours::text, r.opening_hours::text) AS opening_hours,
+          r.slug AS restaurant_slug,
+          COALESCE(rp.restaurant_id, la.restaurant_id) AS real_restaurant_id
         FROM review_posts rp
         LEFT JOIN users u ON rp.author_id = u.id
         LEFT JOIN location_addresses la ON rp.location_address_id = la.id
-        LEFT JOIN restaurants r ON rp.restaurant_id = r.id
+        LEFT JOIN restaurants r ON r.id = COALESCE(rp.restaurant_id, la.restaurant_id)
       `;
 
       const whereClause = restaurantId
@@ -101,6 +104,7 @@ export const handler: Handler = {
         author_name: string;
         author_avatar: string | null;
         restaurant_id: string;
+        location_address_id: string | null;
         text: string;
         photos: unknown;
         upvote_count: number;
@@ -116,6 +120,8 @@ export const handler: Handler = {
         price_min: number | null;
         price_max: number | null;
         opening_hours: string | null;
+        restaurant_slug: string | null;
+        real_restaurant_id: string | null;
       }
 
       const userId = getUserIdFromEvent(event);
@@ -143,7 +149,7 @@ export const handler: Handler = {
             try {
               photosData = JSON.parse(photosData);
             } catch {
-              continue;
+              // ignore
             }
           }
 
@@ -190,9 +196,90 @@ export const handler: Handler = {
         }
       }
 
+      // Determine which reviews need fallback (no photo ID or photo ID not found in DB)
+      const reviewsNeedingFallback: { reviewId: string; locationAddressId: string | null; restaurantId: string | null }[] = [];
+      for (const row of result.rows as HotReviewRow[]) {
+        const photoId = reviewFirstPhotoMap.get(row.id);
+        const hasValidPhoto = photoId && photoUrlMap.has(photoId);
+        
+        if (!hasValidPhoto && (row.location_address_id || row.real_restaurant_id)) {
+          reviewsNeedingFallback.push({ 
+            reviewId: row.id, 
+            locationAddressId: row.location_address_id,
+            restaurantId: row.real_restaurant_id 
+          });
+        }
+      }
+
+      // Fetch fallback photos by location_address_id and restaurant_id
+      const locationAddressPhotoMap = new Map<string, string>();
+      const restaurantPhotoMap = new Map<string, string>();
+      
+      if (reviewsNeedingFallback.length > 0) {
+        // First, try to get photos by location_address_id
+        const locationAddressIds = [...new Set(
+          reviewsNeedingFallback
+            .map((r) => r.locationAddressId)
+            .filter((id): id is string => id !== null)
+        )];
+        
+        if (locationAddressIds.length > 0) {
+          const locationPhotos = await db
+            .selectFrom("photos")
+            .select(["location_address_id", "s3_url", "s3_thumbnail_url"])
+            .where("location_address_id", "in", locationAddressIds)
+            .where("is_safe", "=", true)
+            .distinctOn("location_address_id")
+            .orderBy("location_address_id")
+            .orderBy("display_order", "asc")
+            .execute();
+
+          for (const photo of locationPhotos) {
+            if (photo.location_address_id) {
+              locationAddressPhotoMap.set(photo.location_address_id, photo.s3_thumbnail_url || photo.s3_url);
+            }
+          }
+        }
+
+        // Then, get photos by restaurant_id for reviews that still need fallback
+        const restaurantIds = [...new Set(
+          reviewsNeedingFallback
+            .filter((r) => !r.locationAddressId || !locationAddressPhotoMap.has(r.locationAddressId))
+            .map((r) => r.restaurantId)
+            .filter((id): id is string => id !== null)
+        )];
+        
+        if (restaurantIds.length > 0) {
+          const fallbackPhotos = await db
+            .selectFrom("photos")
+            .select(["restaurant_id", "s3_url", "s3_thumbnail_url"])
+            .where("restaurant_id", "in", restaurantIds)
+            .where("is_safe", "=", true)
+            .distinctOn("restaurant_id")
+            .orderBy("restaurant_id")
+            .orderBy("display_order", "asc")
+            .execute();
+
+          for (const photo of fallbackPhotos) {
+            if (photo.restaurant_id) {
+              restaurantPhotoMap.set(photo.restaurant_id, photo.s3_thumbnail_url || photo.s3_url);
+            }
+          }
+        }
+      }
+
       const reviews = (result.rows as HotReviewRow[]).map((row) => {
         const firstPhotoId = reviewFirstPhotoMap.get(row.id);
-        const firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
+        let firstPhotoUrl = firstPhotoId ? photoUrlMap.get(firstPhotoId) : null;
+        
+        // Apply fallback: first try location_address photos, then restaurant photos
+        if (!firstPhotoUrl && row.location_address_id) {
+          firstPhotoUrl = locationAddressPhotoMap.get(row.location_address_id);
+        }
+        if (!firstPhotoUrl && row.real_restaurant_id) {
+          firstPhotoUrl = restaurantPhotoMap.get(row.real_restaurant_id);
+        }
+
         const photos = firstPhotoUrl ? [{ url: firstPhotoUrl }] : [];
 
         return {
@@ -201,6 +288,7 @@ export const handler: Handler = {
           author_name: row.author_name,
           author_avatar: row.author_avatar,
           restaurant_id: row.restaurant_id,
+          restaurant_slug: row.restaurant_slug, // Include slug in response
           text: row.text,
           photos,
           upvote_count: row.upvote_count,

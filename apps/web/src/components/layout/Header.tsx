@@ -255,7 +255,6 @@ export function Header() {
                       <Settings className="h-4 w-4" />
                       Cài đặt tài khoản
                     </Link>
-
                     <Button
                       variant="ghost"
                       size="sm"

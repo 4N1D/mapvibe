@@ -6,26 +6,37 @@
 
   <p>
     <strong>
-      A Modern, Scalable Monorepo Web Application for AWS<br/>
-      An AI-powered food and drink discovery platform based on user needs and emotions.
+      AI-powered food and drink discovery platform<br/>
+      Find your perfect spot based on mood, preferences, and real reviews.
     </strong>
   </p>
 
   <p>
     <a href="#features">Features</a> •
+    <a href="#demo">Demo</a> •
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#getting-started">Getting Started</a> •
-    <a href="#architecture">Architecture</a> •
     <a href="#deployment">Deployment</a>
   </p>
 
-  <!-- Badges - Replace with actual URLs when available -->
+  <!-- Badges -->
   <img src="https://img.shields.io/badge/status-active-success.svg" alt="Status" />
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
   <img src="https://img.shields.io/badge/bun-1.3.2-black?logo=bun" alt="Bun" />
   <img src="https://img.shields.io/badge/typescript-5.0-blue?logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/turborepo-2.0-red?logo=turborepo" alt="Turborepo" />
 
+</div>
+
+<br />
+
+## Demo
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=lZndONjFrc4">
+    <img src="https://img.youtube.com/vi/lZndONjFrc4/maxresdefault.jpg" alt="MapVibe Demo Video" width="720" />
+  </a>
+  <p><em>Click to watch the demo video</em></p>
 </div>
 
 <br />
@@ -50,7 +61,7 @@ Whether you're looking for a solid foundation for your next SaaS or exploring mo
 - **Type-Safe Database:** PostgreSQL interaction using [Kysely](https://kysely.dev) for type-safe SQL queries.
 - **Developer Experience:** Pre-configured ESLint, Prettier, and Husky for consistent code quality.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Category | Technology | Description |
 | :--- | :--- | :--- |
@@ -64,7 +75,7 @@ Whether you're looking for a solid foundation for your next SaaS or exploring mo
 | **Icons** | [Lucide React](https://lucide.dev) | Beautiful & consistent icons |
 | **Infrastructure** | Terraform / CDK | Infrastructure as Code (IaC) |
 
-## 📂 Project Structure
+## Project Structure
 
 ```bash
 mapvibe/
@@ -75,13 +86,13 @@ mapvibe/
 ├── packages/
 │   ├── ui-components/   # Shared React UI component library
 │   ├── types/           # Shared TypeScript definitions (DTOs, DB models)
-│   ├── utils/           # (Optional) Shared utility functions
-│   └── eslint-config/   # (Optional) Shared linting configuration
+│   ├── utils/           # Shared utility functions
+│   └── eslint-config/   # Shared linting configuration
 ├── infrastructure/      # Infrastructure as Code (AWS resource definitions)
 └── ...
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these steps to set up your local development environment.
 
@@ -108,11 +119,11 @@ Follow these steps to set up your local development environment.
 
 3.  **Environment Setup:**
 
-    ⚠️ **Important:** You must create `.env` files for the root, `apps/web`, `apps/admin`, and `apps/api` directories.
+    You must create `.env` files for the root, `apps/web`, `apps/admin`, and `apps/api` directories.
 
     *Example `.env` content is often found in `.env.example` files within each directory.*
 
-    > **Note:** For access to the correct environment variables, please contact the maintainer (see [Contact](#-contact)).
+    > **Note:** For access to the correct environment variables, please contact the maintainer (see [Contact](#contact)).
 
 ### Development
 
@@ -126,34 +137,26 @@ This command uses TurboRepo to launch all apps in parallel.
 
 ### Other Commands
 
-- **Build all packages/apps:** `bun run build`
-- **Lint code:** `bun run lint`
-- **Run tests:** `bun run test`
-- **Type check:** `bun run type-check`
-- **Clean artifacts:** `bun run clean`
+| Command | Description |
+| :--- | :--- |
+| `bun run build` | Build all packages/apps |
+| `bun run lint` | Lint code |
+| `bun run test` | Run tests |
+| `bun run type-check` | Type check |
+| `bun run clean` | Clean artifacts |
 
-## ☁️ Deployment
+## Deployment
 
 MapVibe includes scripts for deploying to AWS. Ensure you have the necessary AWS permissions.
 
-- **Deploy Infrastructure:**
-  ```bash
-  bun run deploy:infra
-  ```
-- **Deploy Web App:**
-  ```bash
-  bun run deploy:web
-  ```
-- **Deploy API:**
-  ```bash
-  bun run deploy:api
-  ```
-- **Run Database Migrations:**
-  ```bash
-  bun run deploy:migrate
-  ```
+| Command | Description |
+| :--- | :--- |
+| `bun run deploy:infra` | Deploy Infrastructure |
+| `bun run deploy:web` | Deploy Web App |
+| `bun run deploy:api` | Deploy API |
+| `bun run deploy:migrate` | Run Database Migrations |
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -163,11 +166,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4.  Push to the branch (`git push origin feature/AmazingFeature`)
 5.  Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👤 Contact
+## Contact
 
 For environment variables or inquiries, please reach out:
 

@@ -33,10 +33,10 @@
 ## Demo
 
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=lZndONjFrc4">
-    <img src="https://img.youtube.com/vi/lZndONjFrc4/maxresdefault.jpg" alt="MapVibe Demo Video" width="720" />
-  </a>
-  <p><em>Click to watch the demo video</em></p>
+  <video src="public/videos/mapvibe_demo.mp4" controls width="720">
+    Your browser does not support the video
+  </video>
+  <p><em>Demo video</em></p>
 </div>
 
 <br />
@@ -50,6 +50,16 @@
 **MapVibe** is a high-performance web application engineered for scalability and developer experience. Built as a monorepo using **TurboRepo** and **Bun**, it seamlessly integrates a modern React frontend with a robust serverless backend on AWS.
 
 Whether you're looking for a solid foundation for your next SaaS or exploring modern full-stack patterns, MapVibe provides a production-ready architecture with type safety, shared UI components, and infrastructure-as-code.
+
+## Architecture
+
+<div align="center">
+  <img src="public/images/Architechture.png" alt="MapVibe Architecture Diagram" width="900" />
+</div>
+
+## SRS
+
+- [Software Requirements Specification (SRS)](docs/[4N1D]-MapVibe-Proposal.docx)
 
 ## Features
 

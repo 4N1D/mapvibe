@@ -33,10 +33,10 @@
 ## Demo
 
 <div align="center">
-  <video src="public/videos/mapvibe_demo.mp4" controls width="720">
-    <a href="public/videos/mapvibe_demo.mp4">Watch the demo video</a>
-  </video>
-  <p><em>Demo video</em></p>
+  <a href="https://youtu.be/HS46cUHzcSQ">
+    <img src="https://img.youtube.com/vi/HS46cUHzcSQ/maxresdefault.jpg" alt="MapVibe Demo Video" width="720" />
+  </a>
+  <p><em>Click to watch the demo video</em></p>
 </div>
 
 <br />

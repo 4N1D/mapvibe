@@ -34,7 +34,7 @@
 
 <div align="center">
   <video src="public/videos/mapvibe_demo.mp4" controls width="720">
-    Your browser does not support the video
+    <a href="public/videos/mapvibe_demo.mp4">Watch the demo video</a>
   </video>
   <p><em>Demo video</em></p>
 </div>
